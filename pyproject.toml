@@ -1,0 +1,52 @@
+[build-system]
+requires = ["setuptools>=61.0.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "whatsplay"
+version = "0.1.0"
+description = "A modern Python library for automating WhatsApp Web using Playwright"
+readme = "README.md"
+requires-python = ">=3.8"
+license = {text = "MIT"}
+authors = [
+    {name = "Marcos Bustos", email = "markbustos1912@gmail.com"}
+]
+keywords = ["whatsapp", "automation", "playwright", "bot"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+    "Topic :: Communications :: Chat",
+]
+dependencies = [
+    "playwright>=1.35.0",
+    "opencv-python>=4.8.0",
+    "numpy>=1.24.0"
+]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["whatsplay*"]
+
+[project.urls]
+Homepage = "https://github.com/markbus-ai/whatsplay"
+Documentation = "https://github.com/markbus-ai/whatsplay#readme"
+Issues = "https://github.com/markbus-ai/whatsplay/issues"
+
+[tool.hatch.build.targets.wheel]
+packages = ["whatsplay"]
+
+[tool.hatch.envs.default]
+dependencies = [
+    "pytest>=7.0.0",
+    "pytest-asyncio>=0.21.0",
+    "black>=23.0.0",
+    "mypy>=1.0.0",
+]
