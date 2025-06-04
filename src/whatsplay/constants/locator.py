@@ -57,3 +57,5 @@ CHAT_MESSAGE = ".//div[@data-pre-plain-text]"
 CHAT_MESSAGE_QUOTE = ".//div[@aria-label='Quoted message']"
 CHAT_MESSAGE_IMAGE = ".//div[@aria-label='Open picture']"
 CHAT_MESSAGE_IMAGE_ELEMENT = ".//img[starts-with(@src, 'blob:https://web.whatsapp.com')]"
+# Locator para identificar cualquier botón de descarga de archivos
+ANY_DOWNLOAD_ICON = "//span[@data-icon='audio-download']"
