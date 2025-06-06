@@ -1,18 +1,17 @@
 import asyncio
 import time
-import cv2
-import numpy as np
 from typing import Optional, Dict, List, Any, Union
 from pathlib import Path
 
-from playwright.async_api import async_playwright, TimeoutError as PlaywrightTimeoutError, Error as PlaywrightError
+from playwright.async_api import TimeoutError as PlaywrightTimeoutError, Error as PlaywrightError
 
 from .base_client import BaseWhatsAppClient
 from .wa_elements import WhatsAppElements
-from .utils import show_qr_window, close_all_windows
+from .utils import show_qr_window, copy_file_to_clipboard
 from .constants.states import State
 from .constants import locator as loc
-from .object.message import Message, FileMessage  # Asegúrate de que el archivo se llame models.py
+from .object.message import Message, FileMessage
+import datetime
 
 class Client(BaseWhatsAppClient):
     """
@@ -36,9 +35,8 @@ class Client(BaseWhatsAppClient):
         """Check if client is running"""
         return getattr(self, '_is_running', False)
 
-    async def stop(self):
+    async def stop(self) -> None:
         self._is_running = False
-        close_all_windows()
         try:
             if hasattr(self, '_browser') and self._browser:
                 await self._browser.close()
@@ -62,9 +60,12 @@ class Client(BaseWhatsAppClient):
     async def _main_loop(self) -> None:
         """Implementación del ciclo principal con Playwright"""
         await self.emit("on_start")
-        
+        await self._page.screenshot(path="init_main.png", full_page=True)
+        asyncio.create_task(self._auto_screenshot_loop(interval=30))
+
         qr_binary = None
         state = None
+        last_qr_shown = None  # Guarda la última imagen QR mostrada
 
         while self.running:
             curr_state = await self._get_state()
@@ -77,12 +78,17 @@ class Client(BaseWhatsAppClient):
             if curr_state != state:
                 if curr_state == State.AUTH:
                     await self.emit("on_auth")
-                
+
                 elif curr_state == State.QR_AUTH:
                     try:
                         qr_code_canvas = await self._page.wait_for_selector(loc.QR_CODE, timeout=5000)
                         qr_binary = await self._extract_image_from_canvas(qr_code_canvas)
-                        show_qr_window(qr_binary)
+
+                        # Mostrar solo si la imagen QR es distinta a la última mostrada
+                        if qr_binary != last_qr_shown:
+                            show_qr_window(qr_binary)
+                            last_qr_shown = qr_binary
+
                         await self.emit("on_qr", qr_binary)
                     except PlaywrightTimeoutError:
                         pass
@@ -94,7 +100,15 @@ class Client(BaseWhatsAppClient):
                 elif curr_state == State.LOGGED_IN:
                     await self.emit("on_logged_in")
 
-                state = curr_state
+                    # Buscar y hacer clic en botón "Continue" si aparece
+                    try:
+                        continue_button = await self._page.query_selector("button:has(div:has-text('Continue'))")
+                        if continue_button:
+                            await continue_button.click()
+                            await asyncio.sleep(1)  # Esperar a que se actualice la interfaz
+                    except Exception as e:
+                        await self.emit("on_error", f"⚠️ Error al hacer clic en 'Continue': {e}")
+
 
             else:
                 if curr_state == State.QR_AUTH:
@@ -102,47 +116,57 @@ class Client(BaseWhatsAppClient):
                         qr_code_canvas = await self._page.query_selector(loc.QR_CODE)
                         if qr_code_canvas:
                             curr_qr_binary = await self._extract_image_from_canvas(qr_code_canvas)
-                            if curr_qr_binary != qr_binary:
-                                qr_binary = curr_qr_binary
-                                show_qr_window(qr_binary)
-                                await self.emit("on_qr_change", qr_binary)
+
+                            # Mostrar solo si la imagen QR cambió respecto a la última mostrada
+                            if curr_qr_binary != last_qr_shown:
+                                show_qr_window(curr_qr_binary)
+                                last_qr_shown = curr_qr_binary
+                                await self.emit("on_qr_change", curr_qr_binary)
                     except Exception:
                         pass
 
                 elif curr_state == State.LOGGED_IN:
                     unread_chats = []
                     try:
-                        # Hacer clic en el botón de chats no leídos
+                        continue_button = await self._page.query_selector("button:has(div:has-text('Continue'))")
+                        if continue_button:
+                            await self.emit("on_debug", "🟢 Botón 'Continue' detectado. Haciendo clic...")
+                            await continue_button.click()
+                            await asyncio.sleep(2)  # Esperar a que se actualice la interfaz
+                    except Exception as e:
+                        await self.emit("on_error", f"⚠️ Error al hacer clic en 'Continue': {e}")
+                    try:
                         unread_button = await self._page.query_selector(loc.UNREAD_CHATS_BUTTON)
                         if unread_button:
                             await unread_button.click()
                             await asyncio.sleep(self.unread_messages_sleep)
 
-                            # Obtener la lista de chats no leídos
                             chat_list = await self._page.query_selector_all(loc.UNREAD_CHAT_DIV)
                             if chat_list and len(chat_list) > 0:
                                 chats = await chat_list[0].query_selector_all(loc.SEARCH_ITEM)
                                 for chat in chats:
+                                    inner_text = await chat.inner_text()
                                     chat_result = await self._parse_search_result(chat, "CHATS")
                                     if chat_result:
                                         unread_chats.append(chat_result)
                                         await self.emit("on_unread_chat", [chat_result])
 
-                        # Volver a todos los chats
                         all_button = await self._page.query_selector(loc.ALL_CHATS_BUTTON)
                         if all_button:
                             await all_button.click()
+
                     except Exception as e:
-                        await self.emit("on_error", f"Error checking unread chats: {e}")
+                        await self.emit("on_error", f"Error checking unread chats: {e} ({type(e)})")
 
             await self.emit("on_tick")
             await asyncio.sleep(self.poll_freq)
+
 
     async def _get_state(self) -> Optional[State]:
         """Obtiene el estado actual de WhatsApp Web"""
         return await self.wa_elements.get_state()
     
-    async def open(self, chat_name: str) -> bool:
+    async def open(self, chat_name: str, close = True) -> bool:
         try:
             if not await self.wait_until_logged_in():
                 await self.emit("on_error", "Cliente no logueado.")
@@ -292,25 +316,68 @@ class Client(BaseWhatsAppClient):
         except Exception as e:
             await self.emit("on_error", f"Error extracting QR image: {e}")
             return None
-
+        
     async def _parse_search_result(self, element, result_type: str = "CHATS") -> Optional[Dict[str, Any]]:
-        """Parsea un resultado de búsqueda"""
         try:
-            text = await element.inner_text()
-            if not text:
-                return None
-            lines = text.strip().split('\n')
-            if len(lines) < 1:
-                return None
-            return {
-                "type": result_type,
-                "name": lines[0],
-                "last_activity": lines[1] if len(lines) > 1 else "",
-                "element": element
-            }
-        except Exception as e:
-            await self.emit("on_error", f"Error parsing search result: {e}")
+            components = await element.query_selector_all("xpath=.//div[@role='gridcell' and @aria-colindex='2']/parent::div/div")
+            count = len(components)
+
+            unread_el = await element.query_selector(f"xpath={loc.SEARCH_ITEM_UNREAD_MESSAGES}")
+            unread_count = await unread_el.inner_text() if unread_el else "0"
+
+            if count == 3:
+                span_title_0 = await components[0].query_selector(f"xpath={loc.SPAN_TITLE}")
+                group_title = await span_title_0.get_attribute("title") if span_title_0 else ""
+
+                datetime_children = await components[0].query_selector_all("xpath=./*")
+                datetime_text = await datetime_children[1].text_content() if len(datetime_children) > 1 else ""
+
+                span_title_1 = await components[1].query_selector(f"xpath={loc.SPAN_TITLE}")
+                title = await span_title_1.get_attribute("title") if span_title_1 else ""
+
+                info_text = (await components[2].text_content()) or ""
+                info_text = info_text.replace("\n", "")
+
+
+                return {
+                    "type": result_type,
+                    "group": group_title,
+                    "name": title,
+                    "last_activity": datetime_text,
+                    "last_message": info_text,
+                    "unread_count": unread_count,
+                    "element": element
+                }
+
+            elif count == 2:
+                span_title_0 = await components[0].query_selector(f"xpath={loc.SPAN_TITLE}")
+                title = await span_title_0.get_attribute("title") if span_title_0 else ""
+
+                datetime_children = await components[0].query_selector_all("xpath=./*")
+                datetime_text = await datetime_children[1].text_content() if len(datetime_children) > 1 else ""
+
+                info_children = await components[1].query_selector_all("xpath=./*")
+                info_text = (await info_children[0].text_content() if len(info_children) > 0 else "") or ""
+                info_text = info_text.replace("\n", "")
+
+
+                return {
+                    "type": result_type,
+                    "name": title,
+                    "last_activity": datetime_text,
+                    "last_message": info_text,
+                    "unread_count": unread_count,
+                    "element": element
+                }
+
             return None
+
+        except Exception as e:
+            print(f"Error parsing result: {e}")
+            return None
+
+
+
 
     async def wait_until_logged_in(self, timeout: int = 60) -> bool:
         """Espera hasta que el estado sea LOGGED_IN o se agote el tiempo"""
@@ -404,7 +471,6 @@ class Client(BaseWhatsAppClient):
             return False
 
         try:
-            print("Enviando mensaje...")
             await self.open(chat_query)
             await self._page.wait_for_selector(loc.CHAT_INPUT_BOX, timeout=10000)
             input_box = await self._page.wait_for_selector(loc.CHAT_INPUT_BOX, timeout=10000)
@@ -420,3 +486,39 @@ class Client(BaseWhatsAppClient):
         except Exception as e:
             await self.emit("on_error", f"Error al enviar el mensaje: {e}")
             return False
+    async def send_file(self, chat_name, path):
+        try:
+            await self.open(chat_name)
+            copy_file_to_clipboard(path)
+            
+            input_box = await self._page.wait_for_selector(loc.CHAT_INPUT_BOX, timeout=10000)
+            await input_box.click()
+            
+            await self._page.keyboard.press('Control+v')
+            await asyncio.sleep(2)  # async sleep para no bloquear
+            
+            await self._page.keyboard.press('Enter')
+            return True
+        except Exception as e:
+            await self.emit("on_error", f"Error al enviar el mensaje: {e}")
+            return False
+            
+    async def _auto_screenshot_loop(self, interval: int = 30):
+        """
+        Toma una captura de pantalla cada `interval` segundos mientras el cliente esté corriendo.
+        """
+        counter = 0
+        while self.running:
+            timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+            filename = f"screenshots/wa_{timestamp}_{counter}.png"
+            try:
+                Path("screenshots").mkdir(exist_ok=True)
+                await self._page.screenshot(path=filename, full_page=True)
+                await self.emit("on_info", f"Screenshot tomada: {filename}")
+            except Exception as e:
+                await self.emit("on_error", f"Error al tomar screenshot periódica: {e}")
+            counter += 1
+            await asyncio.sleep(interval)
+
+
+        

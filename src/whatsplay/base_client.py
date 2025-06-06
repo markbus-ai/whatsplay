@@ -8,6 +8,12 @@ from .events.event_handler import EventHandler
 from .events.event_types import EVENT_LIST
 from .constants.states import State
 
+# User Agent para Chrome 114 en Windows 10
+USER_AGENT_CHROME_114_WIN10 = (
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+    "AppleWebKit/537.36 (KHTML, like Gecko) "
+    "Chrome/114.0.5735.91 Safari/537.36"
+)
 
 class BaseWhatsAppClient(EventHandler):
     """
@@ -71,7 +77,8 @@ class BaseWhatsAppClient(EventHandler):
                     args=launch_args.get("args", []),
                     locale='en-US',
                     timezone_id='UTC',
-                    viewport={"width": 1280, "height": 720}
+                    viewport={"width": 1280, "height": 720},
+                    user_agent=USER_AGENT_CHROME_114_WIN10
                 )
                 self._browser = self._context.browser
             else:
@@ -80,11 +87,19 @@ class BaseWhatsAppClient(EventHandler):
                 self._context = await self._browser.new_context(
                     locale='en-US',
                     timezone_id='UTC',
-                    viewport={"width": 1280, "height": 720}
+                    viewport={"width": 1280, "height": 720},
+                    user_agent=USER_AGENT_CHROME_114_WIN10
                 )
             
-            # Enable file downloads if needed
+            # Set Accept-Language header
             await self._context.set_extra_http_headers({"Accept-Language": "en-US,en;q=0.9"})
+            
+            # Evitar detección básica de webdriver
+            await self._context.add_init_script("""
+                Object.defineProperty(navigator, 'webdriver', {
+                    get: () => false,
+                });
+            """)
             
             self._page = await self._context.new_page()
             

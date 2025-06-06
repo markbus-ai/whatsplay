@@ -39,12 +39,17 @@ async def main():
     @client.event("on_unread_chat")
     async def unread_chat(chats):
         print("evento unread")
-        print("chat name: ", chats[0]['name'])
-        success = await client.send_message(chats[0]['name'], "Hello!")
+        print("chat name: ", chats[0].get('name'))
+        success = await client.send_message(chats[0].get('name'), "Hello!")
         if success:
             print("✅ Mensaje enviado con éxito")
         else:
             print("❌ Falló el envío del mensaje")
+        success_file = await client.send_file(chats[0].get('name'), r'C:\Users\Educacion\Desktop\profesional.pdf')
+        if success_file:
+            print("✅ archivo enviado con éxito")
+        else:
+            print("❌ Falló el envío del archivo")
 
 
     @client.event("on_error")

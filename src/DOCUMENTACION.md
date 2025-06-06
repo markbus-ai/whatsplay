@@ -67,8 +67,7 @@ Gestiona múltiples eventos y listeners.
 
 ### 4. utils.py
 
-- **show_qr_window(qr_image_bytes)**: Muestra una ventana con el código QR para autenticación.
-- **close_all_windows()**: Cierra todas las ventanas de OpenCV.
+- **show_qr_window(qr_image_bytes)**: Muestra el código QR para autenticación.
 
 ### 5. wa_elements.py
 

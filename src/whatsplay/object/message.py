@@ -1,7 +1,7 @@
 # models.py
 from datetime import datetime
 from pathlib import Path
-from typing import Optional, List, Union
+from typing import Optional
 from playwright.async_api import Page, ElementHandle, Download
 
 
@@ -30,44 +30,49 @@ class Message:
     async def from_element(cls, elem: ElementHandle) -> Optional["Message"]:
         """
         Crea un Message a partir del <div> que engloba TODO el mensaje.
-        - Busca dentro de `elem` un <span aria-label="X:"> para extraer `sender`.
-        - Busca <span class*="x16dsc37"> para extraer la hora (formato HH:MM).
-        - El texto del mensaje (texto libre) se obtiene con inner_text,
-          limpiando la primera línea si coincide con el remitente/hora.
-        Si no logra extraer nada relevante, retorna None.
+        Usa XPath para encontrar:
+          - <span aria-label="X:"> → sender
+          - <span class*="x16dsc37"> → hora
+          - <div class="copyable-text"> → cuerpo textual
         """
         try:
             # 1) EXTRAER REMITENTE
             sender = ""
-            remitente_span = await elem.query_selector('span[aria-label$=":"]')
+            remitente_span = await elem.query_selector(
+                'xpath=.//span[@aria-label and substring(@aria-label, string-length(@aria-label))=":"]'
+            )
             if remitente_span:
-                raw_label = await remitente_span.get_attribute("aria-label")  # e.g. "Mom:"
+                raw_label = await remitente_span.get_attribute("aria-label")
                 if raw_label:
                     sender = raw_label.rstrip(":").strip()
 
             # 2) EXTRAER HORA
             timestamp = datetime.now()
-            time_span = await elem.query_selector('span[class*="x16dsc37"]')
+            time_span = await elem.query_selector(
+                'xpath=.//span[contains(@class,"x16dsc37")]'
+            )
             if time_span:
-                hora_text = (await time_span.inner_text()).strip()  # e.g. "13:40"
+                hora_text = (await time_span.inner_text()).strip()
                 if ":" in hora_text:
+                    hh, mm = map(int, hora_text.split(":"))
                     ahora = datetime.now()
-                    hh, mm = [int(x) for x in hora_text.split(":")]
                     timestamp = ahora.replace(hour=hh, minute=mm, second=0, microsecond=0)
 
             # 3) EXTRAER TEXTO DEL MENSAJE
-            #    inner_text normalmente trae primera línea “[Mom:]” y luego el cuerpo real.
             texto = ""
-            raw_inner = await elem.inner_text()
-            if raw_inner:
-                lineas = raw_inner.split("\n")
-                # Si la primera línea contiene el remitente o la hora, la descartamos
-                if len(lineas) > 1:
-                    texto = "\n".join(lineas[1:]).strip()
-                else:
-                    texto = ""
+            cuerpo_div = await elem.query_selector(
+                'xpath=.//div[contains(@class,"copyable-text")]/div'
+            )
+            if cuerpo_div:
+                raw_inner = await cuerpo_div.inner_text()
+                if raw_inner:
+                    lineas = raw_inner.split("\n")
+                    if len(lineas) > 1 and (lineas[0].strip().startswith(sender) or ":" in lineas[0]):
+                        texto = "\n".join(lineas[1:]).strip()
+                    else:
+                        texto = raw_inner.strip()
 
-            # 4) Retornar instancia
+            # 4) RETORNAR INSTANCIA
             return cls(sender=sender, timestamp=timestamp, text=texto, container=elem)
 
         except Exception:
@@ -105,16 +110,15 @@ class FileMessage(Message):
           4) Si todo OK, retorna FileMessage; de lo contrario, retorna None.
         """
         try:
-            # 1) ¿Hay icono de descarga en este mensaje?
+            # 1) ¿HAY ICONO DE DESCARGA?
             icon = await elem.query_selector('span[data-icon="audio-download"]')
             if not icon:
                 return None
 
-            # 2) BUSCAR NOMBRE DE ARCHIVO (dentro de un ancestro con atributo title="Download ...")
+            # 2) BUSCAR NOMBRE DE ARCHIVO
             filename = ""
-            # Subimos por los ancestros hasta encontrar un nodo con atributo title que comience por "Download"
-            title_handle = await icon.evaluate_handle(
-                """(node) => {
+            title_handle = await icon.evaluate_handle("""
+                (node) => {
                     let curr = node;
                     while (curr) {
                         if (curr.title && curr.title.startsWith("Download")) {
@@ -123,23 +127,22 @@ class FileMessage(Message):
                         curr = curr.parentElement;
                     }
                     return null;
-                }"""
-            )
+                }
+            """)
+
             if title_handle:
                 title_elem: ElementHandle = title_handle.as_element()
                 if title_elem:
                     raw_title = await title_elem.get_attribute("title")
-                    # raw_title = 'Download "SoftwareDeveloper_JeanRoa_ES.pdf"'
                     if raw_title and '"' in raw_title:
                         parts = raw_title.split('"')
                         if len(parts) >= 2:
                             filename = parts[1].strip()
 
-            # Si no obtuvimos filename, abortamos
             if not filename:
                 return None
 
-            # 3) Extraer el mensaje base
+            # 3) EXTRAER DATOS BASE DEL MENSAJE
             base_msg = await Message.from_element(elem)
             if not base_msg:
                 return None
@@ -152,6 +155,7 @@ class FileMessage(Message):
                 filename=filename,
                 download_icon=icon
             )
+
         except Exception:
             return None
 
@@ -162,19 +166,19 @@ class FileMessage(Message):
         Si algo falla, devuelve None.
         """
         try:
-            # 1) Preparamos carpeta
+            # 1) CREAR DIRECTORIO SI NO EXISTE
             downloads_dir.mkdir(parents=True, exist_ok=True)
 
-            # 2) Escuchar la descarga
+            # 2) ESPERAR DESCARGA
             async with page.expect_download() as evento:
                 await self.download_icon.click()
             descarga: Download = await evento.value
 
-            # 3) Determinar nombre final (si el servidor sugiere distinto, lo usamos)
+            # 3) OBTENER NOMBRE SUGERIDO
             suggested = descarga.suggested_filename or self.filename
             destino = downloads_dir / suggested
 
-            # 4) Guardar en disco
+            # 4) GUARDAR EN DISCO
             await descarga.save_as(str(destino))
             return destino
 

@@ -22,17 +22,20 @@ class WhatsAppElements:
         try:
             # Checkear en orden de prioridad
             if await self.page.locator(loc.LOGGED_IN).is_visible():
-                print("Logged in")
+                print("LOGGED_IN")
                 return State.LOGGED_IN
             elif await self.page.locator(loc.LOADING).is_visible():
-                print("Loading")
+                print("LOADING")
                 return State.LOADING
             elif await self.page.locator(loc.QR_CODE).is_visible():
-                print("QR auth")
+                print("QR_AUTH")
                 return State.QR_AUTH
             elif await self.page.locator(loc.AUTH).is_visible():
-                print("Auth")
+                print("AUTH")
                 return State.AUTH
+            elif await self.page.locator(loc.LOADING_CHATS).is_visible():
+                print("LOADING_CHATS")
+                return State.LOADING
             return None
         except Exception:
             return None
@@ -128,7 +131,6 @@ class WhatsAppElements:
         try:
             # Activar búsqueda
             if not await self.click_search_button():
-                print("Could not activate search")
                 return results
 
             # Buscar campo de texto y escribir consulta
@@ -142,7 +144,6 @@ class WhatsAppElements:
                     continue
 
             if not search_box:
-                print("Could not find search text box")
                 return results
 
             # Escribir consulta con reintento
@@ -156,7 +157,6 @@ class WhatsAppElements:
                     break
                 except Exception as e:
                     if attempt == max_attempts - 1:
-                        print(f"Could not type in search box: {e}")
                         return results
                     await self.page.wait_for_timeout(1000)
 

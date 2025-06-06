@@ -1,7 +1,7 @@
 # State locators
-AUTH = "//div[contains(text(), 'Use WhatsApp on your computer')]"
+AUTH = "//div[contains(text(), 'Steps to log in')]"
 QR_CODE = "//canvas[@aria-label='Scan this QR code to link a device!']"
-LOADING = "//div[//span[@data-icon='lock'] and contains(text(), 'End-to-end encrypted') and //progress]"
+LOADING = "//div[//span[@data-icon='lock-refreshed'] and contains(text(), 'End-to-end encrypted')]"
 LOADING_CHATS = "//div[text()='Loading your chats']"
 LOGGED_IN = "//span[@data-icon='wa-wordmark-refreshed']"
 
