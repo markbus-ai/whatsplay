@@ -53,9 +53,12 @@ SPAN_TITLE = ".//span[@title]"
 
 # Message elements
 CHAT_COMPONENT = ".//div[@role='row']"
-CHAT_MESSAGE = ".//div[@data-pre-plain-text]"
+CHAT_MESSAGE = ".//div[@data-pre-plain-text"
 CHAT_MESSAGE_QUOTE = ".//div[@aria-label='Quoted message']"
 CHAT_MESSAGE_IMAGE = ".//div[@aria-label='Open picture']"
 CHAT_MESSAGE_IMAGE_ELEMENT = ".//img[starts-with(@src, 'blob:https://web.whatsapp.com')]"
 # Locator para identificar cualquier botón de descarga de archivos
 ANY_DOWNLOAD_ICON = "//span[@data-icon='audio-download']"
+ATTACH_BUTTON = "span[data-icon='plus-rounded']"
+SEND_BUTTON = "span[data-icon='wds-ic-send-filled']"
+FILE_INPUT = "input[type='file']"

@@ -10,13 +10,12 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..',
 
 from whatsplay import Client
 from whatsplay.auth import LocalProfileAuth
-
+from pathlib import Path
 async def main():
     # Configure auth with local profile in user's documents folder
-    data_dir = os.path.abspath(os.path.join(os.path.expanduser("~"), "Documents", "whatsapp_data"))
-    os.makedirs(data_dir, exist_ok=True)
+    user_data = Path(__file__).parent / "whatsapp_session"
     
-    auth = LocalProfileAuth(data_dir)
+    auth = LocalProfileAuth(user_data)
     client = Client(auth=auth)
     
     @client.event("on_start")

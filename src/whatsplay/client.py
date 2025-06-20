@@ -1,7 +1,11 @@
 import asyncio
+import logging
+import signal
+import sys
+import os
 import time
-from typing import Optional, Dict, List, Any, Union
 from pathlib import Path
+from typing import Optional, Dict, List, Any, Union
 
 from playwright.async_api import TimeoutError as PlaywrightTimeoutError, Error as PlaywrightError
 
@@ -24,44 +28,283 @@ class Client(BaseWhatsAppClient):
                  auth: Optional[Any] = None):
         super().__init__(user_data_dir=user_data_dir, headless=headless, auth=auth)
         self.locale = locale
+        self._cached_chats = set()
         self.poll_freq = 0.25
         self.wa_elements = None
         self.qr_task = None
         self.current_state = None
         self.unread_messages_sleep = 1  # Tiempo de espera para cargar mensajes no leídos
+        self._shutdown_event = asyncio.Event()
+        self._setup_signal_handlers()
+        
+    def _setup_signal_handlers(self):
+        """Configura los manejadores de señales para un cierre limpio"""
+        if sys.platform != 'win32':
+            # En Windows, asyncio solo soporta add_signal_handler para SIGINT y SIGTERM
+            for sig in (signal.SIGINT, signal.SIGTERM):
+                try:
+                    asyncio.get_event_loop().add_signal_handler(
+                        sig, lambda s=sig: asyncio.create_task(self._handle_signal(s)))
+                except (NotImplementedError, RuntimeError):
+                    # Algunas plataformas pueden no soportar add_signal_handler
+                    signal.signal(sig, lambda s, f: asyncio.create_task(self._handle_signal(s)))
+        else:
+            # En Windows, solo podemos manejar estas señales
+            for sig in (signal.SIGINT, signal.SIGTERM):
+                signal.signal(sig, lambda s, f: asyncio.create_task(self._handle_signal(s)))
+    
+    async def _handle_signal(self, signum):
+        """Maneja las señales del sistema para un cierre limpio"""
+        signame = signal.Signals(signum).name if hasattr(signal, 'Signals') else str(signum)
+        print(f"\nRecibida señal {signame}. Cerrando limpiamente...")
+        self._shutdown_event.set()
+        await self.stop()
+        sys.exit(0)
 
     @property
     def running(self) -> bool:
         """Check if client is running"""
         return getattr(self, '_is_running', False)
 
-    async def stop(self) -> None:
+    async def stop(self):
+        """Detiene el cliente y libera todos los recursos"""
+        if not hasattr(self, '_is_running') or not self._is_running:
+            return
+            
         self._is_running = False
+        
         try:
+            # Cerrar página si existe
+            if hasattr(self, '_page') and self._page:
+                try:
+                    await self._page.close()
+                except Exception as e:
+                    await self.emit("on_error", f"Error al cerrar la página: {e}")
+                finally:
+                    self._page = None
+            
+            # Llamar al stop del padre para limpiar el contexto y el navegador
+            await super().stop()
+            
+            # Asegurarse de que el navegador se cierre
             if hasattr(self, '_browser') and self._browser:
-                await self._browser.close()
-                self._browser = None
+                try:
+                    await self._browser.close()
+                except Exception as e:
+                    await self.emit("on_error", f"Error al cerrar el navegador: {e}")
+                finally:
+                    self._browser = None
+            
+            # Detener Playwright si está activo
+            if hasattr(self, 'playwright') and self.playwright:
+                try:
+                    await self.playwright.stop()
+                except Exception as e:
+                    await self.emit("on_error", f"Error al detener Playwright: {e}")
+                finally:
+                    self.playwright = None
+                    
         except Exception as e:
-            await self.emit("on_error", f"Error al cerrar el navegador: {e}")
-        await self.emit("on_stop")
+            await self.emit("on_error", f"Error durante la limpieza: {e}")
+        finally:
+            await self.emit("on_stop")
+            self._shutdown_event.set()
 
     async def start(self) -> None:
         """Inicia el cliente y maneja el ciclo principal"""
-        await super().start()
-        self.wa_elements = WhatsAppElements(self._page)
-        self._is_running = True
-        
-        # Iniciar el ciclo principal
         try:
+            await super().start()
+            self.wa_elements = WhatsAppElements(self._page)
+            self._is_running = True
+            
+            # Iniciar el ciclo principal
             await self._main_loop()
+            
+        except asyncio.CancelledError:
+            # Manejar cancelación de tareas
+            await self.emit("on_info", "Operación cancelada")
+            raise
+            
+        except Exception as e:
+            await self.emit("on_error", f"Error en el bucle principal: {e}")
+            raise
+            
         finally:
+            # Asegurarse de que todo se cierre correctamente
             await self.stop()
-
     async def _main_loop(self) -> None:
-        """Implementación del ciclo principal con Playwright"""
+        """Implementación del ciclo principal con manejo de errores"""
+        if not self._page:
+            await self.emit("on_error", "No se pudo inicializar la página")
+            return
+            
         await self.emit("on_start")
-        await self._page.screenshot(path="init_main.png", full_page=True)
-        asyncio.create_task(self._auto_screenshot_loop(interval=30))
+        
+        # Tarea para capturas de pantalla automáticas (opcional, comentado por defecto)
+        # screenshot_task = asyncio.create_task(self._auto_screenshot_loop(interval=30))
+        
+        try:
+            # Tomar captura inicial para depuración
+            try:
+                await self._page.screenshot(path="init_main.png", full_page=True)
+            except Exception as e:
+                await self.emit("on_warning", f"No se pudo tomar captura inicial: {e}")
+                
+            await self._run_main_loop()
+            
+        except asyncio.CancelledError:
+            await self.emit("on_info", "Bucle principal cancelado")
+            raise
+            
+        except Exception as e:
+            await self.emit("on_error", f"Error en el bucle principal: {e}")
+            raise
+            
+        finally:
+            # Cancelar tareas pendientes
+            # screenshot_task.cancel()
+            # try:
+            #     await screenshot_task
+            # except asyncio.CancelledError:
+            #     pass
+            pass
+    
+    async def _run_main_loop(self) -> None:
+        """Bucle principal de la aplicación"""
+        qr_binary = None
+        state = None
+        last_qr_shown = None  # Guarda la última imagen QR mostrada
+
+        while self._is_running and not self._shutdown_event.is_set():
+            try:
+                curr_state = await self._get_state()
+                self.current_state = curr_state  # Actualizar la propiedad current_state
+
+                if curr_state is None:
+                    await asyncio.sleep(self.poll_freq)
+                    continue
+
+                if curr_state != state:
+                    await self._handle_state_change(curr_state, state)
+                    state = curr_state
+                else:
+                    await self._handle_same_state(curr_state, last_qr_shown)
+                    
+                await self.emit("on_tick")
+                await asyncio.sleep(self.poll_freq)
+                
+            except asyncio.CancelledError:
+                await self.emit("on_info", "Bucle principal cancelado")
+                raise
+                
+            except Exception as e:
+                await self.emit("on_error", f"Error en la iteración del bucle: {e}")
+                await asyncio.sleep(1)  # Pequeña pausa para evitar bucles rápidos de error
+                
+                # Si el error persiste, intentar reconectar después de varios fallos
+                if self._consecutive_errors > 5:  # Ajusta según sea necesario
+                    await self.emit("on_warning", "Demasiados errores consecutivos, intentando reconectar...")
+                    try:
+                        await self.reconnect()
+                        self._consecutive_errors = 0
+                    except Exception as reconnect_error:
+                        await self.emit("on_error", f"Error al reconectar: {reconnect_error}")
+                        # Si la reconexión falla, salir del bucle
+                        break
+    
+    async def _handle_state_change(self, curr_state, prev_state):
+        """Maneja los cambios de estado"""
+        if curr_state == State.AUTH:
+            await self.emit("on_auth")
+
+        elif curr_state == State.QR_AUTH:
+            try:
+                qr_code_canvas = await self._page.wait_for_selector(loc.QR_CODE, timeout=5000)
+                qr_binary = await self._extract_image_from_canvas(qr_code_canvas)
+
+                if qr_binary != self.last_qr_shown:
+                    show_qr_window(qr_binary)
+                    self.last_qr_shown = qr_binary
+
+                await self.emit("on_qr", qr_binary)
+            except PlaywrightTimeoutError:
+                await self.emit("on_warning", "Tiempo de espera agotado para el código QR")
+            except Exception as e:
+                await self.emit("on_error", f"Error al procesar código QR: {e}")
+
+        elif curr_state == State.LOADING:
+            loading_chats = await self._is_present(loc.LOADING_CHATS)
+            await self.emit("on_loading", loading_chats)
+
+        elif curr_state == State.LOGGED_IN:
+            await self.emit("on_logged_in")
+            await self._handle_logged_in_state()
+    
+    async def _handle_same_state(self, state, last_qr_shown):
+        """Maneja la lógica cuando el estado no ha cambiado"""
+        if state == State.QR_AUTH:
+            await self._handle_qr_auth_state(last_qr_shown)
+        elif state == State.LOGGED_IN:
+            await self._handle_logged_in_state()
+    
+    async def _handle_qr_auth_state(self, last_qr_shown):
+        """Maneja el estado de autenticación QR"""
+        try:
+            qr_code_canvas = await self._page.query_selector(loc.QR_CODE)
+            if qr_code_canvas:
+                curr_qr_binary = await self._extract_image_from_canvas(qr_code_canvas)
+
+                if curr_qr_binary != last_qr_shown:
+                    show_qr_window(curr_qr_binary)
+                    last_qr_shown = curr_qr_binary
+                    await self.emit("on_qr_change", curr_qr_binary)
+        except Exception as e:
+            await self.emit("on_warning", f"Error al actualizar código QR: {e}")
+    
+    async def _handle_logged_in_state(self):
+        """Maneja el estado de sesión iniciada"""
+        try:
+            # Intentar hacer clic en el botón Continue si está presente
+            continue_button = await self._page.query_selector("button:has(div:has-text('Continue'))")
+            if continue_button:
+                await continue_button.click()
+                await asyncio.sleep(1)
+                return  # Salir después de manejar el botón Continue
+                
+            # Manejar chats no leídos
+            unread_chats = await self._check_unread_chats()
+            if unread_chats:
+                await self.emit("on_unread_chat", unread_chats)
+                
+        except Exception as e:
+            await self.emit("on_error", f"Error en estado de sesión iniciada: {e}")
+    
+    async def _check_unread_chats(self):
+        """Verifica y devuelve los chats no leídos"""
+        unread_chats = []
+        try:
+            unread_button = await self._page.query_selector(loc.UNREAD_CHATS_BUTTON)
+            if unread_button:
+                await unread_button.click()
+                await asyncio.sleep(self.unread_messages_sleep)
+
+                chat_list = await self._page.query_selector_all(loc.UNREAD_CHAT_DIV)
+                if chat_list and len(chat_list) > 0:
+                    chats = await chat_list[0].query_selector_all(loc.SEARCH_ITEM)
+                    for chat in chats:
+                        chat_result = await self._parse_search_result(chat, "CHATS")
+                        if chat_result:
+                            unread_chats.append(chat_result)
+            
+            # Volver a la vista de todos los chats
+            all_button = await self._page.query_selector(loc.ALL_CHATS_BUTTON)
+            if all_button:
+                await all_button.click()
+                
+        except Exception as e:
+            await self.emit("on_warning", f"Error al verificar chats no leídos: {e}")
+            
+        return unread_chats
 
         qr_binary = None
         state = None
@@ -84,14 +327,13 @@ class Client(BaseWhatsAppClient):
                         qr_code_canvas = await self._page.wait_for_selector(loc.QR_CODE, timeout=5000)
                         qr_binary = await self._extract_image_from_canvas(qr_code_canvas)
 
-                        # Mostrar solo si la imagen QR es distinta a la última mostrada
                         if qr_binary != last_qr_shown:
                             show_qr_window(qr_binary)
                             last_qr_shown = qr_binary
 
                         await self.emit("on_qr", qr_binary)
                     except PlaywrightTimeoutError:
-                        pass
+                        print("⚠️ Timeout esperando QR.")
 
                 elif curr_state == State.LOADING:
                     loading_chats = await self._is_present(loc.LOADING_CHATS)
@@ -100,15 +342,16 @@ class Client(BaseWhatsAppClient):
                 elif curr_state == State.LOGGED_IN:
                     await self.emit("on_logged_in")
 
-                    # Buscar y hacer clic en botón "Continue" si aparece
                     try:
                         continue_button = await self._page.query_selector("button:has(div:has-text('Continue'))")
                         if continue_button:
                             await continue_button.click()
-                            await asyncio.sleep(1)  # Esperar a que se actualice la interfaz
+                            await asyncio.sleep(1)
                     except Exception as e:
+                        print(f"⚠️ Error en 'Continue': {e}")
                         await self.emit("on_error", f"⚠️ Error al hacer clic en 'Continue': {e}")
 
+                state = curr_state
 
             else:
                 if curr_state == State.QR_AUTH:
@@ -117,7 +360,6 @@ class Client(BaseWhatsAppClient):
                         if qr_code_canvas:
                             curr_qr_binary = await self._extract_image_from_canvas(qr_code_canvas)
 
-                            # Mostrar solo si la imagen QR cambió respecto a la última mostrada
                             if curr_qr_binary != last_qr_shown:
                                 show_qr_window(curr_qr_binary)
                                 last_qr_shown = curr_qr_binary
@@ -130,11 +372,11 @@ class Client(BaseWhatsAppClient):
                     try:
                         continue_button = await self._page.query_selector("button:has(div:has-text('Continue'))")
                         if continue_button:
-                            await self.emit("on_debug", "🟢 Botón 'Continue' detectado. Haciendo clic...")
                             await continue_button.click()
-                            await asyncio.sleep(2)  # Esperar a que se actualice la interfaz
+                            await asyncio.sleep(2)
                     except Exception as e:
                         await self.emit("on_error", f"⚠️ Error al hacer clic en 'Continue': {e}")
+
                     try:
                         unread_button = await self._page.query_selector(loc.UNREAD_CHATS_BUTTON)
                         if unread_button:
@@ -150,12 +392,15 @@ class Client(BaseWhatsAppClient):
                                     if chat_result:
                                         unread_chats.append(chat_result)
                                         await self.emit("on_unread_chat", [chat_result])
+                        else:
+                            print("ℹ️ No se encontró el botón de chats no leídos.")
 
                         all_button = await self._page.query_selector(loc.ALL_CHATS_BUTTON)
                         if all_button:
                             await all_button.click()
 
                     except Exception as e:
+                        print(f"❌ Error buscando chats no leídos: {e} ({type(e)})")
                         await self.emit("on_error", f"Error checking unread chats: {e} ({type(e)})")
 
             await self.emit("on_tick")
@@ -165,147 +410,68 @@ class Client(BaseWhatsAppClient):
     async def _get_state(self) -> Optional[State]:
         """Obtiene el estado actual de WhatsApp Web"""
         return await self.wa_elements.get_state()
-    
-    async def open(self, chat_name: str, close = True) -> bool:
+        
+    async def close(self):
+        if self._page:
+            await self._page.close()
+    async def open(self, chat_name: str, timeout: int = 10000) -> bool:
+        """
+        Abre un chat por su nombre visible. Si no está en el DOM, lo busca y lo abre.
+
+        Args:
+            chat_name (str): El nombre del chat tal como aparece en WhatsApp.
+            timeout (int): Tiempo máximo de espera para elementos (en ms).
+
+        Returns:
+            bool: True si se abrió el chat correctamente, False si falló.
+        """
+        page = self._page
+        span_xpath = f"//span[contains(@title, {repr(chat_name)})]"
+
         try:
-            if not await self.wait_until_logged_in():
-                await self.emit("on_error", "Cliente no logueado.")
-                return False
+            # 1. Buscar el chat directamente visible
+            chat_element = await page.query_selector(f"xpath={span_xpath}")
+            if chat_element:
+                await chat_element.click()
+                print(f"✅ Chat '{chat_name}' abierto directamente.")
+            else:
+                print(f"🔍 Chat '{chat_name}' no visible, usando buscador...")
 
-            # Helper function to escape chat name for CSS selectors
-            def escape_css_string(value: str) -> str:
-                return value.replace('"', '\\"')
-
-            # Helper function to escape chat name for XPath query
-            def escape_xpath_string(value: str) -> str:
-                if "'" in value and '"' in value:
-                    parts = value.split("'")
-                    return "concat('" + "', \"'\" , '".join(parts) + "')"
-                elif "'" in value:
-                    return f'"{value}"'
-                else:
-                    return f"'{value}'"
-
-            escaped_chat_name_for_css = escape_css_string(chat_name)
-
-            async def find_and_click_chat_in_list(name_css_escaped: str) -> bool:
-                chat_selector = f"span[title='{name_css_escaped}']"
-                chat_element = await self._page.query_selector(chat_selector)
-                if chat_element and await chat_element.is_visible():
-                    try:
-                        await chat_element.scroll_into_view_if_needed()
-                        await chat_element.click()
-                        await self._page.wait_for_timeout(1500)  # Wait for chat to open
-                        return True
-                    except Exception as e:
-                        await self.emit("on_warning", f"Error al hacer clic en '{chat_name}' directamente: {e}")
-                return False
-
-            # 1. Try in "All Chats" (this is often default, but click to be sure)
-            await self.emit("on_info", "Intentando abrir chat en 'Todos los chats'.")
-            all_chats_button = await self._page.query_selector(loc.ALL_CHATS_BUTTON)
-            if all_chats_button and await all_chats_button.is_visible():
-                try:
-                    await all_chats_button.click()
-                    await self._page.wait_for_timeout(1000)  # Wait for filter to apply
-                    if await find_and_click_chat_in_list(escaped_chat_name_for_css):
-                        await self.emit("on_info", f"Chat '{chat_name}' abierto desde 'Todos los chats'.")
-                        return True
-                except Exception as e:
-                    await self.emit("on_warning", f"Error al intentar filtrar por 'Todos los chats': {e}")
-            else: # Fallback if 'All Chats' button not found or not clicked, try finding directly
-                if await find_and_click_chat_in_list(escaped_chat_name_for_css):
-                    await self.emit("on_info", f"Chat '{chat_name}' abierto directamente (sin filtro explícito).")
-                    return True
-
-            # 2. Try in "Unread"
-            await self.emit("on_info", "Intentando abrir chat en 'No leídos'.")
-            unread_chats_button = await self._page.query_selector(loc.UNREAD_CHATS_BUTTON)
-            if unread_chats_button and await unread_chats_button.is_visible():
-                try:
-                    await unread_chats_button.click()
-                    await self._page.wait_for_timeout(1000)  # Wait for filter to apply
-                    if await find_and_click_chat_in_list(escaped_chat_name_for_css):
-                        await self.emit("on_info", f"Chat '{chat_name}' abierto desde 'No leídos'.")
-                        return True
-                except Exception as e:
-                    await self.emit("on_warning", f"Error al intentar filtrar por 'No leídos': {e}")
-            
-            # 3. Use the main search bar
-            await self.emit("on_info", f"Chat '{chat_name}' no encontrado en filtros, usando buscador general.")
-            
-            if not await self.wa_elements.click_search_button():
-                await self.emit("on_error", "No se pudo activar la barra de búsqueda.")
-                return False
-
-            search_box_typed = False
-            for selector in loc.SEARCH_TEXT_BOX:
-                search_input = await self._page.query_selector(selector)
-                if search_input and await search_input.is_visible():
-                    try:
-                        await search_input.click(timeout=1000) 
-                        await self._page.wait_for_timeout(200)
-                        await search_input.fill("") 
-                        await search_input.type(chat_name, delay=75)
-                        search_box_typed = True
+                # 2. Click en botón de búsqueda
+                for btn in loc.SEARCH_BUTTON:
+                    btns = await page.query_selector_all(f"xpath={btn}")
+                    if btns:
+                        await btns[0].click()
                         break
-                    except Exception as e:
-                        await self.emit("on_warning", f"Error al escribir en el buscador ({selector}): {e}")
-            
-            if not search_box_typed:
-                await self.emit("on_error", "No se pudo escribir en la barra de búsqueda.")
-                try: await self._page.keyboard.press("Escape") # Close search bar if open
-                except: pass
-                return False
-
-            xpath_safe_chat_name = escape_xpath_string(chat_name)
-            chat_list_item_selector = f"{loc.SEARCH_ITEM}[.//span[@title={xpath_safe_chat_name}]]"
-
-            try:
-                chat_result_element = await self._page.wait_for_selector(
-                    chat_list_item_selector, 
-                    timeout=7000, 
-                    state="visible" 
-                )
-                if chat_result_element:
-                    await chat_result_element.scroll_into_view_if_needed()
-                    await chat_result_element.click()
-                    await self._page.wait_for_timeout(1500) 
-                    await self.emit("on_info", f"Chat '{chat_name}' abierto desde el buscador general.")
-                    # Search usually closes on click, or we can press Escape if needed
-                    # For now, assume it's handled or chat opening takes precedence.
-                    return True
                 else:
-                    # This case should ideally be caught by PlaywrightTimeoutError
-                    await self.emit("on_error", f"No se encontró '{chat_name}' en resultados del buscador (elemento no devuelto).")
-                    try: await self._page.keyboard.press("Escape")
-                    except: pass
-                    return False
-            except PlaywrightTimeoutError:
-                await self.emit("on_error", f"No se encontró '{chat_name}' en resultados del buscador (timeout).")
-                try: await self._page.keyboard.press("Escape")
-                except: pass
-                return False
-            except Exception as e:
-                await self.emit("on_error", f"Error al seleccionar '{chat_name}' de resultados: {e}")
-                try: await self._page.keyboard.press("Escape")
-                except: pass
-                return False
+                    raise Exception("❌ Botón de búsqueda no encontrado")
 
-        except PlaywrightError as e:
-            await self.emit("on_error", f"Error general de Playwright al abrir el chat '{chat_name}': {e}")
+                # 3. Escribir en el input de búsqueda
+                for input_xpath in loc.SEARCH_TEXT_BOX:
+                    inputs = await page.query_selector_all(f"xpath={input_xpath}")
+                    if inputs:
+                        await inputs[0].fill(chat_name)
+                        break
+                else:
+                    raise Exception("❌ Input de búsqueda no encontrado")
+
+                # 4. Esperar resultado y presionar ↓ y Enter
+                await page.wait_for_selector(loc.SEARCH_ITEM, timeout=timeout)
+                await page.keyboard.press("ArrowDown")
+                await page.keyboard.press("Enter")
+                print(f"✅ Chat '{chat_name}' abierto desde buscador.")
+
+            # 5. Confirmar apertura del input de mensajes
+            await page.wait_for_selector(loc.CHAT_INPUT_BOX, timeout=timeout)
+            return True
+
+        except PlaywrightTimeoutError:
+            print(f"❌ Timeout esperando el input del chat '{chat_name}'")
             return False
         except Exception as e:
-            await self.emit("on_error", f"Error inesperado al abrir el chat '{chat_name}': {e}")
+            print(f"❌ Error al abrir el chat '{chat_name}': {e}")
             return False
 
-    async def _is_present(self, selector: str) -> bool:
-        """Verifica si un elemento está presente en la página"""
-        try:
-            element = await self._page.query_selector(selector)
-            return element is not None
-        except Exception:
-            return False
 
     async def _extract_image_from_canvas(self, canvas_element) -> Optional[bytes]:
         """Extrae la imagen de un elemento canvas"""
@@ -486,39 +652,51 @@ class Client(BaseWhatsAppClient):
         except Exception as e:
             await self.emit("on_error", f"Error al enviar el mensaje: {e}")
             return False
+        finally:
+            await self.close()
+
     async def send_file(self, chat_name, path):
+        """Envía un archivo a un chat especificado en WhatsApp Web usando Playwright"""
+
         try:
-            await self.open(chat_name)
-            copy_file_to_clipboard(path)
-            
-            input_box = await self._page.wait_for_selector(loc.CHAT_INPUT_BOX, timeout=10000)
-            await input_box.click()
-            
-            await self._page.keyboard.press('Control+v')
-            await asyncio.sleep(2)  # async sleep para no bloquear
-            
-            await self._page.keyboard.press('Enter')
+            if not os.path.isfile(path):
+                msg = f"El archivo no existe: {path}"
+                await self.emit("on_error", msg)
+                return False
+
+            if not await self.wait_until_logged_in():
+                msg = "No se pudo iniciar sesión"
+                await self.emit("on_error", msg)
+                return False
+
+            if not await self.open(chat_name):
+                msg = f"No se pudo abrir el chat: {chat_name}"
+                await self.emit("on_error", msg)
+                return False
+
+            await self._page.wait_for_selector(loc.CHAT_INPUT_BOX, timeout=10000)
+
+            attach_btn = await self._page.wait_for_selector(loc.ATTACH_BUTTON, timeout=5000)
+            await attach_btn.click()
+
+            input_files = await self._page.query_selector_all(loc.FILE_INPUT)
+            if not input_files:
+                msg = "No se encontró input[type='file']"
+                await self.emit("on_error", msg)
+                return False
+
+            await input_files[0].set_input_files(path)
+            await asyncio.sleep(1)  # Esperar que se cargue previsualización
+
+            send_btn = await self._page.wait_for_selector(loc.SEND_BUTTON, timeout=10000)
+            await send_btn.click()
+
             return True
+
         except Exception as e:
-            await self.emit("on_error", f"Error al enviar el mensaje: {e}")
+            msg = f"Error inesperado en send_file: {str(e)}"
+            await self.emit("on_error", msg)
+            await self._page.screenshot(path="debug_send_file/error_unexpected.png")
             return False
-            
-    async def _auto_screenshot_loop(self, interval: int = 30):
-        """
-        Toma una captura de pantalla cada `interval` segundos mientras el cliente esté corriendo.
-        """
-        counter = 0
-        while self.running:
-            timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-            filename = f"screenshots/wa_{timestamp}_{counter}.png"
-            try:
-                Path("screenshots").mkdir(exist_ok=True)
-                await self._page.screenshot(path=filename, full_page=True)
-                await self.emit("on_info", f"Screenshot tomada: {filename}")
-            except Exception as e:
-                await self.emit("on_error", f"Error al tomar screenshot periódica: {e}")
-            counter += 1
-            await asyncio.sleep(interval)
-
-
-        
+        finally:
+            await self.close()

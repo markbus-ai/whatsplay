@@ -66,7 +66,6 @@ class WhatsAppElements:
                     element = await self.page.wait_for_selector(selector, timeout=1000, state='visible')
                     if element:
                         await element.click()
-                        await self.page.wait_for_timeout(1000)
                         if await self.verify_search_active():
                             return True
                 except Exception:
@@ -77,10 +76,7 @@ class WhatsAppElements:
             for shortcut in shortcuts:
                 try:
                     await self.page.keyboard.press("Escape")  # Limpiar estado actual
-                    await self.page.wait_for_timeout(500)
                     await self.page.keyboard.press(shortcut)
-                    await self.page.wait_for_timeout(1000)
-                    
                     if await self.verify_search_active():
                         return True
                 except Exception:
@@ -151,23 +147,18 @@ class WhatsAppElements:
             for attempt in range(max_attempts):
                 try:
                     await search_box.click()
-                    await self.page.wait_for_timeout(500)
                     await search_box.fill("")
                     await search_box.type(query, delay=100)
                     break
                 except Exception as e:
                     if attempt == max_attempts - 1:
                         return results
-                    await self.page.wait_for_timeout(1000)
 
             # Esperar resultados
             results_container = await self.wait_for_selector(loc.SEARCH_RESULT, timeout=5000)
             if not results_container:
                 print("No search results found")
                 return results
-
-            # Pequeña pausa para cargar resultados
-            await self.page.wait_for_timeout(1000)
 
             # Obtener y procesar resultados
             items = await self.page.locator(loc.SEARCH_ITEM).all()
