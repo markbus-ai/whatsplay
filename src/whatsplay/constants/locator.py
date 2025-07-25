@@ -24,14 +24,14 @@ SEARCH_BUTTON = [
     "//button[@aria-label='Search or start new chat']",
     "//div[@role='button' and @title='Search input textbox']",
     "//span[@data-icon='search']/parent::button",
-    "//span[@data-testid='search']/parent::button"
+    "//span[@data-testid='search']/parent::button",
 ]
 
 SEARCH_TEXT_BOX = [
     "//div[@contenteditable='true']",
     "//div[contains(@class, 'lexical-rich-text-input')]//div[@contenteditable='true']",
     "//div[@role='textbox'][@contenteditable='true']",
-    "//div[contains(@class, '_13NKt')]"
+    "//div[contains(@class, '_13NKt')]",
 ]
 
 SEARCH_RESULT = "//div[@aria-label='Search results.']"
@@ -47,7 +47,9 @@ UNREAD_CHAT_DIV = "//div[@aria-label='Chat list']"
 # Search results
 SEARCH_RESULT = "//div[@aria-label='Search results.']"
 SEARCH_ITEM = "//div[@role='listitem']"
-SEARCH_ITEM_COMPONENTS = ".//div[@role='gridcell' and @aria-colindex='2']/parent::div/div"
+SEARCH_ITEM_COMPONENTS = (
+    ".//div[@role='gridcell' and @aria-colindex='2']/parent::div/div"
+)
 SEARCH_ITEM_UNREAD_MESSAGES = ".//span[contains(@aria-label, 'unread message')]"
 SPAN_TITLE = ".//span[@title]"
 
@@ -56,7 +58,9 @@ CHAT_COMPONENT = ".//div[@role='row']"
 CHAT_MESSAGE = ".//div[@data-pre-plain-text"
 CHAT_MESSAGE_QUOTE = ".//div[@aria-label='Quoted message']"
 CHAT_MESSAGE_IMAGE = ".//div[@aria-label='Open picture']"
-CHAT_MESSAGE_IMAGE_ELEMENT = ".//img[starts-with(@src, 'blob:https://web.whatsapp.com')]"
+CHAT_MESSAGE_IMAGE_ELEMENT = (
+    ".//img[starts-with(@src, 'blob:https://web.whatsapp.com')]"
+)
 # Locator para identificar cualquier botón de descarga de archivos
 ANY_DOWNLOAD_ICON = "//span[@data-icon='audio-download']"
 ATTACH_BUTTON = "span[data-icon='plus-rounded']"

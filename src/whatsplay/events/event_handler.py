@@ -1,6 +1,7 @@
 """
 Event handling system implementation
 """
+
 from typing import Any, Callable, List, Dict, Optional
 
 
@@ -8,6 +9,7 @@ class Event:
     """
     Represents a single event type that can have multiple listeners
     """
+
     def __init__(self) -> None:
         self.__listeners: List[Callable] = []
 
@@ -31,6 +33,7 @@ class EventHandler:
     """
     Base class for handling events
     """
+
     def __init__(self, events: Optional[List[str]] = None) -> None:
         self._events: Dict[str, Event] = {}
         if events:

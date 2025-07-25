@@ -1,11 +1,13 @@
 """Base class for authentication strategies"""
+
 from abc import ABC, abstractmethod
 from typing import Dict, Any
 from playwright.async_api import BrowserContext
 
+
 class AuthBase(ABC):
     """Base class for all authentication methods"""
-    
+
     def __init__(self):
         pass
 

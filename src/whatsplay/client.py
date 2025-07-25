@@ -8,7 +8,10 @@ from typing import Optional, Dict, List, Any, Union
 import re
 import urllib.parse
 
-from playwright.async_api import TimeoutError as PlaywrightTimeoutError, Error as PlaywrightError
+from playwright.async_api import (
+    TimeoutError as PlaywrightTimeoutError,
+    Error as PlaywrightError,
+)
 
 from .base_client import BaseWhatsAppClient
 from .wa_elements import WhatsAppElements
@@ -17,15 +20,19 @@ from .constants.states import State
 from .constants import locator as loc
 from .object.message import Message, FileMessage
 
+
 class Client(BaseWhatsAppClient):
     """
     Cliente de WhatsApp Web implementado con Playwright
     """
-    def __init__(self,
-                 user_data_dir: Optional[str] = None,
-                 headless: bool = False,
-                 locale: str = 'en-US',
-                 auth: Optional[Any] = None):
+
+    def __init__(
+        self,
+        user_data_dir: Optional[str] = None,
+        headless: bool = False,
+        locale: str = "en-US",
+        auth: Optional[Any] = None,
+    ):
         super().__init__(user_data_dir=user_data_dir, headless=headless, auth=auth)
         self.locale = locale
         self._cached_chats = set()
@@ -33,31 +40,40 @@ class Client(BaseWhatsAppClient):
         self.wa_elements = None
         self.qr_task = None
         self.current_state = None
-        self.unread_messages_sleep = 1  # Tiempo de espera para cargar mensajes no leídos
+        self.unread_messages_sleep = (
+            1  # Tiempo de espera para cargar mensajes no leídos
+        )
         self._shutdown_event = asyncio.Event()
         self._consecutive_errors = 0
         self.last_qr_shown = None
         self._setup_signal_handlers()
-        
+
     def _setup_signal_handlers(self):
         """Configura los manejadores de señales para un cierre limpio"""
-        if sys.platform != 'win32':
+        if sys.platform != "win32":
             # En Windows, asyncio solo soporta add_signal_handler para SIGINT y SIGTERM
             for sig in (signal.SIGINT, signal.SIGTERM):
                 try:
                     asyncio.get_event_loop().add_signal_handler(
-                        sig, lambda s=sig: asyncio.create_task(self._handle_signal(s)))
+                        sig, lambda s=sig: asyncio.create_task(self._handle_signal(s))
+                    )
                 except (NotImplementedError, RuntimeError):
                     # Algunas plataformas pueden no soportar add_signal_handler
-                    signal.signal(sig, lambda s, f: asyncio.create_task(self._handle_signal(s)))
+                    signal.signal(
+                        sig, lambda s, f: asyncio.create_task(self._handle_signal(s))
+                    )
         else:
             # En Windows, solo podemos manejar estas señales
             for sig in (signal.SIGINT, signal.SIGTERM):
-                signal.signal(sig, lambda s, f: asyncio.create_task(self._handle_signal(s)))
-    
+                signal.signal(
+                    sig, lambda s, f: asyncio.create_task(self._handle_signal(s))
+                )
+
     async def _handle_signal(self, signum):
         """Maneja las señales del sistema para un cierre limpio"""
-        signame = signal.Signals(signum).name if hasattr(signal, 'Signals') else str(signum)
+        signame = (
+            signal.Signals(signum).name if hasattr(signal, "Signals") else str(signum)
+        )
         print(f"\nRecibida señal {signame}. Cerrando limpiamente...")
         self._shutdown_event.set()
         await self.stop()
@@ -66,46 +82,46 @@ class Client(BaseWhatsAppClient):
     @property
     def running(self) -> bool:
         """Check if client is running"""
-        return getattr(self, '_is_running', False)
+        return getattr(self, "_is_running", False)
 
     async def stop(self):
         """Detiene el cliente y libera todos los recursos"""
-        if not hasattr(self, '_is_running') or not self._is_running:
+        if not hasattr(self, "_is_running") or not self._is_running:
             return
-            
+
         self._is_running = False
-        
+
         try:
             # Cerrar página si existe
-            if hasattr(self, '_page') and self._page:
+            if hasattr(self, "_page") and self._page:
                 try:
                     await self._page.close()
                 except Exception as e:
                     await self.emit("on_error", f"Error al cerrar la página: {e}")
                 finally:
                     self._page = None
-            
+
             # Llamar al stop del padre para limpiar el contexto y el navegador
             await super().stop()
-            
+
             # Asegurarse de que el navegador se cierre
-            if hasattr(self, '_browser') and self._browser:
+            if hasattr(self, "_browser") and self._browser:
                 try:
                     await self._browser.close()
                 except Exception as e:
                     await self.emit("on_error", f"Error al cerrar el navegador: {e}")
                 finally:
                     self._browser = None
-            
+
             # Detener Playwright si está activo
-            if hasattr(self, 'playwright') and self.playwright:
+            if hasattr(self, "playwright") and self.playwright:
                 try:
                     await self.playwright.stop()
                 except Exception as e:
                     await self.emit("on_error", f"Error al detener Playwright: {e}")
                 finally:
                     self.playwright = None
-                    
+
         except Exception as e:
             await self.emit("on_error", f"Error durante la limpieza: {e}")
         finally:
@@ -118,50 +134,51 @@ class Client(BaseWhatsAppClient):
             await super().start()
             self.wa_elements = WhatsAppElements(self._page)
             self._is_running = True
-            
+
             # Iniciar el ciclo principal
             await self._main_loop()
-            
+
         except asyncio.CancelledError:
             # Manejar cancelación de tareas
             await self.emit("on_info", "Operación cancelada")
             raise
-            
+
         except Exception as e:
             await self.emit("on_error", f"Error en el bucle principal: {e}")
             raise
-            
+
         finally:
             # Asegurarse de que todo se cierre correctamente
             await self.stop()
+
     async def _main_loop(self) -> None:
         """Implementación del ciclo principal con manejo de errores"""
         if not self._page:
             await self.emit("on_error", "No se pudo inicializar la página")
             return
-            
+
         await self.emit("on_start")
-        
+
         # Tarea para capturas de pantalla automáticas (opcional, comentado por defecto)
         # screenshot_task = asyncio.create_task(self._auto_screenshot_loop(interval=30))
-        
+
         try:
             # Tomar captura inicial para depuración
             try:
                 await self._page.screenshot(path="init_main.png", full_page=True)
             except Exception as e:
                 await self.emit("on_warning", f"No se pudo tomar captura inicial: {e}")
-                
+
             await self._run_main_loop()
-            
+
         except asyncio.CancelledError:
             await self.emit("on_info", "Bucle principal cancelado")
             raise
-            
+
         except Exception as e:
             await self.emit("on_error", f"Error en el bucle principal: {e}")
             raise
-            
+
         finally:
             # Cancelar tareas pendientes
             # screenshot_task.cancel()
@@ -170,7 +187,7 @@ class Client(BaseWhatsAppClient):
             # except asyncio.CancelledError:
             #     pass
             pass
-    
+
     async def _run_main_loop(self) -> None:
         """Bucle principal de la aplicación"""
         qr_binary = None
@@ -191,29 +208,36 @@ class Client(BaseWhatsAppClient):
                     state = curr_state
                 else:
                     await self._handle_same_state(curr_state, last_qr_shown)
-                    
+
                 await self.emit("on_tick")
                 await asyncio.sleep(self.poll_freq)
-                
+
             except asyncio.CancelledError:
                 await self.emit("on_info", "Bucle principal cancelado")
                 raise
-                
+
             except Exception as e:
                 await self.emit("on_error", f"Error en la iteración del bucle: {e}")
-                await asyncio.sleep(1)  # Pequeña pausa para evitar bucles rápidos de error
-                
+                await asyncio.sleep(
+                    1
+                )  # Pequeña pausa para evitar bucles rápidos de error
+
                 # Si el error persiste, intentar reconectar después de varios fallos
                 if self._consecutive_errors > 5:  # Ajusta según sea necesario
-                    await self.emit("on_warning", "Demasiados errores consecutivos, intentando reconectar...")
+                    await self.emit(
+                        "on_warning",
+                        "Demasiados errores consecutivos, intentando reconectar...",
+                    )
                     try:
                         await self.reconnect()
                         self._consecutive_errors = 0
                     except Exception as reconnect_error:
-                        await self.emit("on_error", f"Error al reconectar: {reconnect_error}")
+                        await self.emit(
+                            "on_error", f"Error al reconectar: {reconnect_error}"
+                        )
                         # Si la reconexión falla, salir del bucle
                         break
-    
+
     async def _handle_state_change(self, curr_state, prev_state):
         """Maneja los cambios de estado"""
         if curr_state == State.AUTH:
@@ -221,7 +245,9 @@ class Client(BaseWhatsAppClient):
 
         elif curr_state == State.QR_AUTH:
             try:
-                qr_code_canvas = await self._page.wait_for_selector(loc.QR_CODE, timeout=5000)
+                qr_code_canvas = await self._page.wait_for_selector(
+                    loc.QR_CODE, timeout=5000
+                )
                 qr_binary = await self._extract_image_from_canvas(qr_code_canvas)
 
                 if qr_binary != self.last_qr_shown:
@@ -230,7 +256,9 @@ class Client(BaseWhatsAppClient):
 
                 await self.emit("on_qr", qr_binary)
             except PlaywrightTimeoutError:
-                await self.emit("on_warning", "Tiempo de espera agotado para el código QR")
+                await self.emit(
+                    "on_warning", "Tiempo de espera agotado para el código QR"
+                )
             except Exception as e:
                 await self.emit("on_error", f"Error al procesar código QR: {e}")
 
@@ -241,14 +269,14 @@ class Client(BaseWhatsAppClient):
         elif curr_state == State.LOGGED_IN:
             await self.emit("on_logged_in")
             await self._handle_logged_in_state()
-    
+
     async def _handle_same_state(self, state, last_qr_shown):
         """Maneja la lógica cuando el estado no ha cambiado"""
         if state == State.QR_AUTH:
             await self._handle_qr_auth_state(last_qr_shown)
         elif state == State.LOGGED_IN:
             await self._handle_logged_in_state()
-    
+
     async def _handle_qr_auth_state(self, last_qr_shown):
         """Maneja el estado de autenticación QR"""
         try:
@@ -262,25 +290,27 @@ class Client(BaseWhatsAppClient):
                     await self.emit("on_qr_change", curr_qr_binary)
         except Exception as e:
             await self.emit("on_warning", f"Error al actualizar código QR: {e}")
-    
+
     async def _handle_logged_in_state(self):
         """Maneja el estado de sesión iniciada"""
         try:
             # Intentar hacer clic en el botón Continue si está presente
-            continue_button = await self._page.query_selector("button:has(div:has-text('Continue'))")
+            continue_button = await self._page.query_selector(
+                "button:has(div:has-text('Continue'))"
+            )
             if continue_button:
                 await continue_button.click()
                 await asyncio.sleep(1)
                 return  # Salir después de manejar el botón Continue
-                
+
             # Manejar chats no leídos
             unread_chats = await self._check_unread_chats()
             if unread_chats:
                 await self.emit("on_unread_chat", unread_chats)
-                
+
         except Exception as e:
             await self.emit("on_error", f"Error en estado de sesión iniciada: {e}")
-    
+
     async def _check_unread_chats(self):
         """Verifica y devuelve los chats no leídos"""
         unread_chats = []
@@ -297,15 +327,15 @@ class Client(BaseWhatsAppClient):
                         chat_result = await self._parse_search_result(chat, "CHATS")
                         if chat_result:
                             unread_chats.append(chat_result)
-            
+
             # Volver a la vista de todos los chats
             all_button = await self._page.query_selector(loc.ALL_CHATS_BUTTON)
             if all_button:
                 await all_button.click()
-                
+
         except Exception as e:
             await self.emit("on_warning", f"Error al verificar chats no leídos: {e}")
-            
+
         return unread_chats
 
     async def _get_state(self) -> Optional[State]:
@@ -318,15 +348,20 @@ class Client(BaseWhatsAppClient):
             return False
         element = await self.wa_elements.wait_for_selector(selector, timeout=timeout)
         return element is not None
-        
+
     async def close(self):
         """Cierra el chat o la vista actual presionando Escape."""
         if self._page:
             try:
                 await self._page.keyboard.press("Escape")
             except Exception as e:
-                await self.emit("on_warning", f"Error trying to close chat with Escape: {e}")
-    async def open(self, chat_name: str, timeout: int = 10000, force_open: bool = False) -> bool:
+                await self.emit(
+                    "on_warning", f"Error trying to close chat with Escape: {e}"
+                )
+
+    async def open(
+        self, chat_name: str, timeout: int = 10000, force_open: bool = False
+    ) -> bool:
         """
         Abre un chat por su nombre visible. Si no está en el DOM, lo busca y lo abre.
 
@@ -338,7 +373,7 @@ class Client(BaseWhatsAppClient):
             bool: True si se abrió el chat correctamente, False si falló.
         """
         page = self._page
-# detectar si chat_name es número (solo dígitos y + opcional)
+        # detectar si chat_name es número (solo dígitos y + opcional)
         es_numero = bool(re.fullmatch(r"\+?\d+", chat_name))
 
         if es_numero or force_open:
@@ -392,7 +427,6 @@ class Client(BaseWhatsAppClient):
             print(f"❌ Error al abrir el chat '{chat_name}': {e}")
             return False
 
-
     async def _extract_image_from_canvas(self, canvas_element) -> Optional[bytes]:
         """Extrae la imagen de un elemento canvas"""
         if not canvas_element:
@@ -402,28 +436,45 @@ class Client(BaseWhatsAppClient):
         except Exception as e:
             await self.emit("on_error", f"Error extracting QR image: {e}")
             return None
-        
-    async def _parse_search_result(self, element, result_type: str = "CHATS") -> Optional[Dict[str, Any]]:
+
+    async def _parse_search_result(
+        self, element, result_type: str = "CHATS"
+    ) -> Optional[Dict[str, Any]]:
         try:
-            components = await element.query_selector_all("xpath=.//div[@role='gridcell' and @aria-colindex='2']/parent::div/div")
+            components = await element.query_selector_all(
+                "xpath=.//div[@role='gridcell' and @aria-colindex='2']/parent::div/div"
+            )
             count = len(components)
 
-            unread_el = await element.query_selector(f"xpath={loc.SEARCH_ITEM_UNREAD_MESSAGES}")
+            unread_el = await element.query_selector(
+                f"xpath={loc.SEARCH_ITEM_UNREAD_MESSAGES}"
+            )
             unread_count = await unread_el.inner_text() if unread_el else "0"
 
             if count == 3:
-                span_title_0 = await components[0].query_selector(f"xpath={loc.SPAN_TITLE}")
-                group_title = await span_title_0.get_attribute("title") if span_title_0 else ""
+                span_title_0 = await components[0].query_selector(
+                    f"xpath={loc.SPAN_TITLE}"
+                )
+                group_title = (
+                    await span_title_0.get_attribute("title") if span_title_0 else ""
+                )
 
                 datetime_children = await components[0].query_selector_all("xpath=./*")
-                datetime_text = await datetime_children[1].text_content() if len(datetime_children) > 1 else ""
+                datetime_text = (
+                    await datetime_children[1].text_content()
+                    if len(datetime_children) > 1
+                    else ""
+                )
 
-                span_title_1 = await components[1].query_selector(f"xpath={loc.SPAN_TITLE}")
-                title = await span_title_1.get_attribute("title") if span_title_1 else ""
+                span_title_1 = await components[1].query_selector(
+                    f"xpath={loc.SPAN_TITLE}"
+                )
+                title = (
+                    await span_title_1.get_attribute("title") if span_title_1 else ""
+                )
 
                 info_text = (await components[2].text_content()) or ""
                 info_text = info_text.replace("\n", "")
-
 
                 return {
                     "type": result_type,
@@ -432,20 +483,31 @@ class Client(BaseWhatsAppClient):
                     "last_activity": datetime_text,
                     "last_message": info_text,
                     "unread_count": unread_count,
-                    "element": element
+                    "element": element,
                 }
 
             elif count == 2:
-                span_title_0 = await components[0].query_selector(f"xpath={loc.SPAN_TITLE}")
-                title = await span_title_0.get_attribute("title") if span_title_0 else ""
+                span_title_0 = await components[0].query_selector(
+                    f"xpath={loc.SPAN_TITLE}"
+                )
+                title = (
+                    await span_title_0.get_attribute("title") if span_title_0 else ""
+                )
 
                 datetime_children = await components[0].query_selector_all("xpath=./*")
-                datetime_text = await datetime_children[1].text_content() if len(datetime_children) > 1 else ""
+                datetime_text = (
+                    await datetime_children[1].text_content()
+                    if len(datetime_children) > 1
+                    else ""
+                )
 
                 info_children = await components[1].query_selector_all("xpath=./*")
-                info_text = (await info_children[0].text_content() if len(info_children) > 0 else "") or ""
+                info_text = (
+                    await info_children[0].text_content()
+                    if len(info_children) > 0
+                    else ""
+                ) or ""
                 info_text = info_text.replace("\n", "")
-
 
                 return {
                     "type": result_type,
@@ -453,7 +515,7 @@ class Client(BaseWhatsAppClient):
                     "last_activity": datetime_text,
                     "last_message": info_text,
                     "unread_count": unread_count,
-                    "element": element
+                    "element": element,
                 }
 
             return None
@@ -461,9 +523,6 @@ class Client(BaseWhatsAppClient):
         except Exception as e:
             print(f"Error parsing result: {e}")
             return None
-
-
-
 
     async def wait_until_logged_in(self, timeout: int = 60) -> bool:
         """Espera hasta que el estado sea LOGGED_IN o se agote el tiempo"""
@@ -475,7 +534,9 @@ class Client(BaseWhatsAppClient):
         await self.emit("on_error", "Tiempo de espera agotado para iniciar sesión")
         return False
 
-    async def search_conversations(self, query: str, close=True) -> List[Dict[str, Any]]:
+    async def search_conversations(
+        self, query: str, close=True
+    ) -> List[Dict[str, Any]]:
         """Busca conversaciones por término"""
         if not await self.wait_until_logged_in():
             return []
@@ -531,7 +592,9 @@ class Client(BaseWhatsAppClient):
                     archivos_guardados.append(ruta)
         return archivos_guardados
 
-    async def download_file_by_index(self, index: int, carpeta: Optional[str] = None) -> Optional[Path]:
+    async def download_file_by_index(
+        self, index: int, carpeta: Optional[str] = None
+    ) -> Optional[Path]:
         """
         Descarga sólo el FileMessage en la posición `index` de la lista devuelta
         por collect_messages() filtrando por FileMessage.
@@ -551,7 +614,9 @@ class Client(BaseWhatsAppClient):
 
         return await archivos[index].download(self._page, downloads_dir)
 
-    async def send_message(self, chat_query: str, message: str, force_open=True) -> bool:
+    async def send_message(
+        self, chat_query: str, message: str, force_open=True
+    ) -> bool:
         """Envía un mensaje a un chat"""
         if not await self.wait_until_logged_in():
             return False
@@ -560,9 +625,14 @@ class Client(BaseWhatsAppClient):
             if force_open:
                 await self.open(chat_query)
             await self._page.wait_for_selector(loc.CHAT_INPUT_BOX, timeout=10000)
-            input_box = await self._page.wait_for_selector(loc.CHAT_INPUT_BOX, timeout=10000)
+            input_box = await self._page.wait_for_selector(
+                loc.CHAT_INPUT_BOX, timeout=10000
+            )
             if not input_box:
-                await self.emit("on_error", "No se encontró el cuadro de texto para enviar el mensaje")
+                await self.emit(
+                    "on_error",
+                    "No se encontró el cuadro de texto para enviar el mensaje",
+                )
                 return False
 
             await input_box.click()
@@ -597,7 +667,9 @@ class Client(BaseWhatsAppClient):
 
             await self._page.wait_for_selector(loc.CHAT_INPUT_BOX, timeout=10000)
 
-            attach_btn = await self._page.wait_for_selector(loc.ATTACH_BUTTON, timeout=5000)
+            attach_btn = await self._page.wait_for_selector(
+                loc.ATTACH_BUTTON, timeout=5000
+            )
             await attach_btn.click()
 
             input_files = await self._page.query_selector_all(loc.FILE_INPUT)
@@ -609,7 +681,9 @@ class Client(BaseWhatsAppClient):
             await input_files[0].set_input_files(path)
             await asyncio.sleep(1)  # Esperar que se cargue previsualización
 
-            send_btn = await self._page.wait_for_selector(loc.SEND_BUTTON, timeout=10000)
+            send_btn = await self._page.wait_for_selector(
+                loc.SEND_BUTTON, timeout=10000
+            )
             await send_btn.click()
 
             return True

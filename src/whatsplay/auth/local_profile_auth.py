@@ -1,8 +1,10 @@
 """Local profile authentication implementation"""
+
 import os
 from typing import Dict, Any
 from .auth import AuthBase
 from playwright.async_api import BrowserContext
+
 
 class LocalProfileAuth(AuthBase):
     """Authentication using a local browser profile"""
@@ -21,8 +23,8 @@ class LocalProfileAuth(AuthBase):
             "args": [
                 "--no-sandbox",
                 "--disable-setuid-sandbox",
-                "--disable-dev-shm-usage"
-            ]
+                "--disable-dev-shm-usage",
+            ],
         }
 
     async def setup_context(self, context: BrowserContext) -> None:

@@ -6,11 +6,11 @@ EVENT_LIST = [
     "on_loading",
     "on_logged_in",
     "on_unread_chat",
-    "on_tick"
+    "on_tick",
 ]
 
-class Event:
 
+class Event:
     def __init__(self):
         self.__listeners = []
 
@@ -19,38 +19,33 @@ class Event:
         return func
 
     def add_listener(self, func):
-
         if func in self.__listeners:
             return
 
         self.__listeners.append(func)
 
     def remove_listener(self, func):
-
         if func not in self.__listeners:
             return
 
         self.__listeners.remove(func)
 
     def trigger(self, *args):
-
         for func in self.__listeners:
             func(*args)
 
-class EventHandler:
 
+class EventHandler:
     def __init__(self):
         self._events = {}
 
     def add_event(self, event_type):
-
         if event_type in self._events:
             return
 
         self._events[event_type] = Event()
 
     def event(self, event_type):
-
         if event_type not in self._events:
             return
 
@@ -61,7 +56,6 @@ class EventHandler:
         return decorator
 
     def trigger_event(self, event_type, *args):
-
         if event_type not in self._events:
             return
 

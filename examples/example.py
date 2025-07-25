@@ -3,13 +3,21 @@ import sys
 import asyncio
 
 # Add the src directory to Python path
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'src')))
+sys.path.insert(
+    0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "src"))
+)
 
 import asyncio
 from pathlib import Path
 
-from whatsplay.client import Client    # Asegúrate de que la ruta sea correcta a tu client.py
-from whatsplay.object.message import Message, FileMessage   # Asegúrate de que la ruta sea correcta a tu models.py
+from whatsplay.client import (
+    Client,
+)  # Asegúrate de que la ruta sea correcta a tu client.py
+from whatsplay.object.message import (
+    Message,
+    FileMessage,
+)  # Asegúrate de que la ruta sea correcta a tu models.py
+
 
 async def list_available_chats(client):
     """Función de depuración: lista los títulos de los chats visibles en la interfaz."""
@@ -17,13 +25,14 @@ async def list_available_chats(client):
         # Esperar breve para asegurarse de que la interfaz cargue
         await asyncio.sleep(2)
         # Obtener todos los elementos con título de chat
-        elements = await client._page.query_selector_all('span[title]')
+        elements = await client._page.query_selector_all("span[title]")
         print("Chats disponibles:")
         for elem in elements:
-            title = await elem.get_attribute('title')
+            title = await elem.get_attribute("title")
             print(f" - {title}")
     except Exception as e:
         print(f"⚠️ No se pudieron obtener los chats: {e}")
+
 
 async def main():
     # 1) Creamos una carpeta donde se guardará la sesión de WhatsApp Web
@@ -32,10 +41,7 @@ async def main():
 
     # 2) Instanciamos el cliente; en modo no-headless para poder escanear QR la primera vez
     client = Client(
-        user_data_dir=str(user_data),
-        headless=False,
-        locale="en-US",
-        auth=None
+        user_data_dir=str(user_data), headless=False, locale="en-US", auth=None
     )
 
     # 3) Creamos la tarea que ejecuta el bucle principal del cliente
@@ -55,11 +61,15 @@ async def main():
         await list_available_chats(client)
 
         # 5) Abrimos un chat concreto
-        chat_name = "Mom"  # Asegurate de usar el nombre exacto que aparece en la lista anterior
+        chat_name = (
+            "Mom"  # Asegurate de usar el nombre exacto que aparece en la lista anterior
+        )
         print(f"Abrimos el chat: {chat_name}")
         ok = await client.open(chat_name)
         if ok is False:
-            print(f"No se encontró el chat «{chat_name}». Verifica el nombre y vuelve a intentar.")
+            print(
+                f"No se encontró el chat «{chat_name}». Verifica el nombre y vuelve a intentar."
+            )
             return
         # Damos un par de segundos para que cargue el historial
         await asyncio.sleep(2)
@@ -88,7 +98,9 @@ async def main():
             for r in rutas:
                 print("   •", r)
         else:
-            print("\nNo se descargó ningún archivo (quizá no había ninguno o hubo error).")
+            print(
+                "\nNo se descargó ningún archivo (quizá no había ninguno o hubo error)."
+            )
 
     except Exception as e:
         print(f"❌ Excepción durante ejecución: {e}")
@@ -108,6 +120,7 @@ async def main():
                 await task
             except asyncio.CancelledError:
                 pass
+
 
 if __name__ == "__main__":
     asyncio.run(main())

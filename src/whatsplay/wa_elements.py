@@ -1,8 +1,13 @@
 """
 Utilities for interacting with WhatsApp Web elements
 """
+
 from typing import Optional, List, Dict, Any
-from playwright.async_api import Page, ElementHandle, TimeoutError as PlaywrightTimeoutError
+from playwright.async_api import (
+    Page,
+    ElementHandle,
+    TimeoutError as PlaywrightTimeoutError,
+)
 
 from .constants import locator as loc
 from .constants.states import State
@@ -11,7 +16,7 @@ from .filters import MessageFilter
 
 class WhatsAppElements:
     """Helper class for interacting with WhatsApp Web elements"""
-    
+
     def __init__(self, page: Page):
         self.page = page
 
@@ -40,18 +45,15 @@ class WhatsAppElements:
         except Exception:
             return None
 
-    async def wait_for_selector(self, 
-                              selector: str, 
-                              timeout: int = 5000, 
-                              state: str = "visible") -> Optional[ElementHandle]:
+    async def wait_for_selector(
+        self, selector: str, timeout: int = 5000, state: str = "visible"
+    ) -> Optional[ElementHandle]:
         """
         Espera por un elemento y lo retorna cuando está disponible
         """
         try:
             element = await self.page.wait_for_selector(
-                selector,
-                timeout=timeout,
-                state=state
+                selector, timeout=timeout, state=state
             )
             return element
         except PlaywrightTimeoutError:
@@ -63,7 +65,9 @@ class WhatsAppElements:
             # Intentar con cada selector del botón de búsqueda
             for selector in loc.SEARCH_BUTTON:
                 try:
-                    element = await self.page.wait_for_selector(selector, timeout=1000, state='visible')
+                    element = await self.page.wait_for_selector(
+                        selector, timeout=1000, state="visible"
+                    )
                     if element:
                         await element.click()
                         if await self.verify_search_active():
@@ -92,19 +96,23 @@ class WhatsAppElements:
         """Verifica si la búsqueda está activa usando múltiples indicadores"""
         try:
             # Verificar si el botón de cancelar búsqueda está visible
-            cancel_button = await self.wait_for_selector(loc.CANCEL_SEARCH, timeout=1000)
+            cancel_button = await self.wait_for_selector(
+                loc.CANCEL_SEARCH, timeout=1000
+            )
             if cancel_button:
                 return True
 
             # Verificar si algún campo de búsqueda está visible
             for selector in loc.SEARCH_TEXT_BOX:
                 try:
-                    element = await self.page.wait_for_selector(selector, timeout=1000, state='visible')
+                    element = await self.page.wait_for_selector(
+                        selector, timeout=1000, state="visible"
+                    )
                     if element:
                         return True
                 except Exception:
                     continue
-                    
+
             return False
         except Exception:
             return False
@@ -121,7 +129,7 @@ class WhatsAppElements:
         except Exception:
             return None
 
-    async def search_chats(self, query: str, close = True) -> List[Dict[str, Any]]:
+    async def search_chats(self, query: str, close=True) -> List[Dict[str, Any]]:
         """Busca chats usando un término y retorna los resultados"""
         results = []
         try:
@@ -155,7 +163,9 @@ class WhatsAppElements:
                         return results
 
             # Esperar resultados
-            results_container = await self.wait_for_selector(loc.SEARCH_RESULT, timeout=5000)
+            results_container = await self.wait_for_selector(
+                loc.SEARCH_RESULT, timeout=5000
+            )
             if not results_container:
                 print("No search results found")
                 return results
@@ -177,5 +187,5 @@ class WhatsAppElements:
                     await self.page.keyboard.press("Escape")
             except:
                 pass
-            
+
         return results

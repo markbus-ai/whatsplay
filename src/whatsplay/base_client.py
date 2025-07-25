@@ -1,6 +1,7 @@
 """
 Base client implementation for WhatsApp Web
 """
+
 from typing import Optional, Any, Dict
 from playwright.async_api import Page, Browser, BrowserContext, async_playwright
 
@@ -15,15 +16,19 @@ USER_AGENT_CHROME_114_WIN10 = (
     "Chrome/114.0.5735.91 Safari/537.36"
 )
 
+
 class BaseWhatsAppClient(EventHandler):
     """
     Cliente base para WhatsApp Web que maneja el ciclo de vida básico
     y la gestión de eventos
     """
-    def __init__(self, 
-                 user_data_dir: Optional[str] = None,
-                 headless: bool = False,
-                 auth: Optional[Any] = None):
+
+    def __init__(
+        self,
+        user_data_dir: Optional[str] = None,
+        headless: bool = False,
+        auth: Optional[Any] = None,
+    ):
         super().__init__(EVENT_LIST)
         self.user_data_dir = user_data_dir
         self.headless = headless
@@ -36,7 +41,7 @@ class BaseWhatsAppClient(EventHandler):
 
     def _get_browser_args(self) -> Dict[str, Any]:
         """Get browser launch arguments"""
-        if self.auth and hasattr(self.auth, 'get_browser_args'):
+        if self.auth and hasattr(self.auth, "get_browser_args"):
             # Use auth provider configuration if available
             return self.auth.get_browser_args()
         # Default configuration
@@ -47,67 +52,66 @@ class BaseWhatsAppClient(EventHandler):
             "--disable-accelerated-2d-canvas",
             "--no-first-run",
             "--no-zygote",
-            "--disable-gpu"
+            "--disable-gpu",
         ]
         if self.headless:
             args.append("--headless=new")
-        return {
-            "headless": self.headless,
-            "args": args
-        }
+        return {"headless": self.headless, "args": args}
 
     async def _initialize_browser(self) -> None:
         """Initialize browser and configure context"""
         try:
             self.playwright = await async_playwright().start()
             browser_type = self.playwright.chromium
-            
+
             # Get browser launch configuration
             launch_args = self._get_browser_args()
             user_data_dir = None
-            
-            if self.auth and hasattr(self.auth, 'data_dir'):
+
+            if self.auth and hasattr(self.auth, "data_dir"):
                 user_data_dir = self.auth.data_dir
             elif self.user_data_dir:
                 user_data_dir = self.user_data_dir
-                
+
             if user_data_dir:
                 # Use persistent context when we have a user data directory
                 self._context = await browser_type.launch_persistent_context(
                     user_data_dir=user_data_dir,
                     headless=self.headless,
                     args=launch_args.get("args", []),
-                    locale='en-US',
-                    timezone_id='UTC',
+                    locale="en-US",
+                    timezone_id="UTC",
                     viewport={"width": 1280, "height": 720},
-                    user_agent=USER_AGENT_CHROME_114_WIN10
+                    user_agent=USER_AGENT_CHROME_114_WIN10,
                 )
                 self._browser = self._context.browser
             else:
                 # Use regular launch for no profile
                 self._browser = await browser_type.launch(**launch_args)
                 self._context = await self._browser.new_context(
-                    locale='en-US',
-                    timezone_id='UTC',
+                    locale="en-US",
+                    timezone_id="UTC",
                     viewport={"width": 1280, "height": 720},
-                    user_agent=USER_AGENT_CHROME_114_WIN10
+                    user_agent=USER_AGENT_CHROME_114_WIN10,
                 )
-            
+
             # Set Accept-Language header
-            await self._context.set_extra_http_headers({"Accept-Language": "en-US,en;q=0.9"})
-            
+            await self._context.set_extra_http_headers(
+                {"Accept-Language": "en-US,en;q=0.9"}
+            )
+
             # Evitar detección básica de webdriver
             await self._context.add_init_script("""
                 Object.defineProperty(navigator, 'webdriver', {
                     get: () => false,
                 });
             """)
-            
+
             self._page = await self._context.new_page()
-            
+
             if self.auth:
                 await self.auth.setup_context(self._context)
-                
+
         except Exception as e:
             await self.emit("on_error", f"Browser initialization error: {e}")
             await self._cleanup()
@@ -136,10 +140,10 @@ class BaseWhatsAppClient(EventHandler):
             await self._initialize_browser()
             self._is_running = True
             await self.emit("on_start")
-            
+
             await self._page.goto("https://web.whatsapp.com")
             await self.emit("on_state_change", State.CONNECTING)
-            
+
         except Exception as e:
             await self.emit("on_error", f"Start error: {e}")
             await self._cleanup()

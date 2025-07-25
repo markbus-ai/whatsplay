@@ -14,12 +14,9 @@ class Message:
       - text: cuerpo textual del mensaje (si existe)
       - container: el propio ElementHandle del <div class="message-in/out ...">
     """
+
     def __init__(
-        self,
-        sender: str,
-        timestamp: datetime,
-        text: str,
-        container: ElementHandle
+        self, sender: str, timestamp: datetime, text: str, container: ElementHandle
     ):
         self.sender = sender
         self.timestamp = timestamp
@@ -56,7 +53,9 @@ class Message:
                 if ":" in hora_text:
                     hh, mm = map(int, hora_text.split(":"))
                     ahora = datetime.now()
-                    timestamp = ahora.replace(hour=hh, minute=mm, second=0, microsecond=0)
+                    timestamp = ahora.replace(
+                        hour=hh, minute=mm, second=0, microsecond=0
+                    )
 
             # 3) EXTRAER TEXTO DEL MENSAJE
             texto = ""
@@ -67,7 +66,9 @@ class Message:
                 raw_inner = await cuerpo_div.inner_text()
                 if raw_inner:
                     lineas = raw_inner.split("\n")
-                    if len(lineas) > 1 and (lineas[0].strip().startswith(sender) or ":" in lineas[0]):
+                    if len(lineas) > 1 and (
+                        lineas[0].strip().startswith(sender) or ":" in lineas[0]
+                    ):
                         texto = "\n".join(lineas[1:]).strip()
                     else:
                         texto = raw_inner.strip()
@@ -86,6 +87,7 @@ class FileMessage(Message):
       - filename: nombre real del archivo (p.ej. "SoftwareDeveloper_JeanRoa_ES.pdf")
       - download_icon: ElementHandle apuntando al <span data-icon="audio-download">
     """
+
     def __init__(
         self,
         sender: str,
@@ -93,7 +95,7 @@ class FileMessage(Message):
         text: str,
         container: ElementHandle,
         filename: str,
-        download_icon: ElementHandle
+        download_icon: ElementHandle,
     ):
         super().__init__(sender, timestamp, text, container)
         self.filename = filename
@@ -153,7 +155,7 @@ class FileMessage(Message):
                 text=base_msg.text,
                 container=elem,
                 filename=filename,
-                download_icon=icon
+                download_icon=icon,
             )
 
         except Exception:
