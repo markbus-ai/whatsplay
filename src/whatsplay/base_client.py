@@ -39,19 +39,21 @@ class BaseWhatsAppClient(EventHandler):
         if self.auth and hasattr(self.auth, 'get_browser_args'):
             # Use auth provider configuration if available
             return self.auth.get_browser_args()
-        
         # Default configuration
+        args = [
+            "--no-sandbox",
+            "--disable-setuid-sandbox",
+            "--disable-dev-shm-usage",
+            "--disable-accelerated-2d-canvas",
+            "--no-first-run",
+            "--no-zygote",
+            "--disable-gpu"
+        ]
+        if self.headless:
+            args.append("--headless=new")
         return {
             "headless": self.headless,
-            "args": [
-                "--no-sandbox",
-                "--disable-setuid-sandbox",
-                "--disable-dev-shm-usage",
-                "--disable-accelerated-2d-canvas",
-                "--no-first-run",
-                "--no-zygote",
-                "--disable-gpu"
-            ]
+            "args": args
         }
 
     async def _initialize_browser(self) -> None:
@@ -73,7 +75,7 @@ class BaseWhatsAppClient(EventHandler):
                 # Use persistent context when we have a user data directory
                 self._context = await browser_type.launch_persistent_context(
                     user_data_dir=user_data_dir,
-                    headless=launch_args.get("headless", False),
+                    headless=self.headless,
                     args=launch_args.get("args", []),
                     locale='en-US',
                     timezone_id='UTC',

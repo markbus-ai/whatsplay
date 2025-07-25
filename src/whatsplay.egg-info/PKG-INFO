@@ -46,7 +46,6 @@ WhatsPlay es una librería modular diseñada para automatizar WhatsApp Web desde
 - **Sistema de eventos personalizado** para manejo asíncrono de mensajes
 - **Detección inteligente** de mensajes no leídos
 - **Arquitectura modular** con separación clara de responsabilidades
-- **Procesamiento de imágenes** con OpenCV para reconocimiento avanzado
 
 ## 🖼️ Arquitectura del sistema
 
@@ -63,7 +62,6 @@ La arquitectura modular permite:
 ### Prerrequisitos
 
 - Python 3.8 o superior
-- Node.js (para Playwright)
 
 ### Instalación desde PyPI 
 
@@ -161,13 +159,12 @@ Las contribuciones son bienvenidas. Por favor:
 ### Guías de desarrollo
 
 - Sigue PEP 8 para el estilo de código
-- Agrega tests para nuevas funcionalidades
 - Actualiza la documentación cuando sea necesario
 - Usa type hints en todas las funciones públicas
 
 ## 📋 Roadmap
 
-- [ ] Soporte para mensajes multimedia (imágenes, videos, audios)
+- [✅] Soporte para mensajes multimedia (imágenes, videos, audios)
 - [ ] MessageFilter
 
 ## ❓ FAQ
@@ -176,7 +173,7 @@ Las contribuciones son bienvenidas. Por favor:
 WhatsPlay utiliza WhatsApp Web oficial, por lo que es tan seguro como usar WhatsApp en tu navegador.
 
 **¿Puede ser detectado por WhatsApp?**
-WhatsPlay simula interacciones humanas normales, pero siempre existe un riesgo al automatizar servicios web.
+WhatsPlay simula interacciones humanas normales, pero siempre existe un riesgo al automatizar servicios web, hagalo bajo su propia responsabilidad.
 
 **¿Funciona en servidores sin GUI?**
 Sí, usando el modo headless de Playwright.
@@ -192,7 +189,7 @@ Si encuentras un bug, por favor [abre un issue](https://github.com/markbus-ai/wh
 
 ## 🤝 Agradecimientos
 
-Este proyecto está inspirado y utiliza partes del código de [RedShot](https://github.com/akrentz6/RedShot), licenciado bajo la licencia Apache 2.0. Agradecemos especialmente a la comunidad de RedShot por su trabajo pionero en automatización de WhatsApp.
+Este proyecto está inspirado y utiliza partes del código de [RedShot](https://github.com/akrentz6/RedShot), licenciado bajo la licencia Apache 2.0.
 
 ## 📄 Licencia
 

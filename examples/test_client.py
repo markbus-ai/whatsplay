@@ -42,23 +42,18 @@ async def main():
         
         try:
             # Search for a chat
-            results = await client.search_conversations("mom")
-            print("results:", results)
-            if results:
-                # Display the formatted text for the user
-                print(f"📝 Found chat: {results[1]['name']}")
-                # Use the raw chat title for sending messages
-                success = await client.send_message(
-                    results[1]['name'],  # Use raw chat title
-                    "Hello from WhatsPlay! 👋"
-                )
-                import time
-                time.sleep(5)
-                if success:
-                    print("✉️ Message sent successfully!")
-                else:
-                    print("❌ Failed to send message")
+
+            success = await client.send_message(
+                "5492234480402",  # Use raw chat title
+                "Hello from WhatsPlay! 👋"
+            )
+            import time
+            time.sleep(5)
+            if success:
+                print("✉️ Message sent successfully!")
             else:
+                print("❌ Failed to send message")
+
                 print("❌ Chat not found")
         except Exception as e:
             print(f"❌ Error: {e}")

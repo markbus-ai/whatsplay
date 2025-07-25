@@ -1,21 +1,21 @@
 import asyncio
-import logging
 import signal
 import sys
 import os
 import time
 from pathlib import Path
 from typing import Optional, Dict, List, Any, Union
+import re
+import urllib.parse
 
 from playwright.async_api import TimeoutError as PlaywrightTimeoutError, Error as PlaywrightError
 
 from .base_client import BaseWhatsAppClient
 from .wa_elements import WhatsAppElements
-from .utils import show_qr_window, copy_file_to_clipboard
+from .utils import show_qr_window
 from .constants.states import State
 from .constants import locator as loc
 from .object.message import Message, FileMessage
-import datetime
 
 class Client(BaseWhatsAppClient):
     """
@@ -35,6 +35,8 @@ class Client(BaseWhatsAppClient):
         self.current_state = None
         self.unread_messages_sleep = 1  # Tiempo de espera para cargar mensajes no leídos
         self._shutdown_event = asyncio.Event()
+        self._consecutive_errors = 0
+        self.last_qr_shown = None
         self._setup_signal_handlers()
         
     def _setup_signal_handlers(self):
@@ -306,115 +308,25 @@ class Client(BaseWhatsAppClient):
             
         return unread_chats
 
-        qr_binary = None
-        state = None
-        last_qr_shown = None  # Guarda la última imagen QR mostrada
-
-        while self.running:
-            curr_state = await self._get_state()
-            self.current_state = curr_state  # Actualizar la propiedad current_state
-
-            if curr_state is None:
-                await asyncio.sleep(self.poll_freq)
-                continue
-
-            if curr_state != state:
-                if curr_state == State.AUTH:
-                    await self.emit("on_auth")
-
-                elif curr_state == State.QR_AUTH:
-                    try:
-                        qr_code_canvas = await self._page.wait_for_selector(loc.QR_CODE, timeout=5000)
-                        qr_binary = await self._extract_image_from_canvas(qr_code_canvas)
-
-                        if qr_binary != last_qr_shown:
-                            show_qr_window(qr_binary)
-                            last_qr_shown = qr_binary
-
-                        await self.emit("on_qr", qr_binary)
-                    except PlaywrightTimeoutError:
-                        print("⚠️ Timeout esperando QR.")
-
-                elif curr_state == State.LOADING:
-                    loading_chats = await self._is_present(loc.LOADING_CHATS)
-                    await self.emit("on_loading", loading_chats)
-
-                elif curr_state == State.LOGGED_IN:
-                    await self.emit("on_logged_in")
-
-                    try:
-                        continue_button = await self._page.query_selector("button:has(div:has-text('Continue'))")
-                        if continue_button:
-                            await continue_button.click()
-                            await asyncio.sleep(1)
-                    except Exception as e:
-                        print(f"⚠️ Error en 'Continue': {e}")
-                        await self.emit("on_error", f"⚠️ Error al hacer clic en 'Continue': {e}")
-
-                state = curr_state
-
-            else:
-                if curr_state == State.QR_AUTH:
-                    try:
-                        qr_code_canvas = await self._page.query_selector(loc.QR_CODE)
-                        if qr_code_canvas:
-                            curr_qr_binary = await self._extract_image_from_canvas(qr_code_canvas)
-
-                            if curr_qr_binary != last_qr_shown:
-                                show_qr_window(curr_qr_binary)
-                                last_qr_shown = curr_qr_binary
-                                await self.emit("on_qr_change", curr_qr_binary)
-                    except Exception:
-                        pass
-
-                elif curr_state == State.LOGGED_IN:
-                    unread_chats = []
-                    try:
-                        continue_button = await self._page.query_selector("button:has(div:has-text('Continue'))")
-                        if continue_button:
-                            await continue_button.click()
-                            await asyncio.sleep(2)
-                    except Exception as e:
-                        await self.emit("on_error", f"⚠️ Error al hacer clic en 'Continue': {e}")
-
-                    try:
-                        unread_button = await self._page.query_selector(loc.UNREAD_CHATS_BUTTON)
-                        if unread_button:
-                            await unread_button.click()
-                            await asyncio.sleep(self.unread_messages_sleep)
-
-                            chat_list = await self._page.query_selector_all(loc.UNREAD_CHAT_DIV)
-                            if chat_list and len(chat_list) > 0:
-                                chats = await chat_list[0].query_selector_all(loc.SEARCH_ITEM)
-                                for chat in chats:
-                                    inner_text = await chat.inner_text()
-                                    chat_result = await self._parse_search_result(chat, "CHATS")
-                                    if chat_result:
-                                        unread_chats.append(chat_result)
-                                        await self.emit("on_unread_chat", [chat_result])
-                        else:
-                            print("ℹ️ No se encontró el botón de chats no leídos.")
-
-                        all_button = await self._page.query_selector(loc.ALL_CHATS_BUTTON)
-                        if all_button:
-                            await all_button.click()
-
-                    except Exception as e:
-                        print(f"❌ Error buscando chats no leídos: {e} ({type(e)})")
-                        await self.emit("on_error", f"Error checking unread chats: {e} ({type(e)})")
-
-            await self.emit("on_tick")
-            await asyncio.sleep(self.poll_freq)
-
-
     async def _get_state(self) -> Optional[State]:
         """Obtiene el estado actual de WhatsApp Web"""
         return await self.wa_elements.get_state()
+
+    async def _is_present(self, selector: str, timeout: int = 1000) -> bool:
+        """Verifica si un elemento está presente en la página."""
+        if not self.wa_elements:
+            return False
+        element = await self.wa_elements.wait_for_selector(selector, timeout=timeout)
+        return element is not None
         
     async def close(self):
+        """Cierra el chat o la vista actual presionando Escape."""
         if self._page:
-            await self._page.close()
-    async def open(self, chat_name: str, timeout: int = 10000) -> bool:
+            try:
+                await self._page.keyboard.press("Escape")
+            except Exception as e:
+                await self.emit("on_warning", f"Error trying to close chat with Escape: {e}")
+    async def open(self, chat_name: str, timeout: int = 10000, force_open: bool = False) -> bool:
         """
         Abre un chat por su nombre visible. Si no está en el DOM, lo busca y lo abre.
 
@@ -426,6 +338,14 @@ class Client(BaseWhatsAppClient):
             bool: True si se abrió el chat correctamente, False si falló.
         """
         page = self._page
+# detectar si chat_name es número (solo dígitos y + opcional)
+        es_numero = bool(re.fullmatch(r"\+?\d+", chat_name))
+
+        if es_numero or force_open:
+            # quitar '+' si existe
+            numero = chat_name.lstrip("+")
+            url = f"https://web.whatsapp.com/send?phone={numero}"
+            await page.goto(url)
         span_xpath = f"//span[contains(@title, {repr(chat_name)})]"
 
         try:
@@ -631,13 +551,14 @@ class Client(BaseWhatsAppClient):
 
         return await archivos[index].download(self._page, downloads_dir)
 
-    async def send_message(self, chat_query: str, message: str) -> bool:
+    async def send_message(self, chat_query: str, message: str, force_open=True) -> bool:
         """Envía un mensaje a un chat"""
         if not await self.wait_until_logged_in():
             return False
 
         try:
-            await self.open(chat_query)
+            if force_open:
+                await self.open(chat_query)
             await self._page.wait_for_selector(loc.CHAT_INPUT_BOX, timeout=10000)
             input_box = await self._page.wait_for_selector(loc.CHAT_INPUT_BOX, timeout=10000)
             if not input_box:
