@@ -119,7 +119,8 @@ class FileMessage(Message):
 
             # 2) BUSCAR NOMBRE DE ARCHIVO
             filename = ""
-            title_handle = await icon.evaluate_handle("""
+            title_handle = await icon.evaluate_handle(
+                """
                 (node) => {
                     let curr = node;
                     while (curr) {
@@ -130,7 +131,8 @@ class FileMessage(Message):
                     }
                     return null;
                 }
-            """)
+            """
+            )
 
             if title_handle:
                 title_elem: ElementHandle = title_handle.as_element()

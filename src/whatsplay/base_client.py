@@ -101,11 +101,13 @@ class BaseWhatsAppClient(EventHandler):
             )
 
             # Evitar detección básica de webdriver
-            await self._context.add_init_script("""
+            await self._context.add_init_script(
+                """
                 Object.defineProperty(navigator, 'webdriver', {
                     get: () => false,
                 });
-            """)
+            """
+            )
 
             self._page = await self._context.new_page()
 
