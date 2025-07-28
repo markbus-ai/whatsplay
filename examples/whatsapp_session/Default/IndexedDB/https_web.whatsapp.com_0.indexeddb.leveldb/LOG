@@ -1,0 +1,33 @@
+2025/07/28-11:55:36.478 3be4d Reusing MANIFEST /home/markusking/proyectos/whatsplay/examples/whatsapp_session/Default/IndexedDB/https_web.whatsapp.com_0.indexeddb.leveldb/MANIFEST-000001
+2025/07/28-11:55:36.478 3be4d Recovering log #39
+2025/07/28-11:55:36.498 3be4d Reusing old log /home/markusking/proyectos/whatsplay/examples/whatsapp_session/Default/IndexedDB/https_web.whatsapp.com_0.indexeddb.leveldb/000039.log 
+2025/07/28-11:55:37.328 3be4f Level-0 table #44: started
+2025/07/28-11:55:37.377 3be4f Level-0 table #44: 412443 bytes OK
+2025/07/28-11:55:37.381 3be4f Delete type=0 #39
+2025/07/28-11:55:37.388 3be4e Manual compaction at level-0 from '\x00\x18\x00\x00\x00' @ 72057594037927935 : 1 .. '\x00\x19\x00\x00\x00' @ 0 : 0; will stop at (end)
+2025/07/28-11:55:37.389 3be59 Level-0 table #46: started
+2025/07/28-11:55:37.393 3be59 Level-0 table #46: 378 bytes OK
+2025/07/28-11:55:37.397 3be59 Delete type=0 #43
+2025/07/28-11:55:37.398 3be4e Manual compaction at level-0 from '\x00\x19\x00\x00\x00' @ 72057594037927935 : 1 .. '\x00\x1a\x00\x00\x00' @ 0 : 0; will stop at '\x00\x19\x00\x00\x05' @ 75015 : 0
+2025/07/28-11:55:37.398 3be4e Compacting 1@0 + 1@1 files
+2025/07/28-11:55:37.426 3be4e Generated table #47@0: 8928 keys, 274413 bytes
+2025/07/28-11:55:37.427 3be4e Compacted 1@0 + 1@1 files => 274413 bytes
+2025/07/28-11:55:37.429 3be4e compacted to: files[ 0 1 1 0 0 0 0 ]
+2025/07/28-11:55:37.429 3be4e Delete type=2 #46
+2025/07/28-11:55:37.429 3be4f Manual compaction at level-0 from '\x00\x19\x00\x00\x05' @ 75015 : 0 .. '\x00\x1a\x00\x00\x00' @ 0 : 0; will stop at (end)
+2025/07/28-11:55:39.798 3be4e Compacting 1@1 + 1@2 files
+2025/07/28-11:55:39.820 3be4e Generated table #48@1: 16404 keys, 682631 bytes
+2025/07/28-11:55:39.820 3be4e Compacted 1@1 + 1@2 files => 682631 bytes
+2025/07/28-11:55:39.821 3be4e compacted to: files[ 0 0 1 0 0 0 0 ]
+2025/07/28-11:55:39.822 3be4e Delete type=2 #44
+2025/07/28-11:55:39.822 3be4e Delete type=2 #41
+2025/07/28-11:55:39.822 3be4e Delete type=2 #47
+2025/07/28-11:55:57.818 3be4f Level-0 table #50: started
+2025/07/28-11:55:57.853 3be4f Level-0 table #50: 1090656 bytes OK
+2025/07/28-11:55:57.854 3be4f Delete type=0 #45
+2025/07/28-11:55:57.864 3be4f Compacting 1@1 + 1@2 files
+2025/07/28-11:55:57.923 3be4f Generated table #51@1: 29274 keys, 1210666 bytes
+2025/07/28-11:55:57.924 3be4f Compacted 1@1 + 1@2 files => 1210666 bytes
+2025/07/28-11:55:57.925 3be4f compacted to: files[ 0 0 1 0 0 0 0 ]
+2025/07/28-11:55:57.925 3be4f Delete type=2 #50
+2025/07/28-11:55:57.925 3be4f Delete type=2 #48
