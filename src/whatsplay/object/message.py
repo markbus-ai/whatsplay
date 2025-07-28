@@ -22,6 +22,7 @@ class Message:
         self.timestamp = timestamp
         self.text = text
         self.container = container
+        
 
     @classmethod
     async def from_element(cls, elem: ElementHandle) -> Optional["Message"]:

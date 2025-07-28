@@ -137,7 +137,7 @@ Las contribuciones son bienvenidas. Por favor:
 ## 📋 Roadmap
 
 - [✅] Soporte para mensajes multimedia (imágenes, videos, audios)
-- [ ] MessageFilter
+- [✅] MessageFilter
 
 ## ❓ FAQ
 

@@ -13,6 +13,7 @@ sys.path.insert(
 
 from whatsplay import Client
 from whatsplay.auth import LocalProfileAuth
+from whatsplay.filters import CustomFilter
 from pathlib import Path
 
 
@@ -40,22 +41,31 @@ async def main():
         if loading_chats:
             print("⌛ Loading chats...")
 
-    @client.event("on_unread_chat")
+    def unread_filter(chat):
+        """
+        Example filter function.
+        Only allows chats that are not groups.
+        """
+        return chat.get("group") is None
+
+    @client.event("on_unread_chat", filter_obj=CustomFilter(unread_filter))
     async def unread_chat(chats):
         print("evento unread")
+        print("chat: ", chats[0])
         print("chat name: ", chats[0].get("name"))
-        success = await client.send_message(chats[0].get("name"), "Hello!")
-        if success:
-            print("✅ Mensaje enviado con éxito")
-        else:
-            print("❌ Falló el envío del mensaje")
-        success_file = await client.send_file(
-            chats[0].get("name"), r"C:\Users\Educacion\Desktop\profesional.pdf"
-        )
-        if success_file:
-            print("✅ archivo enviado con éxito")
-        else:
-            print("❌ Falló el envío del archivo")
+        print("chat group: ", chats[0].get("group"))
+        # success = await client.send_message(chats[0].get("name"), "Hello!")
+        # if success:
+        #     print("✅ Mensaje enviado con éxito")
+        # else:
+        #     print("❌ Falló el envío del mensaje")
+        # success_file = await client.send_file(
+        #     chats[0].get("name"), r"/home/markusking/Descargas/Plan-de-Estudios-2010.pdf"
+        # )
+        # if success_file:
+        #     print("✅ archivo enviado con éxito")
+        # else:
+        #     print("❌ Falló el envío del archivo")
 
     @client.event("on_error")
     async def on_error(error):

@@ -371,6 +371,9 @@ class Client(BaseWhatsAppClient):
 
         Returns:
             bool: True si se abrió el chat correctamente, False si falló.
+            
+
+
         """
         page = self._page
         # detectar si chat_name es número (solo dígitos y + opcional)
@@ -509,6 +512,12 @@ class Client(BaseWhatsAppClient):
                 ) or ""
                 info_text = info_text.replace("\n", "")
 
+                is_group = False
+                if ":" in info_text:
+                    sender_part = info_text.split(":")[0].strip()
+                    if sender_part.lower() != title.lower():
+                        is_group = True
+
                 return {
                     "type": result_type,
                     "name": title,
@@ -516,6 +525,7 @@ class Client(BaseWhatsAppClient):
                     "last_message": info_text,
                     "unread_count": unread_count,
                     "element": element,
+                    "group": title if is_group else None,
                 }
 
             return None
