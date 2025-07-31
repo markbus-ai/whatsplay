@@ -11,6 +11,8 @@ from .chat_manager import ChatManager
 from .state_manager import StateManager
 from .object.message import Message, FileMessage
 
+
+
 class Client(BaseWhatsAppClient):
     """
     Cliente de WhatsApp Web implementado con Playwright

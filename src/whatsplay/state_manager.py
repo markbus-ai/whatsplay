@@ -2,7 +2,7 @@
 import asyncio
 from .constants.states import State
 from .constants import locator as loc
-from .utils import show_qr_window
+from .utils import show_qr_window, close_qr_window
 from playwright.async_api import (
     TimeoutError as PlaywrightTimeoutError,
 )
@@ -47,6 +47,7 @@ class StateManager:
             await self.client.emit("on_loading", loading_chats)
 
         elif curr_state == State.LOGGED_IN:
+            close_qr_window()
             await self.client.emit("on_logged_in")
             await self._handle_logged_in_state()
 

@@ -2,53 +2,68 @@ import platform
 import subprocess
 import tempfile
 import os
+import http.server
+import socketserver
+import threading
+import base64
 
 
 def show_qr_window(qr_image_bytes):
     """
-    Muestra un QR en la terminal usando 'chafa' o 'catimg'.
-    Funciona en servidores sin GUI.
+    Muestra un QR en una página web simple.
     """
-    # Guardar imagen temporal desde los bytes
-    with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as temp_file:
-        temp_file.write(qr_image_bytes)
-        temp_file_path = temp_file.name
+    qr_base64 = base64.b64encode(qr_image_bytes).decode('utf-8')
+    html_content = f"""
+    <html>
+        <head>
+            <title>WhatsApp QR Code</title>
+            <style>
+                body {{
+                    display: flex;
+                    justify-content: center;
+                    align-items: center;
+                    height: 100vh;
+                    margin: 0;
+                    background-color: #f0f0f0;
+                }}
+                img {{
+                    max-width: 100%;
+                    max-height: 100%;
+                }}
+            </style>
+        </head>
+        <body>
+            <img src="data:image/png;base64,{qr_base64}" alt="QR Code">
+        </body>
+    </html>
+    """
 
-    try:
-        subprocess.run(["chafa", temp_file_path])
-    finally:
-        os.remove(temp_file_path)
+    class Handler(http.server.SimpleHTTPRequestHandler):
+        def do_GET(self):
+            if self.path == '/':
+                self.send_response(200)
+                self.send_header('Content-type', 'text/html')
+                self.end_headers()
+                self.wfile.write(html_content.encode('utf-8'))
+            else:
+                super().do_GET()
+
+    PORT = 8000
+    httpd = None
+
+    def start_server():
+        nonlocal httpd
+        with socketserver.TCPServer(("", PORT), Handler) as httpd_server:
+            httpd = httpd_server
+            print(f"Servidor iniciado en http://localhost:{PORT}")
+            httpd.serve_forever()
+
+    server_thread = threading.Thread(target=start_server)
+    server_thread.daemon = True
+    server_thread.start()
 
 
-def copy_file_to_clipboard(filepath):
-    system = platform.system()
-
-    if system == "Windows":
-        # En Windows usamos PowerShell Set-Clipboard -LiteralPath
-        command = ["powershell", "Set-Clipboard", "-LiteralPath", filepath]
-        try:
-            subprocess.run(command, check=True)
-            print("Archivo copiado al portapapeles en Windows.")
-        except subprocess.CalledProcessError:
-            print("Error copiando archivo al portapapeles en Windows.")
-
-    elif system == "Linux":
-        # En Linux no hay un portapapeles nativo para archivos como en Windows,
-        # pero podemos copiar la ruta como texto al portapapeles (ejemplo con xclip)
-        try:
-            # Asegúrate de tener xclip instalado: sudo apt install xclip
-            subprocess.run(
-                ["xclip", "-selection", "clipboard"],
-                input=filepath.encode(),
-                check=True,
-            )
-            print("Ruta del archivo copiada al portapapeles en Linux (como texto).")
-        except FileNotFoundError:
-            print("xclip no está instalado. Instálalo para copiar al portapapeles.")
-        except subprocess.CalledProcessError:
-            print("Error copiando ruta al portapapeles en Linux.")
-
-    else:
-        print(
-            f"Sistema operativo '{system}' no soportado para copiar archivos al portapapeles."
-        )
+def close_qr_window():
+    global httpd
+    if httpd:
+        httpd.shutdown()
