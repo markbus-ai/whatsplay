@@ -1,8 +1,7 @@
-
 import asyncio
 from .constants.states import State
 from .constants import locator as loc
-from .utils import show_qr_window, close_qr_window
+from .utils import show_qr_window, close_qr_window, update_qr_code
 from playwright.async_api import (
     TimeoutError as PlaywrightTimeoutError,
 )
@@ -13,10 +12,23 @@ class StateManager:
         self._page = client._page
         self.wa_elements = client.wa_elements
         self.last_qr_shown = None
+        self.qr_server_started = False
 
     async def _get_state(self) -> State:
         """Obtiene el estado actual de WhatsApp Web"""
         return await self.wa_elements.get_state()
+
+    async def _handle_qr_logic(self, qr_binary):
+        """Handles the logic for showing and updating the QR code."""
+        if qr_binary and qr_binary != self.last_qr_shown:
+            if not self.qr_server_started:
+                show_qr_window(qr_binary)
+                self.qr_server_started = True
+            else:
+                update_qr_code(qr_binary)
+            self.last_qr_shown = qr_binary
+            return True
+        return False
 
     async def _handle_state_change(self, curr_state, prev_state):
         """Maneja los cambios de estado"""
@@ -30,11 +42,9 @@ class StateManager:
                 )
                 qr_binary = await self._extract_image_from_canvas(qr_code_canvas)
 
-                if qr_binary != self.last_qr_shown:
-                    show_qr_window(qr_binary)
-                    self.last_qr_shown = qr_binary
+                if await self._handle_qr_logic(qr_binary):
+                    await self.client.emit("on_qr", qr_binary)
 
-                await self.client.emit("on_qr", qr_binary)
             except PlaywrightTimeoutError:
                 await self.client.emit(
                     "on_warning", "Tiempo de espera agotado para el código QR"
@@ -47,7 +57,9 @@ class StateManager:
             await self.client.emit("on_loading", loading_chats)
 
         elif curr_state == State.LOGGED_IN:
-            close_qr_window()
+            if self.qr_server_started:
+                close_qr_window()
+                self.qr_server_started = False
             await self.client.emit("on_logged_in")
             await self._handle_logged_in_state()
 
@@ -65,9 +77,7 @@ class StateManager:
             if qr_code_canvas:
                 curr_qr_binary = await self._extract_image_from_canvas(qr_code_canvas)
 
-                if curr_qr_binary != self.last_qr_shown:
-                    show_qr_window(curr_qr_binary)
-                    self.last_qr_shown = curr_qr_binary
+                if await self._handle_qr_logic(curr_qr_binary):
                     await self.client.emit("on_qr_change", curr_qr_binary)
         except Exception as e:
             await self.client.emit("on_warning", f"Error al actualizar código QR: {e}")
