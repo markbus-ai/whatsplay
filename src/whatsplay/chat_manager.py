@@ -59,7 +59,8 @@ class ChatManager:
                 f"xpath={loc.SEARCH_ITEM_UNREAD_MESSAGES}"
             )
             unread_count = await unread_el.inner_text() if unread_el else "0"
-
+            mic_span = await components[1].query_selector('xpath=.//span[@data-icon="mic"]')
+            
             if count == 3:
                 span_title_0 = await components[0].query_selector(
                     f"xpath={loc.SPAN_TITLE}"
@@ -91,6 +92,7 @@ class ChatManager:
                     "name": title,
                     "last_activity": datetime_text,
                     "last_message": info_text,
+                    "last_message_type": "audio" if mic_span else "text",
                     "unread_count": unread_count,
                     "element": element,
                 }
@@ -123,6 +125,7 @@ class ChatManager:
                     "name": title,
                     "last_activity": datetime_text,
                     "last_message": info_text,
+                    "last_message_type": "audio" if mic_span else "text",
                     "unread_count": unread_count,
                     "element": element,
                     "group": None,
