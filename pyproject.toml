@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "whatsplay"
-version = "1.4.6"
+version = "1.5.2"
 description = "A modern Python library for automating WhatsApp Web using Playwright"
 readme = "README.md"
 requires-python = ">=3.8"
