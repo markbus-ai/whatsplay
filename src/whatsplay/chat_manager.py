@@ -86,6 +86,9 @@ class ChatManager:
                 info_text = (await components[2].text_content()) or ""
                 info_text = info_text.replace("\n", "")
 
+                if "loading" in info_text or "status-" in info_text or "typing" in info_text:
+                    return None
+
                 return {
                     "type": result_type,
                     "group": group_title,
@@ -119,6 +122,8 @@ class ChatManager:
                     else ""
                 ) or ""
                 info_text = info_text.replace("\n", "")
+                if "loading" in info_text or "status-" in info_text or "typing" in info_text:
+                    return None
 
                 return {
                     "type": result_type,
