@@ -208,3 +208,6 @@ class Client(BaseWhatsAppClient):
 
     async def send_file(self, chat_name, path):
         return await self.chat_manager.send_file(chat_name, path)
+
+    async def new_group(self, group_name: str, members: list[str]):
+        return await self.chat_manager.new_group(group_name, members)

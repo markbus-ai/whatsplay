@@ -66,3 +66,7 @@ ANY_DOWNLOAD_ICON = "//span[@data-icon='audio-download']"
 ATTACH_BUTTON = "span[data-icon='plus-rounded']"
 SEND_BUTTON = "span[data-icon='wds-ic-send-filled']"
 FILE_INPUT = "input[type='file']"
+NEW_CHAT_BUTTON = 'xpath=//span[@data-icon="new-chat-outline"]'
+NEW_GROUP_BUTTON = 'xpath=//div[@aria-label="New group" and @role="button"]'
+INPUT_MEMBERS_GROUP = 'xpath=//input[@placeholder="Search name or number"]'
+ENTER_GROUP_NAME = 'xpath=//div[@aria-label="Group subject (optional)"]'

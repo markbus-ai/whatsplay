@@ -2,6 +2,7 @@
 Utilities for interacting with WhatsApp Web elements
 """
 
+import asyncio
 from typing import Optional, List, Dict, Any
 from playwright.async_api import (
     Page,
@@ -189,3 +190,51 @@ class WhatsAppElements:
                 pass
 
         return results
+    async def new_group(self, group_name: str, members: List[str]) -> Optional[ElementHandle]:
+        print(f"Creating new group: {group_name} with members: {members}")
+        """
+        Crea un nuevo grupo con el nombre especificado
+        """
+        try:
+            # Hacer click en el botón de nuevo chat
+            new_chat_button = await self.page.wait_for_selector(
+                loc.NEW_CHAT_BUTTON, timeout=5000
+            )
+            if new_chat_button:
+                await new_chat_button.click()
+            new_group_button = await self.page.wait_for_selector(
+                loc.NEW_GROUP_BUTTON, timeout=5000
+            )
+            if new_group_button:
+                await new_group_button.click()
+            # Esperar al campo de nombre del grupo
+            member_name_input = await self.page.wait_for_selector(
+                loc.INPUT_MEMBERS_GROUP, timeout=5000
+            )
+            if member_name_input:
+                for name in members:
+                    await member_name_input.fill(name)
+                    await asyncio.sleep(0.5)  # Esperar un poco entre entradas
+                    await self.page.keyboard.press("Enter")
+                    
+            enter_arrow = await self.page.wait_for_selector(
+                "xpath=//span[@data-icon='arrow-forward']", timeout=5000
+            )
+            if enter_arrow:
+                await enter_arrow.click()
+                
+            input_group_name = await self.page.wait_for_selector(
+                loc.ENTER_GROUP_NAME, timeout=5000
+            )
+            if input_group_name:
+                await input_group_name.fill(group_name)
+                await self.page.keyboard.press("Enter")
+            
+
+
+        except PlaywrightTimeoutError:
+            print("Timeout while trying to create a new group")
+            return None
+        except Exception as e:
+            print(f"Error creating new group: {e}")
+            return None

@@ -22,7 +22,7 @@ async def main():
     user_data = Path(__file__).parent / "whatsapp_session"
 
     auth = LocalProfileAuth(user_data)
-    client = Client(auth=auth)
+    client = Client(auth=auth, headless=False)
 
     @client.event("on_start")
     async def on_start():
@@ -41,6 +41,8 @@ async def main():
         if loading_chats:
             print("⌛ Loading chats...")
 
+        
+
     def unread_filter(chat):
         """
         Example filter function.
@@ -50,12 +52,13 @@ async def main():
 
     @client.event("on_unread_chat", filter_obj=CustomFilter(unread_filter))
     async def unread_chat(chats):
+        
         print("evento unread")
         print("chat: ", chats[0])
         print("chat name: ", chats[0].get("name"))
         print("chat group: ", chats[0].get("group"))
         print("chat type message", chats[0].get("last_message_type"))
-        # success = await client.send_message(chats[0].get("name"), "Hello!")
+        success = await client.send_message(chats[0].get("name"), "Hello!")
         # if success:
         #     print("✅ Mensaje enviado con éxito")
         # else:

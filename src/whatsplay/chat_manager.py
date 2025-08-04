@@ -364,3 +364,6 @@ class ChatManager:
             return False
         finally:
             await self.close()
+
+    async def new_group(self, group_name: str, members: list[str]):
+        return await self.wa_elements.new_group(group_name, members)

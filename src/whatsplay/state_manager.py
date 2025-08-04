@@ -53,7 +53,7 @@ class StateManager:
                 await self.client.emit("on_error", f"Error al procesar código QR: {e}")
 
         elif curr_state == State.LOADING:
-            loading_chats = await self.wa_elements.is_present(loc.LOADING_CHATS)
+            loading_chats = await self.wa_elements.wait_for_selector(loc.LOADING_CHATS) is not None
             await self.client.emit("on_loading", loading_chats)
 
         elif curr_state == State.LOGGED_IN:
