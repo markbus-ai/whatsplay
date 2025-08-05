@@ -9,6 +9,7 @@ from playwright.async_api import (
     ElementHandle,
     TimeoutError as PlaywrightTimeoutError,
 )
+import re
 
 from .constants import locator as loc
 from .constants.states import State
