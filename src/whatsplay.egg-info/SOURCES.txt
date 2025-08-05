@@ -3,8 +3,10 @@ README.md
 pyproject.toml
 src/whatsplay/__init__.py
 src/whatsplay/base_client.py
+src/whatsplay/chat_manager.py
 src/whatsplay/client.py
 src/whatsplay/event.py
+src/whatsplay/state_manager.py
 src/whatsplay/utils.py
 src/whatsplay/wa_elements.py
 src/whatsplay.egg-info/PKG-INFO
@@ -22,5 +24,8 @@ src/whatsplay/events/__init__.py
 src/whatsplay/events/event_handler.py
 src/whatsplay/events/event_types.py
 src/whatsplay/filters/__init__.py
+src/whatsplay/filters/filters.py
 src/whatsplay/filters/message_filter.py
 src/whatsplay/object/message.py
+tests/test_chat_manager.py
+tests/test_state_manager.py

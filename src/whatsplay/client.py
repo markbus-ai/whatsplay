@@ -211,3 +211,6 @@ class Client(BaseWhatsAppClient):
 
     async def new_group(self, group_name: str, members: list[str]):
         return await self.chat_manager.new_group(group_name, members)
+
+    async def add_members_to_group(self, group_name: str, members: list[str]):
+        return await self.chat_manager.add_members_to_group(group_name, members)

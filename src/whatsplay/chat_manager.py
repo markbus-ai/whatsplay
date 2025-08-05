@@ -155,56 +155,7 @@ class ChatManager:
     async def open(
         self, chat_name: str, timeout: int = 10000, force_open: bool = False
     ) -> bool:
-        """
-        Abre un chat por su nombre visible. Si no está en el DOM, lo busca y lo abre.
-        """
-        page = self._page
-        es_numero = bool(re.fullmatch(r"\+?\d+", chat_name))
-
-        if es_numero or force_open:
-            numero = chat_name.lstrip("+")
-            url = f"https://web.whatsapp.com/send?phone={numero}"
-            await page.goto(url)
-        
-        span_xpath = f"//span[contains(@title, {repr(chat_name)})]"
-
-        try:
-            chat_element = await page.query_selector(f"xpath={span_xpath}")
-            if chat_element:
-                await chat_element.click()
-                print(f"✅ Chat '{chat_name}' abierto directamente.")
-            else:
-                print(f"🔍 Chat '{chat_name}' no visible, usando buscador...")
-                for btn in loc.SEARCH_BUTTON:
-                    btns = await page.query_selector_all(f"xpath={btn}")
-                    if btns:
-                        await btns[0].click()
-                        break
-                else:
-                    raise Exception("❌ Botón de búsqueda no encontrado")
-
-                for input_xpath in loc.SEARCH_TEXT_BOX:
-                    inputs = await page.query_selector_all(f"xpath={input_xpath}")
-                    if inputs:
-                        await inputs[0].fill(chat_name)
-                        break
-                else:
-                    raise Exception("❌ Input de búsqueda no encontrado")
-
-                await page.wait_for_selector(loc.SEARCH_ITEM, timeout=timeout)
-                await page.keyboard.press("ArrowDown")
-                await page.keyboard.press("Enter")
-                print(f"✅ Chat '{chat_name}' abierto desde buscador.")
-
-            await page.wait_for_selector(loc.CHAT_INPUT_BOX, timeout=timeout)
-            return True
-
-        except PlaywrightTimeoutError:
-            print(f"❌ Timeout esperando el input del chat '{chat_name}'")
-            return False
-        except Exception as e:
-            print(f"❌ Error al abrir el chat '{chat_name}': {e}")
-            return False
+        return await self.wa_elements.open(chat_name, timeout, force_open)
 
     async def search_conversations(
         self, query: str, close=True
@@ -367,3 +318,21 @@ class ChatManager:
 
     async def new_group(self, group_name: str, members: list[str]):
         return await self.wa_elements.new_group(group_name, members)
+
+    async def add_members_to_group(self, group_name: str, members: list[str]) -> bool:
+        """
+        Abre un grupo y le añade nuevos miembros.
+        """
+        try:
+            # 1. Abrir el chat del grupo
+            if not await self.open(group_name):
+                await self.client.emit("on_error", f"No se pudo abrir el grupo '{group_name}'")
+                return False
+
+            # 2. Llamar al método de bajo nivel para agregar miembros
+            success = await self.wa_elements.add_members_to_group(group_name, members)
+            return success
+
+        except Exception as e:
+            await self.client.emit("on_error", f"Error al añadir miembros al grupo '{group_name}': {e}")
+            return False

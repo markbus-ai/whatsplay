@@ -1,6 +1,6 @@
 Metadata-Version: 2.4
 Name: whatsplay
-Version: 1.4.6
+Version: 1.6.0
 Summary: A modern Python library for automating WhatsApp Web using Playwright
 Author-email: Marcos Bustos <markbustos1912@gmail.com>
 License: MIT
@@ -165,7 +165,7 @@ Las contribuciones son bienvenidas. Por favor:
 ## 📋 Roadmap
 
 - [✅] Soporte para mensajes multimedia (imágenes, videos, audios)
-- [ ] MessageFilter
+- [✅] MessageFilter
 
 ## ❓ FAQ
 

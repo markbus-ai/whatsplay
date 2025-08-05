@@ -190,6 +190,60 @@ class WhatsAppElements:
                 pass
 
         return results
+
+    async def open(
+        self, chat_name: str, timeout: int = 10000, force_open: bool = False
+    ) -> bool:
+        """
+        Abre un chat por su nombre visible. Si no está en el DOM, lo busca y lo abre.
+        """
+        es_numero = bool(re.fullmatch(r"\+?\d+", chat_name))
+
+        if es_numero or force_open:
+            numero = chat_name.lstrip("+")
+            url = f"https://web.whatsapp.com/send?phone={numero}"
+            await self.page.goto(url)
+
+        span_xpath = f"//span[contains(@title, {repr(chat_name)})]"
+
+        try:
+            chat_element = await self.page.query_selector(f"xpath={span_xpath}")
+            if chat_element:
+                await chat_element.click()
+                print(f"✅ Chat '{chat_name}' abierto directamente.")
+            else:
+                print(f"🔍 Chat '{chat_name}' no visible, usando buscador...")
+                for btn in loc.SEARCH_BUTTON:
+                    btns = await self.page.query_selector_all(f"xpath={btn}")
+                    if btns:
+                        await btns[0].click()
+                        break
+                else:
+                    raise Exception("❌ Botón de búsqueda no encontrado")
+
+                for input_xpath in loc.SEARCH_TEXT_BOX:
+                    inputs = await self.page.query_selector_all(f"xpath={input_xpath}")
+                    if inputs:
+                        await inputs[0].fill(chat_name)
+                        break
+                else:
+                    raise Exception("❌ Input de búsqueda no encontrado")
+
+                await self.page.wait_for_selector(loc.SEARCH_ITEM, timeout=timeout)
+                await self.page.keyboard.press("ArrowDown")
+                await self.page.keyboard.press("Enter")
+                print(f"✅ Chat '{chat_name}' abierto desde buscador.")
+
+            await self.page.wait_for_selector(loc.CHAT_INPUT_BOX, timeout=timeout)
+            return True
+
+        except PlaywrightTimeoutError:
+            print(f"❌ Timeout esperando el input del chat '{chat_name}'")
+            return False
+        except Exception as e:
+            print(f"❌ Error al abrir el chat '{chat_name}': {e}")
+            return False
+
     async def new_group(self, group_name: str, members: List[str]) -> Optional[ElementHandle]:
         print(f"Creating new group: {group_name} with members: {members}")
         """
@@ -238,3 +292,108 @@ class WhatsAppElements:
         except Exception as e:
             print(f"Error creating new group: {e}")
             return None
+            
+    async def add_members_to_group(
+        self, group_name: str, members: List[str]
+    ) -> bool:
+        """
+        Agrega miembros a un grupo existente. Asume que el chat del grupo ya está abierto.
+        """
+        try:
+            if not self.open(group_name, timeout=5000):
+                print(f"❌ No se pudo abrir el grupo '{group_name}'")
+                return False
+            
+            # 2. Hacer clic en la cabecera para abrir la info del grupo
+            header = await self.page.wait_for_selector(loc.GROUP_INFO_BUTTON, timeout=5000)
+            await header.click()
+
+            # 2. Buscar y hacer clic en el botón "Add participant"
+            # Usamos un selector de texto porque es más robusto
+            add_participant_button = await self.page.wait_for_selector(
+                loc.ADD_MEMBERS_BUTTON, timeout=5000
+            )
+            await add_participant_button.click()
+
+            # 3. Agregar cada miembro
+            member_input = await self.page.wait_for_selector(
+                loc.INPUT_MEMBERS_GROUP, timeout=5000
+            )
+            for member in members:
+                await member_input.fill(member)
+                await asyncio.sleep(0.5)
+                await self.page.keyboard.press("Enter")
+                await asyncio.sleep(0.5)
+
+            # 4. Confirmar la adición
+            confirm_button = await self.page.wait_for_selector(
+                loc.CONFIRM_ADD_MEMBERS_BUTTON, timeout=5000
+            )
+            await confirm_button.click()
+            await asyncio.sleep(0.5)  # Esperar un poco para que se procese
+            
+            confirm_add_button = await self.page.wait_for_selector('//div[text()="Add member"]', timeout=3000)
+            
+            # Esperar un poco para que se procese y cerrar el panel
+            await asyncio.sleep(1)
+            await self.page.keyboard.press("Escape")
+            return True
+
+        except PlaywrightTimeoutError:
+            print(f"Timeout al intentar agregar miembros a '{group_name}'")
+            await self.page.keyboard.press("Escape") # Intentar limpiar
+            return False
+        except Exception as e:
+            print(f"Error agregando miembros a '{group_name}': {e}")
+            await self.page.keyboard.press("Escape") # Intentar limpiar
+            return False
+    async def del_member_group(self, group_name: str, member_name: str) -> bool:
+        """
+        Elimina un miembro de un grupo existente. Asume que el chat del grupo ya está abierto.
+        """
+        try:
+            if not await self.open(group_name, timeout=5000):
+                print(f"❌ No se pudo abrir el grupo '{group_name}'")
+                return False
+            
+            # 2. Hacer clic en la cabecera para abrir la info del grupo
+            header = await self.page.wait_for_selector(loc.GROUP_INFO_BUTTON, timeout=5000)
+            await header.click()
+
+            # 3. Buscar al miembro, activar menú contextual y hacer clic
+            xpath_member_row = f'//span[@title="{member_name}"]/ancestor::div[@role="button"]'
+            member_row = await self.page.query_selector(f"xpath={xpath_member_row}")
+
+            if member_row:
+                await member_row.scroll_into_view_if_needed()
+                await member_row.hover()
+
+                # Dale tiempo a que aparezca
+                try:
+                    context_menu_btn = await member_row.wait_for_selector(
+                        'button[aria-label="Open the chat context menu"]',
+                        timeout=3000
+                    )
+                    await context_menu_btn.click()
+                    print("✅ Menú contextual clickeado correctamente.")
+                except Exception as e:
+                    print(f"❌ No se pudo hacer clic en el botón del menú: {e}")
+                
+                remove_button = await self.page.wait_for_selector(
+                    loc.REMOVE_MEMBER_BUTTON, timeout=5000
+                )
+                await remove_button.click()
+                await asyncio.sleep(0.5)
+                confirm_button = await self.page.wait_for_selector('//div[text()="Remove"]', timeout=3000)
+                await confirm_button.click()
+                
+                print(f"✅ Miembro '{member_name}' eliminado de '{group_name}'.")
+            else:
+                print(f"🔍 Miembro '{member_name}' no encontrado en '{group_name}'")
+            return False
+
+        except PlaywrightTimeoutError:
+            print(f"Timeout al intentar eliminar miembro de '{group_name}'")
+            await self.page.keyboard.press("Escape")
+            return False
+        
