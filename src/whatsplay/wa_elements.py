@@ -356,45 +356,92 @@ class WhatsAppElements:
             if not await self.open(group_name, timeout=5000):
                 print(f"❌ No se pudo abrir el grupo '{group_name}'")
                 return False
-            
-            # 2. Hacer clic en la cabecera para abrir la info del grupo
+
+            # 1. Abrir info de grupo
+            print(" 1. Esperando GROUP_INFO_BUTTON...")
             header = await self.page.wait_for_selector(loc.GROUP_INFO_BUTTON, timeout=5000)
             await header.click()
 
-            # 3. Buscar al miembro, activar menú contextual y hacer clic
-            xpath_member_row = f'//span[@title="{member_name}"]/ancestor::div[@role="button"]'
-            member_row = await self.page.query_selector(f"xpath={xpath_member_row}")
+            # 2. Contenedor de info del grupo
+            print(" 2. Esperando contenedor 'Group info'...")
+            group_info = await self.page.wait_for_selector('div[aria-label="Group info"]', timeout=5000)
+            if not group_info:
+                print("❌ No se encontró el contenedor 'Group info'")
+                return False
 
-            if member_row:
-                await member_row.scroll_into_view_if_needed()
-                await member_row.hover()
+            # 3. Buscar el <span> del miembro por coincidencia parcial
+            print(" 3. Buscando miembro por coincidencia parcial...")
+            span_member = await group_info.evaluate_handle(
+                f"""
+                (container) => {{
+                    const spans = Array.from(container.querySelectorAll('span[title]'));
+                    return spans.find(s => s.textContent.trim().toLowerCase().includes("{member_name.lower()}")) || null;
+                }}
+                """
+            )
 
-                # Dale tiempo a que aparezca
-                try:
-                    context_menu_btn = await member_row.wait_for_selector(
-                        'button[aria-label="Open the chat context menu"]',
-                        timeout=3000
-                    )
-                    await context_menu_btn.click()
-                    print("✅ Menú contextual clickeado correctamente.")
-                except Exception as e:
-                    print(f"❌ No se pudo hacer clic en el botón del menú: {e}")
-                
-                remove_button = await self.page.wait_for_selector(
-                    loc.REMOVE_MEMBER_BUTTON, timeout=5000
+            # ⚠️ Verificar si se encontró o no
+            if not await span_member.evaluate("el => !!el"):
+                print(f"❌ No se encontró el miembro '{member_name}'")
+                return False
+
+            # 4. Subir al contenedor general del miembro (div[role="button"])
+            member_row = await span_member.evaluate_handle("el => el.closest('div[role=\"button\"]')")
+            if not await member_row.evaluate("el => !!el"):
+                print("⚠️ No se encontró el contenedor del miembro")
+                return False
+
+            # 5. Buscar el contenedor del status
+            status_container = await member_row.evaluate_handle(
+                """(row) => {
+                    const divs = Array.from(row.querySelectorAll('div'));
+                    return divs.find(div => {
+                        const span = div.querySelector('span');
+                        return span && span.getAttribute('title');
+                    }) || null;
+                }"""
+            )
+            if not await status_container.evaluate("el => !!el"):
+                print("⚠️ No se encontró el contenedor del estado del miembro")
+                return False
+
+            # 6. Hover sobre el estado
+            print(" 4. Hover sobre el estado...")
+            await status_container.scroll_into_view_if_needed()
+            await status_container.hover()
+            print(f"✅ Hover sobre el estado de '{member_name}'")
+
+            # 7. Esperar botón de menú
+            print(" 5. Esperando botón ⋮ ...")
+            try:
+                menu_btn = await self.page.wait_for_selector(
+                    'button[aria-label="Open the chat context menu"]',
+                    timeout=3000
                 )
-                await remove_button.click()
-                await asyncio.sleep(0.5)
-                confirm_button = await self.page.wait_for_selector('//div[text()="Remove"]', timeout=3000)
-                await confirm_button.click()
-                
-                print(f"✅ Miembro '{member_name}' eliminado de '{group_name}'.")
-            else:
-                print(f"🔍 Miembro '{member_name}' no encontrado en '{group_name}'")
-            return False
+                await menu_btn.click()
+                print("✅ Menú contextual clickeado correctamente.")
+            except Exception as e:
+                print(f"❌ No se pudo hacer clic en el botón del menú: {e}")
+                return False
+
+            # 8. Clic en "Remove"
+            remove_button = await self.page.wait_for_selector(loc.REMOVE_MEMBER_BUTTON, timeout=5000)
+            await remove_button.click()
+            await asyncio.sleep(0.5)
+
+            # 9. Confirmar
+            confirm_button = await self.page.wait_for_selector('//div[text()="Remove"]', timeout=3000)
+            await confirm_button.click()
+            await asyncio.sleep(0.5)
+
+            print(f"✅ Miembro '{member_name}' eliminado de '{group_name}'.")
+            return True
 
         except PlaywrightTimeoutError:
-            print(f"Timeout al intentar eliminar miembro de '{group_name}'")
+            print(f"⏱️ Timeout al intentar eliminar miembro de '{group_name}'")
             await self.page.keyboard.press("Escape")
             return False
-        
+        except Exception as e:
+            print(f"❌ Error eliminando miembro '{member_name}' de '{group_name}': {e}")
+            await self.page.keyboard.press("Escape")
+            return False
