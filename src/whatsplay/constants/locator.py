@@ -19,6 +19,7 @@ GROUPS_CHATS_BUTTON = "//div[text()='Groups']"
 
 # Search related locators
 SEARCH_BUTTON = [
+    "//div[@aria-label='Search input textbox']",
     "//button[@aria-label='Search']",
     "//button[@title='Search']",
     "//button[@aria-label='Search or start new chat']",
