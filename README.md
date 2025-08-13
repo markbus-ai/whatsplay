@@ -44,7 +44,7 @@ pip install whatsplay
 Después de instalar la librería, descargá los navegadores de Playwright con:
 
 ```bash
-npx playwright install
+python -m playwright install
 ```
 
 ---
