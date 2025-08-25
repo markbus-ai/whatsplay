@@ -58,7 +58,8 @@ async def main():
         print("chat name: ", chats[0].get("name"))
         print("chat group: ", chats[0].get("group"))
         print("chat type message", chats[0].get("last_message_type"))
-        success = await client.send_message(chats[0].get("name"), "Hello!")
+        print("is group:", chats[0].get("group"))
+        #success = await client.send_message(chats[0].get("name"), "Hello!")
         # if success:
         #     print("✅ Mensaje enviado con éxito")
         # else:
