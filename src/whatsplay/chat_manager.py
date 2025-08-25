@@ -69,13 +69,13 @@ class ChatManager:
         )
         return (await chat_row.locator(sel).count()) > 0
     # ===== helpers =====
-
+    @staticmethod
     def _looks_like_status(s: str) -> bool:
         s = (s or "").lower()
         return any(x in s for x in ("loading", "status-", "typing", "default-", "ic-", "call", "escribiendo"))
 
+    @staticmethod
     def _strip_noise(s: str) -> str:
-        # limpia horas/fechas, contadores y espacios duplicados
         s = s or ""
         s = re.sub(r"\b\d{1,2}:\d{2}\s?(am|pm)?\b", "", s, flags=re.I)  # horas 12/24h
         s = re.sub(r"\b(hoy|ayer|today|yesterday)\b", "", s, flags=re.I)
@@ -83,55 +83,60 @@ class ChatManager:
         s = " ".join(s.split())
         return s
 
-    async def _extract_name_and_preview(self,row) -> Tuple[str, str]:
-        """
-        Obtiene name + preview desde la columna central (aria-colindex=2) sin “aplastar” el listitem.
-        """
+
+    async def _extract_name_and_preview(self, row) -> Tuple[str, str]:
         name = ""
         preview = ""
 
-        # 1) nombre desde <span title="...">
+        # 1) nombre: <span title="..."> dentro de la col 2
         span_name = row.locator('div[role="gridcell"][aria-colindex="2"] span[title]').first
-        name = (await span_name.get_attribute("title")) or ""
-        if name != "":
-            print("DEBUG: name encontrado: ", name)
+        if await span_name.count():
+            name = (await span_name.get_attribute("title")) or ""
+            if name:
+                print("DEBUG: name encontrado:", name)
 
         # fallback: primer span visible con dir="auto" y title
         if not name:
-            span_alt = await row.query_selector('xpath=.//span[@dir="auto" and @title]')
-            if span_alt:
+            span_alt = row.locator('xpath=.//span[@dir="auto" and @title]').first
+            if await span_alt.count():
                 name = (await span_alt.get_attribute("title")) or ""
-                print("DEBUG: name encontrado en fallback: ", name)
+                if name:
+                    print("DEBUG: name encontrado en fallback:", name)
 
-        # 2) preview
-        line2 = await row.locator('.//div[@role="gridcell" and @aria-colindex="2"]/../div[2]//span[@title][1]')
-        if line2:
-            print("DEBUG: preview encontrado: ", line2)
-            t = (await line2.inner_text()) or ""
+        # 2) preview: 2º <div> hijo directo dentro de la col 2; buscar span con title o texto
+        cell = row.locator('div[role="gridcell"][aria-colindex="2"]')
+        line2 = cell.locator(':scope > div').nth(1)  # segundo div (0-based)
+        if await line2.count():
+            span_with_title = line2.locator('span[title]').first
+            if await span_with_title.count():
+                t = (await span_with_title.inner_text()) or ""
+            else:
+                t = (await line2.inner_text()) or ""
             preview = self._strip_noise(t)
 
-        # fallback: último span de esa línea que no sea “estado”
+        # fallback: último span de esa línea que no sea “status”
         if not preview:
-            spans = await row.query_selector_all('xpath=.//*[@aria-colindex="2"]//div[position()=2]//span')
-            for sp in spans[::-1]:
-                tx = (await sp.inner_text()) or ""
+            spans = line2.locator('span')
+            n = await spans.count()
+            for idx in range(n - 1, -1, -1):
+                tx = (await spans.nth(idx).inner_text()) or ""
                 if tx and not self._looks_like_status(tx):
                     preview = self._strip_noise(tx)
-                    print("DEBUG: preview encontrado en fallback: ", sp)
+                    print("DEBUG: preview fallback OK")
                     break
 
         return (name or "Sin nombre"), (preview or "")
-
     async def _get_time_text(self, row) -> str:
-        # columna derecha (horario/fecha)
+        # columna 2: el 2º div hijo directo tiene el horario/fecha
         cell = row.locator('div[role="gridcell"][aria-colindex="2"]')
-        time_div = cell.locator(':scope > div').nth(1)  # segundo div hijo directo
+        time_div = cell.locator(':scope > div').nth(1)
 
         if not await time_div.count():
             return ""
 
         txt = (await time_div.inner_text()) or ""
         return self._strip_noise(txt.strip())
+
 
 
     # ===== _check_unread_chats =====
@@ -405,6 +410,22 @@ class ChatManager:
             return False
         finally:
             await self.close()
+
+    async def close(self):
+        """Cierra el chat o la vista actual presionando Escape."""
+        if self._page:
+            try:
+                await self._page.keyboard.press("Escape")
+            except Exception as e:
+                await self.client.emit(
+                    "on_warning", f"Error trying to close chat with Escape: {e}"
+                )
+
+    async def open(
+        self, chat_name: str, timeout: int = 10000, force_open: bool = False
+    ) -> bool:
+        return await self.wa_elements.open(chat_name, timeout, force_open)
+
 
     async def new_group(self, group_name: str, members: list[str]):
         return await self.wa_elements.new_group(group_name, members)

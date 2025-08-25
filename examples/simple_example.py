@@ -43,14 +43,14 @@ async def main():
 
         
 
-    def unread_filter(chat):
-        """
-        Example filter function.
-        Only allows chats that are not groups.
-        """
-        return chat.get("group") is None
+    # def unread_filter(chat):
+    #     """
+    #     Example filter function.
+    #     Only allows chats that are not groups.
+    #     """
+    #     return chat.get("group") is None
 
-    @client.event("on_unread_chat", filter_obj=CustomFilter(unread_filter))
+    @client.event("on_unread_chat")
     async def unread_chat(chats):
         
         print("evento unread")
@@ -59,7 +59,7 @@ async def main():
         print("chat group: ", chats[0].get("group"))
         print("chat type message", chats[0].get("last_message_type"))
         print("is group:", chats[0].get("group"))
-        #success = await client.send_message(chats[0].get("name"), "Hello!")
+        success = await client.send_message(chats[0].get("name"), "Hello!")
         # if success:
         #     print("✅ Mensaje enviado con éxito")
         # else:
