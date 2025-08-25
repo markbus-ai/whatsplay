@@ -1,198 +1,164 @@
 # WhatsPlay 🚀
 
 Automatización avanzada de WhatsApp Web usando Playwright, Python y visión por computadora (OpenCV).  
-Permite interactuar con mensajes no leídos, autenticar mediante código QR, y realizar acciones complejas a través de eventos personalizados y filtrado de mensajes.
+Permite interactuar con mensajes no leídos, autenticar mediante código QR y realizar acciones complejas a través de eventos personalizados y filtrado de mensajes.
 
-[![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
-[![Python](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/downloads/)
-[![Playwright](https://img.shields.io/badge/playwright-latest-green.svg)](https://playwright.dev/)
+[![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)  
+[![Python](https://img.shields.io/badge/python-3.8%2B-blue)](https://www.python.org/)
 
-## 🧠 Descripción
+---
 
-WhatsPlay es una librería modular diseñada para automatizar WhatsApp Web desde Python. La arquitectura está inspirada en el patrón de eventos y la separación de responsabilidades, con módulos independientes para autenticación, interacción con la UI, lógica base, y procesamiento de imágenes.
+## ✨ Características
 
-### ✨ Características principales
+- **Eventos asíncronos:** escucha eventos como `on_start`, `on_auth`, `on_unread_chat`.
+- **Persistencia de sesión:** guarda datos de autenticación en un directorio local para no escanear el QR cada vez.
+- **Apertura de chat por nombre o teléfono:** si no conocés el `chat_name` exacto, pasá el número de teléfono completo (con prefijo de país).
+- **Envío y recepción de mensajes** (texto y multimedia).
+- **Filtros personalizados** para procesar solo los mensajes que te interesen.
+- **Extracción automática de código QR** para autenticación.
+- **Compatibilidad con servidores sin GUI** gracias a Playwright en modo *headless*.
 
-- **Automatización de navegador** con Playwright para máxima compatibilidad
-- **extraccion automática de QR** sin intervención manual
-- **Sistema de eventos personalizado** para manejo asíncrono de mensajes
-- **Detección inteligente** de mensajes no leídos
-- **Arquitectura modular** con separación clara de responsabilidades
+---
 
-## 🖼️ Arquitectura del sistema
+## 📦 Arquitectura
 
-![Arquitectura](Editor%20_%20Mermaid%20Chart-2025-06-03-140923.png)
+- **Modularidad:** cada componente (cliente, gestor de chats, filtros, autenticación) está separado.
+- **Mantenibilidad:** componentes independientes y bien definidos.
+- **Testabilidad:** cada módulo puede probarse por separado.
+- **Reutilización:** los módulos pueden usarse en otros proyectos.
 
-La arquitectura modular permite:
-- **Escalabilidad**: Fácil adición de nuevas funcionalidades
-- **Mantenibilidad**: Componentes independientes y bien definidos  
-- **Testabilidad**: Cada módulo puede probarse por separado
-- **Reutilización**: Los módulos pueden usarse en otros proyectos
+---
 
-## 🚀 Instalación
+## 🛠 Instalación
 
 ### Prerrequisitos
 
 - Python 3.8 o superior
 
-### Instalación desde PyPI 
+### Instalación desde PyPI
 
 ```bash
 pip install whatsplay
 ```
 
-## 🧪 Ejemplos de uso
+Después de instalar la librería, descargá los navegadores de Playwright con:
 
-### Uso básico
+```bash
+python -m playwright install
+```
+
+---
+
+## ▶️ Ejemplos de uso
+
+WhatsPlay está construido sobre `asyncio`, por lo que todas las operaciones son asíncronas.
+A continuación se muestra un ejemplo básico para iniciar sesión, escuchar eventos y enviar un mensaje.
+
+**Nota:** siempre usá funciones `async def` como manejadores de eventos, ya que el sistema de eventos los invoca de forma asíncrona.
 
 ```python
-from whatsplay import WhatsAppClient
+import asyncio
+from pathlib import Path
+from whatsplay import Client
+from whatsplay.auth import LocalProfileAuth
 
-# Crear cliente
-client = WhatsAppClient()
+async def main() -> None:
+    data_dir = Path.home() / "Documents" / "whatsapp_session"
+    data_dir.mkdir(parents=True, exist_ok=True)
 
-# Handler para mensajes no leídos
-@client.on_unread_chat
-def handle_unread(chats):
-    print("chat name: ", chats[0]['name'])
-    success = await client.send_message(chats[0]['name'], "Hello!")
-    if success:
-        print("✅ Mensaje enviado con éxito")
-    else:
-        print("❌ Falló el envío del mensaje")
+    auth = LocalProfileAuth(data_dir)
+    client = Client(auth=auth, headless=False)
 
-# Iniciar cliente
-client.run()
+    @client.event("on_start")
+    async def on_start():
+        print("✅ Cliente iniciado")
+
+    @client.event("on_auth")
+    async def on_auth():
+        print("📸 Mostrando QR en pantalla")
+
+    @client.event("on_unread_chat")
+    async def on_unread_chat(chat_name, messages):
+        # Si no conocés el nombre exacto, podés usar el número de teléfono
+        await client.send_message(chat_name, "Hola, este es un mensaje automático!")
+
+    await client.start()
+
+if __name__ == "__main__":
+    asyncio.run(main())
 ```
 
-## 📁 Estructura del proyecto
-
-```
-whatsplay/
-├───examples
-│       simple_example.py
-│       test_client.py
-│       test_main_loop.py
-│       
-└───src
-    └───whatsplay
-        │   base_client.py
-        │   client.py
-        │   event.py
-        │   utils.py
-        │   wa_elements.py
-        │   __init__.py
-        │
-        ├───auth
-        │       auth.py
-        │       local_profile_auth.py
-        │       no_auth.py
-        │       __init__.py
-        │
-        ├───constants
-        │       locator.py
-        │       states.py
-        │
-        ├───events
-        │       event_handler.py
-        │       event_types.py
-        │       __init__.py
-        │
-        └───filters
-                message_filter.py
-                __init__.py
-```
+---
 
 ## 📦 Dependencias
 
 ### Principales
-- `playwright` - Automatización de navegador
-- `opencv-python` - Procesamiento de imágenes (opcional)
-- `pillow` - Manipulación de imágenes
-- `requests` - Cliente HTTP
+
+* `playwright` – Automatización de navegador
+* `opencv-python` – Procesamiento de imágenes (opcional)
+* `numpy` – Operaciones numéricas utilizadas por OpenCV
 
 ### Desarrollo
-- `pytest` - Framework de testing
-- `black` - Formateador de código
-- `flake8` - Linter
-- `mypy` - Verificación de tipos
 
+* `pytest` – Framework de testing
+* `pytest-asyncio` – Soporte para pruebas asíncronas
+* `black` – Formateador de código
+* `flake8` – Linter
+* `mypy` – Verificación de tipos
+* `requests` – Uso en entornos de desarrollo y pruebas
+
+---
 
 ## 🤝 Contribuciones
 
-Las contribuciones son bienvenidas. Por favor:
+1. Hacé un *fork* del repositorio.
+2. Creá una rama (`git checkout -b feature/nueva-funcionalidad`).
+3. Commit de tus cambios (`git commit -am 'Agrega nueva funcionalidad'`).
+4. Push (`git push origin feature/nueva-funcionalidad`).
+5. Abrí un *Pull Request*.
 
-1. Fork el repositorio
-2. Crea una rama para tu feature (`git checkout -b feature/nueva-funcionalidad`)
-3. Commit tus cambios (`git commit -am 'Agrega nueva funcionalidad'`)
-4. Push a la rama (`git push origin feature/nueva-funcionalidad`)
-5. Abre un Pull Request
+---
 
-### Guías de desarrollo
+## 🗺 Roadmap
 
-- Sigue PEP 8 para el estilo de código
-- Actualiza la documentación cuando sea necesario
-- Usa type hints en todas las funciones públicas
+* [✅] Soporte para mensajes multimedia (imágenes, videos, audios)
+* [✅] Filtros para mensajes (MessageFilter)
 
-## 📋 Roadmap
-
-- [✅] Soporte para mensajes multimedia (imágenes, videos, audios)
-- [✅] MessageFilter
+---
 
 ## ❓ FAQ
 
 **¿Es seguro usar WhatsPlay?**
-WhatsPlay utiliza WhatsApp Web oficial, por lo que es tan seguro como usar WhatsApp en tu navegador.
+Usa la interfaz oficial de WhatsApp Web; es tan seguro como usar WhatsApp en un navegador.
 
 **¿Puede ser detectado por WhatsApp?**
-WhatsPlay simula interacciones humanas normales, pero siempre existe un riesgo al automatizar servicios web, hagalo bajo su propia responsabilidad.
+Siempre hay riesgo al automatizar servicios web. Úsalo bajo tu responsabilidad.
 
-**¿Funciona en servidores sin GUI?**
-Sí, usando el modo headless de Playwright.
+**¿Funciona sin GUI?**
+Sí, gracias al modo *headless* de Playwright.
 
-## 🐛 Reporte de bugs
+---
 
-Si encuentras un bug, por favor [abre un issue](https://github.com/markbus-ai/whatsplay/issues) incluyendo:
+## 🐞 Reporte de bugs
 
-- Descripción del problema
-- Pasos para reproducirlo
-- Versión de Python y dependencias
-- Logs relevantes
+Abrí un [issue](https://github.com/markbus-ai/whatsplay/issues) con:
 
-## 🤝 Agradecimientos
+* Descripción del problema
+* Pasos para reproducirlo
+* Versión de Python y dependencias
+* Logs relevantes
 
-Este proyecto está inspirado y utiliza partes del código de [RedShot](https://github.com/akrentz6/RedShot), licenciado bajo la licencia Apache 2.0.
+---
 
 ## 📄 Licencia
 
-Este proyecto está licenciado bajo la **Licencia Apache 2.0**.
-
-```
-Copyright 2025 WhatsPlay
-
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
-
-    http://www.apache.org/licenses/LICENSE-2.0
-
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
-```
-
-Consultá el archivo [LICENSE](./LICENSE) para más información.
+Licencia **Apache 2.0**.
 
 ---
 
 <div align="center">
 
-**[⭐ Star este proyecto](https://github.com/markbus-ai/whatsplay)** si te resulta útil
-
-Made with ❤️ by [Markbusking]
+**[⭐ Dejá una estrella](https://github.com/markbus-ai/whatsplay)** si te resultó útil  
+Hecho con ❤️ por Markbusking
 
 </div>
-
-
