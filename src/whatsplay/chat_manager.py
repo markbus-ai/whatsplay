@@ -1,8 +1,7 @@
 import re
 import os
 from pathlib import Path
-from typing import Optional, Dict, List, Any, Tuple
-
+from typing import Optional, Dict, List, Any, Union
 import asyncio
 
 from playwright.async_api import(
@@ -13,241 +12,234 @@ from playwright.async_api import(
 from .constants import locator as loc
 from .object.message import Message, FileMessage
 
+
 class ChatManager:
     def __init__(self, client):
         self.client = client
         self._page = client._page
         self.wa_elements = client.wa_elements
+        
+    import asyncio
+    
+    # Selectores estables del sidebar
+    
+    # Buscamos “unread” o “mensaje(s) no leído” en cualquier aria-label
+    UNREAD_ARIA_REGEX_JS = r"(?:mensaje(?:s)?\s+no\s+le[ií]do|unread)"
 
-        # Íconos de estado que SOLO aparecen si el último mensaje del chat es tuyo
-        self.ICONOS_ESTADO_CHATLIST = (
-            "ic-chatlist-clock",     # pendiente
-            "ic-chatlist-sent",      # enviado (1 check)
-            "ic-chatlist-delivered", # entregado (2 checks grises)
-            "ic-chatlist-read",      # leído (2 checks azules)
-            "ic-chatlist-error",     # fallo de envío
-            "ic-msg-warning",        # otro posible fallo
-        )
-
-        self.MAP_ESTADO_CHATLIST = {
-            "ic-chatlist-clock": "pendiente",
-            "ic-chatlist-sent": "enviado",
-            "ic-chatlist-delivered": "entregado",
-            "ic-chatlist-read": "leído",
-            "ic-chatlist-error": "fallo",
-            "ic-msg-warning": "fallo",
-        }
-
-    async def _get_chatlist_status(self, chat_row):
-        """
-        Devuelve (is_last_outgoing: bool, status_icon: str|None, status_text: str|None).
-        Si no hay icono, es porque el último mensaje NO es tuyo.
-        """
-        icon_locator = chat_row.locator('[data-icon^="ic-chatlist-"]')
-        # puede haber más de uno (mute/pin/archived), buscamos el primero que esté en nuestra tupla
-        count = await icon_locator.count()
-        if count == 0:
-            return False, None, None
-
-        # recorrer pocos (suelen ser 1-2)
-        for i in range(min(count, 5)):
-            name = await icon_locator.nth(i).get_attribute("data-icon")
-            if name in self.ICONOS_ESTADO_CHATLIST:
-                return True, name, self.MAP_ESTADO_CHATLIST.get(name)
-        return False, None, None
-
-    async def _tiene_badge_unread(self, chat_row):
-        """
-        Heurística para 'tiene no leídos'. Evita .all(timeout=...) que no existe.
-        """
-        # clases ofuscadas típicas + aria-labels
-        sel = (
-            ".x140p0ai, ._ahlk, .xn58pb5, "
-            "[aria-label*='unread' i], "
-            "[aria-label*='no leído' i], "
-            "[aria-label*='sin leer' i]"
-        )
-        return (await chat_row.locator(sel).count()) > 0
-    # ===== helpers =====
-    @staticmethod
-    def _looks_like_status(s: str) -> bool:
-        s = (s or "").lower()
-        return any(x in s for x in ("loading", "status-", "typing", "default-", "ic-", "call", "escribiendo"))
-
-    @staticmethod
-    def _strip_noise(s: str) -> str:
-        s = s or ""
-        s = re.sub(r"\b\d{1,2}:\d{2}\s?(am|pm)?\b", "", s, flags=re.I)  # horas 12/24h
-        s = re.sub(r"\b(hoy|ayer|today|yesterday)\b", "", s, flags=re.I)
-        s = re.sub(r"\b\d+\b", "", s)  # badges numéricos
-        s = " ".join(s.split())
-        return s
-
-
-    async def _extract_name_and_preview(self, row) -> Tuple[str, str]:
-        name = ""
-        preview = ""
-
-        # 1) nombre: <span title="..."> dentro de la col 2
-        span_name = row.locator('div[role="gridcell"][aria-colindex="2"] span[title]').first
-        if await span_name.count():
-            name = (await span_name.get_attribute("title")) or ""
-            if name:
-                print("DEBUG: name encontrado:", name)
-
-        # fallback: primer span visible con dir="auto" y title
-        if not name:
-            span_alt = row.locator('xpath=.//span[@dir="auto" and @title]').first
-            if await span_alt.count():
-                name = (await span_alt.get_attribute("title")) or ""
-                if name:
-                    print("DEBUG: name encontrado en fallback:", name)
-
-        # 2) preview: 2º <div> hijo directo dentro de la col 2; buscar span con title o texto
-        cell = row.locator('div[role="gridcell"][aria-colindex="2"]')
-        line2 = cell.locator(':scope > div').nth(1)  # segundo div (0-based)
-        if await line2.count():
-            span_with_title = line2.locator('span[title]').first
-            if await span_with_title.count():
-                t = (await span_with_title.inner_text()) or ""
-            else:
-                t = (await line2.inner_text()) or ""
-            preview = self._strip_noise(t)
-
-        # fallback: último span de esa línea que no sea “status”
-        if not preview:
-            spans = line2.locator('span')
-            n = await spans.count()
-            for idx in range(n - 1, -1, -1):
-                tx = (await spans.nth(idx).inner_text()) or ""
-                if tx and not self._looks_like_status(tx):
-                    preview = self._strip_noise(tx)
-                    print("DEBUG: preview fallback OK")
-                    break
-
-        return (name or "Sin nombre"), (preview or "")
-    async def _get_time_text(self, row) -> str:
-        # columna 2: el 2º div hijo directo tiene el horario/fecha
-        cell = row.locator('div[role="gridcell"][aria-colindex="2"]')
-        time_div = cell.locator(':scope > div').nth(1)
-
-        if not await time_div.count():
-            return ""
-
-        txt = (await time_div.inner_text()) or ""
-        return self._strip_noise(txt.strip())
-
-
-
-    # ===== _check_unread_chats =====
-    async def _check_unread_chats(self, debug: bool = False):
-        unread_chats = []
+    async def _check_unread_chats(self, debug: bool = True) -> List[Dict[str, Any]]:
         page = self._page
+        unread_chats: List[Dict[str, Any]] = []
+        await self.close()  # Asegura que no haya chat abierto
+        
+        
+
+        def log(msg: str):
+            if debug:
+                print(msg)
+
+        async def wait_for_grid():
+            # Espera a que la grilla de chats esté presente (hidratación)
+            try:
+                await page.locator(loc.CHAT_LIST_GRID).wait_for(timeout=15000)
+            except Exception:
+                await page.wait_for_timeout(1000)
+
+        async def get_scroller_handle():
+            """Devuelve el ElementHandle del contenedor que realmente scrollea (lista virtualizada)."""
+            grid = page.locator(loc.CHAT_LIST_GRID)
+            grid_h = await grid.element_handle()
+            if not grid_h:
+                return await page.locator("#pane-side").element_handle()
+            return await grid_h.evaluate_handle(
+                """(el) => {
+                    let cur = el;
+                    while (cur && cur !== document.body) {
+                    const s = getComputedStyle(cur);
+                    if ((s.overflowY === 'auto' || s.overflowY === 'scroll') &&
+                        cur.clientHeight < cur.scrollHeight) return cur;
+                    cur = cur.parentElement;
+                    }
+                    return document.querySelector('#pane-side');
+                }"""
+            )
+
+        async def row_is_unread(row_loc) -> bool:
+            """
+            Heurística robusta:
+            1) aria-label con 'unread' o 'mensaje(s) no leído'
+            2) badge específico (si existe en este build)
+            3) título en negrita (font-weight >= 600 o 'bold')
+            """
+            try:
+                # (1) cualquier aria-label que matchee ES/EN
+                has_aria = await row_loc.locator("[aria-label]").evaluate_all(
+                    "(els, rx) => els.some(el => (el.getAttribute('aria-label')||'').match(new RegExp(rx,'i')))",
+                    self.UNREAD_ARIA_REGEX_JS,
+                )
+                if has_aria:
+                    return True
+
+                # (2) badge explícito (si existe en tu build)
+                try:
+                    if await row_loc.locator(f"xpath={loc.UNREAD_BADGE}").count() > 0:
+                        return True
+                except Exception:
+                    pass
+
+                # (3) título en negrita
+                title = row_loc.locator(f"xpath={loc.SPAN_TITLE}")
+                if await title.count() == 0:
+                    return False
+                is_bold = await title.evaluate(
+                    """(el) => {
+                        const w = getComputedStyle(el).fontWeight;
+                        const n = parseInt(w, 10);
+                        return isNaN(n) ? /bold/i.test(w) : n >= 600;
+                    }"""
+                )
+                return bool(is_bold)
+            except Exception:
+                return False
+
+        async def parse_row(row_loc):
+            """Respeta tu misma estructura: delega al parser existente."""
+            handle = await row_loc.element_handle()
+            if not handle:
+                return None
+            return await self._parse_search_result(handle, "CHATS")
 
         try:
-            rows = page.locator("[role='listitem']")
-            total = await rows.count()
-            if debug:
-                print(f"DEBUG: listitems visibles: {total}")
+            # 0) UI lista
+            await wait_for_grid()
 
-            if total == 0:
-                # sidebar virtualizado: scrolleo corto para hidratar
-                await page.mouse.wheel(0, 800)
-                await asyncio.sleep(0.25)
-                await page.mouse.wheel(0, -800)
-                await asyncio.sleep(0.25)
-                rows = page.locator("[role='listitem']")
-                total = await rows.count()
-                if debug:
-                    print(f"DEBUG: tras scroll listitems: {total}")
+            # 1) Debug inicial
+            try:
+                total_rows_now = await page.locator(f"xpath={loc.CHAT_LIST_ROWS}").count()
+                log(f"DEBUG: filas visibles inicialmente: {total_rows_now}")
+                if total_rows_now <= 2:
+                    await page.locator(loc.ALL_CHATS_BUTTON).click()  # reset focus
+                    log("DEBUG: pocos chats visibles, forzando click en 'All'")
+                    log("DEBUG: 2 o menos chats visibles, tomando captura.")
+                    await self._page.screenshot(path="pocos_chats_visibles.png")
+                
+            except Exception:
+                log("DEBUG: no pude contar filas inicialmente")
 
-            for i in range(total):
-                row = rows.nth(i)
+            # 2) Scroller correcto (lista virtualizada)
+            scroller_h = await get_scroller_handle()
 
-                # 1) ¿tiene badge de no leído?
-                tiene_unread = await self._tiene_badge_unread(row)
-                if not tiene_unread:
+            # 3) Barrido de filas visibles
+            async def sweep(tag: str):
+                nonlocal unread_chats
+                rows = page.locator(f"xpath={loc.CHAT_LIST_ROWS}")
+                count = await rows.count()
+                log(f"DEBUG: {tag}: filas visibles ahora: {count}")
+
+                for i in range(count):
+                    row = rows.nth(i)
+                    try:
+                        if await row_is_unread(row):
+                            chat = await parse_row(row)
+                            if chat:
+                                unread_chats.append(chat)
+                                log(f"✓ no leído ({tag}): {chat.get('name','Sin nombre')}")
+                    except Exception as e:
+                        log(f"DEBUG: error evaluando fila {i} ({tag}): {e}")
+
+            # 4) Barrido inicial
+            await sweep("inicio")
+            
+            # # 5) Scroll ida y vuelta con barridos intermedios
+            # for pass_idx in range(2):  # down y up
+            #     direction = "down" if pass_idx == 0 else "up"
+            #     step = 900 if direction == "down" else -900
+            #     log(f"DEBUG: scroll {direction}…")
+            #     for k in range(6):
+            #         await sweep(f"{direction}:{k}")
+            #         try:
+            #             await scroller_h.evaluate("(el, dy)=>el.scrollBy(0, dy)", step)
+            #         except Exception:
+            #             # fallback: rueda del mouse si evaluate falla
+            #             await page.mouse.wheel(0, step)
+            #         await asyncio.sleep(0.25)
+
+            # # 6) Último barrido
+            # await sweep("final")
+
+            # 7) Deduplicado suave (si tu parser repite items)
+            def key(ch: Dict[str, Any]):
+                return ch.get("id") or (ch.get("name"), ch.get("last_message"), ch.get("last_activity"))
+
+            seen = set()
+            dedup = []
+            for ch in unread_chats:
+                k = key(ch)
+                if k in seen:
                     continue
-
-                # 2) ¿el último mensaje es tuyo? (iconos ic-chatlist-*)
-                is_out, icon_name, status_text = await self._get_chatlist_status(row)
-
-                # 3) nombre + preview limpios
-                name, preview = await self._extract_name_and_preview(row)
-
-                # 4) hora/fecha (opcional)
-                time_txt = await self._get_time_text(row)
-
-                chat_info = {
-                    "name": name,
-                    "preview": preview,
-                    "has_unread": True,
-                    "last_outgoing": is_out,            # True si el último es tuyo
-                    "last_status_icon": icon_name,      # p.ej. ic-chatlist-delivered
-                    "last_status_text": status_text,    # p.ej. "entregado"
-                    "last_activity": time_txt,          # p.ej. "1:29 am" -> limpiado
-                }
-                unread_chats.append(chat_info)
-
-                if debug:
-                    print(f"✓ Unread: {name} | out={is_out} | {icon_name} ({status_text}) | prev='{preview}'")
+                seen.add(k)
+                dedup.append(ch)
+            unread_chats = dedup
 
         except Exception as e:
             await self.client.emit("on_warning", f"Error detectando no leídos: {e}")
-            if debug:
-                print(f"DEBUG: Error general: {e}")
+            log(f"DEBUG: Error general: {e}")
 
-        if debug:
-            print("\nDEBUG: ===== RESUMEN =====")
-            print(f"Total chats no leídos: {len(unread_chats)}")
-            for i, chat in enumerate(unread_chats):
-                print(f"  {i+1}. {chat['name']} | out={chat['last_outgoing']} | {chat['last_status_icon']}")
+        # 8) Resumen final
+        log("\nDEBUG: ===== RESUMEN =====")
+        log(f"Total chats no leídos encontrados: {len(unread_chats)}")
+        for i, chat in enumerate(unread_chats):
+            log(f"  {i+1}. {chat.get('name','Sin nombre')}")
 
         return unread_chats
 
-    # ===== _parse_search_result =====
-    async def _parse_search_result(self, element, result_type: str = "CHATS") -> Optional[Dict[str, Any]]:
-        """
-        Parsea un ítem de resultados (barra de búsqueda).
-        Estructura contemplada:
-        - count == 3 -> [grupo/fecha] [titulo] [preview]
-        - count == 2 -> [titulo/fecha] [preview]
-        Ignora estados “typing/loading/ic-...” y limpia ruidos/horas.
-        """
+    async def _parse_search_result(
+        self, element, result_type: str = "CHATS"
+    ) -> Optional[Dict[str, Any]]:
         try:
             components = await element.query_selector_all(
-                'xpath=.//div[@role="gridcell" and @aria-colindex="2"]/parent::div/div'
+                "xpath=.//div[@role='gridcell' and @aria-colindex='2']/parent::div/div"
             )
             count = len(components)
 
-            unread_el = await element.query_selector(f"xpath={loc.SEARCH_ITEM_UNREAD_MESSAGES}")
+            unread_el = await element.query_selector(
+                f"xpath={loc.SEARCH_ITEM_UNREAD_MESSAGES}"
+            )
             unread_count = await unread_el.inner_text() if unread_el else "0"
-
-            # defensivo: mic solo si hay al menos 2 componentes
-            mic_span = None
-            if count >= 2:
-                mic_span = await components[1].query_selector('xpath=.//span[@data-icon="mic"]')
-
+            mic_span = await components[1].query_selector('xpath=.//span[@data-icon="mic"]')
+            
             if count == 3:
-                span_title_0 = await components[0].query_selector(f"xpath={loc.SPAN_TITLE}")
-                group_title = await span_title_0.get_attribute("title") if span_title_0 else ""
+                span_title_0 = await components[0].query_selector(
+                    f"xpath={loc.SPAN_TITLE}"
+                )
+                group_title = (
+                    await span_title_0.get_attribute("title") if span_title_0 else ""
+                )
 
                 datetime_children = await components[0].query_selector_all("xpath=./*")
-                datetime_text = (await datetime_children[1].inner_text()) if len(datetime_children) > 1 else ""
+                datetime_text = (
+                    await datetime_children[1].text_content()
+                    if len(datetime_children) > 1
+                    else ""
+                )
 
-                span_title_1 = await components[1].query_selector(f"xpath={loc.SPAN_TITLE}")
-                title = await span_title_1.get_attribute("title") if span_title_1 else ""
+                span_title_1 = await components[1].query_selector(
+                    f"xpath={loc.SPAN_TITLE}"
+                )
+                title = (
+                    await span_title_1.get_attribute("title") if span_title_1 else ""
+                )
 
-                info_text = (await components[2].inner_text()) or ""
-                info_text = self._strip_noise(info_text)
-                if self._looks_like_status(info_text):
+                info_text = (await components[2].text_content()) or ""
+                info_text = info_text.replace("\n", "")
+
+                if "loading" in info_text or "status-" in info_text or "typing" in info_text:
                     return None
 
                 return {
                     "type": result_type,
                     "group": group_title,
                     "name": title,
-                    "last_activity": self._strip_noise(datetime_text),
+                    "last_activity": datetime_text,
                     "last_message": info_text,
                     "last_message_type": "audio" if mic_span else "text",
                     "unread_count": unread_count,
@@ -255,36 +247,95 @@ class ChatManager:
                 }
 
             elif count == 2:
-                span_title_0 = await components[0].query_selector(f"xpath={loc.SPAN_TITLE}")
-                title = await span_title_0.get_attribute("title") if span_title_0 else ""
+                span_title_0 = await components[0].query_selector(
+                    f"xpath={loc.SPAN_TITLE}"
+                )
+                title = (
+                    await span_title_0.get_attribute("title") if span_title_0 else ""
+                )
 
                 datetime_children = await components[0].query_selector_all("xpath=./*")
-                datetime_text = (await datetime_children[1].inner_text()) if len(datetime_children) > 1 else ""
+                datetime_text = (
+                    await datetime_children[1].text_content()
+                    if len(datetime_children) > 1
+                    else ""
+                )
 
                 info_children = await components[1].query_selector_all("xpath=./*")
-                info_text = (await info_children[0].inner_text()) if len(info_children) > 0 else ""
-                info_text = self._strip_noise(info_text)
-                if self._looks_like_status(info_text):
+                info_text = (
+                    await info_children[0].text_content()
+                    if len(info_children) > 0
+                    else ""
+                ) or ""
+                info_text = info_text.replace("\n", "")
+                if "loading" in info_text or "status-" in info_text or "typing" in info_text:
                     return None
 
                 return {
                     "type": result_type,
                     "name": title,
-                    "last_activity": self._strip_noise(datetime_text),
+                    "last_activity": datetime_text,
                     "last_message": info_text,
                     "last_message_type": "audio" if mic_span else "text",
-                "unread_count": unread_count,
+                    "unread_count": unread_count,
                     "element": element,
                     "group": None,
                 }
 
-            # layout no contemplado
             return None
 
         except Exception as e:
             print(f"Error parsing result: {e}")
             return None
 
+    async def close(self):
+        """Cierra el chat o la vista actual presionando Escape."""
+        if self._page:
+            try:
+                await self._page.keyboard.press("Escape")
+            except Exception as e:
+                await self.client.emit(
+                    "on_warning", f"Error trying to close chat with Escape: {e}"
+                )
+
+    async def open(
+        self, chat_name: str, timeout: int = 10000, force_open: bool = False
+    ) -> bool:
+        return await self.wa_elements.open(chat_name, timeout, force_open)
+
+    async def search_conversations(
+        self, query: str, close=True
+    ) -> List[Dict[str, Any]]:
+        """Busca conversaciones por término"""
+        if not await self.client.wait_until_logged_in():
+            return []
+        try:
+            return await self.wa_elements.search_chats(query, close)
+        except Exception as e:
+            await self.client.emit("on_error", f"Search error: {e}")
+            return []
+
+    async def collect_messages(self) -> List[Union[Message, FileMessage]]:
+        """
+        Recorre todos los contenedores de mensaje (message-in/message-out) actualmente visibles
+        y devuelve una lista de instancias Message o FileMessage.
+        """
+        resultados: List[Union[Message, FileMessage]] = []
+        msg_elements = await self._page.query_selector_all(
+            'div[class*="message-in"], div[class*="message-out"]'
+        )
+
+        for elem in msg_elements:
+            file_msg = await FileMessage.from_element(elem)
+            if file_msg:
+                resultados.append(file_msg)
+                continue
+
+            simple_msg = await Message.from_element(elem)
+            if simple_msg:
+                resultados.append(simple_msg)
+
+        return resultados
 
     async def download_all_files(self, carpeta: Optional[str] = None) -> List[Path]:
         """
@@ -334,12 +385,17 @@ class ChatManager:
         self, chat_query: str, message: str, force_open=True
     ) -> bool:
         """Envía un mensaje a un chat"""
+        print("mandando mensaje...")
         if not await self.client.wait_until_logged_in():
             return False
 
         try:
             if force_open:
-                await self.open(chat_query)
+                opened = await self.open(chat_query)
+                if not opened:
+                    await self.client.emit("on_error", f"No se pudo abrir el chat: {chat_query}")
+                    return False
+                print(f"✅ Chat '{chat_query}' abierto directamente enviando mensaje")
             await self._page.wait_for_selector(loc.CHAT_INPUT_BOX, timeout=10000)
             input_box = await self._page.wait_for_selector(
                 loc.CHAT_INPUT_BOX, timeout=10000
@@ -357,6 +413,7 @@ class ChatManager:
             return True
 
         except Exception as e:
+            await self._page.screenshot(path="send_message_error.png")
             await self.client.emit("on_error", f"Error al enviar el mensaje: {e}")
             return False
         finally:
@@ -406,26 +463,10 @@ class ChatManager:
         except Exception as e:
             msg = f"Error inesperado en send_file: {str(e)}"
             await self.client.emit("on_error", msg)
-            await self._page.screenshot(path="debug_send_file/error_unexpected.png")
+            await self._page.screenshot(path="send_file_error.png")
             return False
         finally:
             await self.close()
-
-    async def close(self):
-        """Cierra el chat o la vista actual presionando Escape."""
-        if self._page:
-            try:
-                await self._page.keyboard.press("Escape")
-            except Exception as e:
-                await self.client.emit(
-                    "on_warning", f"Error trying to close chat with Escape: {e}"
-                )
-
-    async def open(
-        self, chat_name: str, timeout: int = 10000, force_open: bool = False
-    ) -> bool:
-        return await self.wa_elements.open(chat_name, timeout, force_open)
-
 
     async def new_group(self, group_name: str, members: list[str]):
         return await self.wa_elements.new_group(group_name, members)

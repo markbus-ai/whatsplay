@@ -1,40 +1,29 @@
 # models.py
+import re
 from datetime import datetime
 from pathlib import Path
 from typing import Optional
 from playwright.async_api import Page, ElementHandle, Download
 
-
 class Message:
-    """
-    Representa un mensaje genérico de WhatsApp Web.
-    Extrae:
-      - sender: el remitente (ej. “Mom”, “Marcos”, etc.)
-      - timestamp: hora (y fecha aproximada, usando la hora del sistema)
-      - text: cuerpo textual del mensaje (si existe)
-      - container: el propio ElementHandle del <div class="message-in/out ...">
-    """
-
-    def __init__(
-        self, sender: str, timestamp: datetime, text: str, container: ElementHandle
-    ):
+    def __init__(self, sender: str, timestamp: datetime, text: str, container: ElementHandle,
+                 is_outgoing: bool = False, msg_id: str = ""):
         self.sender = sender
         self.timestamp = timestamp
         self.text = text
         self.container = container
-        
+        self.is_outgoing = is_outgoing
+        self.msg_id = msg_id
 
     @classmethod
     async def from_element(cls, elem: ElementHandle) -> Optional["Message"]:
-        """
-        Crea un Message a partir del <div> que engloba TODO el mensaje.
-        Usa XPath para encontrar:
-          - <span aria-label="X:"> → sender
-          - <span class*="x16dsc37"> → hora
-          - <div class="copyable-text"> → cuerpo textual
-        """
         try:
-            # 1) EXTRAER REMITENTE
+            # 0) Dirección (in/out) e ID si existe
+            classes = (await elem.get_attribute("class")) or ""
+            is_outgoing = "message-out" in classes  # entrante: message-in
+            msg_id = (await elem.get_attribute("data-id")) or ""
+
+            # 1) remitente
             sender = ""
             remitente_span = await elem.query_selector(
                 'xpath=.//span[@aria-label and substring(@aria-label, string-length(@aria-label))=":"]'
@@ -44,41 +33,45 @@ class Message:
                 if raw_label:
                     sender = raw_label.rstrip(":").strip()
 
-            # 2) EXTRAER HORA
+            # 2) hora
             timestamp = datetime.now()
-            time_span = await elem.query_selector(
-                'xpath=.//span[contains(@class,"x16dsc37")]'
-            )
+            time_span = await elem.query_selector('xpath=.//span[contains(@class,"x16dsc37")]')
             if time_span:
-                hora_text = (await time_span.inner_text()).strip()
-                if ":" in hora_text:
-                    hh, mm = map(int, hora_text.split(":"))
-                    ahora = datetime.now()
-                    timestamp = ahora.replace(
-                        hour=hh, minute=mm, second=0, microsecond=0
-                    )
+                hora_text = (await time_span.inner_text()).strip().lower()
+                # Formatos esperados: "10:30", "10:30 am", "10:30 p.m."
+                match = re.match(r'(\d{1,2}):(\d{2})\s*(a\.?m\.?|p\.?m\.?|)?', hora_text)
+                if match:
+                    hh = int(match.group(1))
+                    mm = int(match.group(2))
+                    ampm = (match.group(3) or "").replace(".", "")
 
-            # 3) EXTRAER TEXTO DEL MENSAJE
+                    if ampm == 'pm' and hh != 12:
+                        hh += 12
+                    elif ampm == 'am' and hh == 12: # Medianoche
+                        hh = 0
+                    
+                    ahora = datetime.now()
+                    timestamp = ahora.replace(hour=hh, minute=mm, second=0, microsecond=0)
+
+            # 3) texto
             texto = ""
-            cuerpo_div = await elem.query_selector(
-                'xpath=.//div[contains(@class,"copyable-text")]/div'
-            )
+            cuerpo_div = await elem.query_selector('xpath=.//div[contains(@class,"copyable-text")]/div')
             if cuerpo_div:
                 raw_inner = await cuerpo_div.inner_text()
                 if raw_inner:
                     lineas = raw_inner.split("\n")
-                    if len(lineas) > 1 and (
-                        lineas[0].strip().startswith(sender) or ":" in lineas[0]
-                    ):
+                    if len(lineas) > 1 and (lineas[0].strip().startswith(sender) or ":" in lineas[0]):
                         texto = "\n".join(lineas[1:]).strip()
                     else:
                         texto = raw_inner.strip()
 
-            # 4) RETORNAR INSTANCIA
-            return cls(sender=sender, timestamp=timestamp, text=texto, container=elem)
-
+            return cls(
+                sender=sender, timestamp=timestamp, text=texto, container=elem,
+                is_outgoing=is_outgoing, msg_id=msg_id
+            )
         except Exception:
             return None
+
 
 
 class FileMessage(Message):
