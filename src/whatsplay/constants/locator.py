@@ -20,10 +20,10 @@ COMMUNITIES_BUTTON = "//div[@aria-label='Communities' or @aria-label='Comunidade
 # ==============================
 # Chat filter buttons (tabs)
 # ==============================
-ALL_CHATS_BUTTON = "//div[normalize-space(text())='All' or normalize-space(text())='Todos']"
-UNREAD_CHATS_BUTTON = "//div[normalize-space(text())='Unread' or normalize-space(text())='No leídos']"
-FAVOURITES_CHATS_BUTTON = "//div[normalize-space(text())='Favourites' or normalize-space(text())='Favoritos']"
-GROUPS_CHATS_BUTTON = "//div[normalize-space(text())='Groups' or normalize-space(text())='Grupos']"
+ALL_CHATS_BUTTON = "//span[normalize-space(text())='All' or normalize-space(text())='Todos']"
+UNREAD_CHATS_BUTTON = "//span[normalize-space(text())='Unread' or normalize-space(text())='No leídos']"
+FAVOURITES_CHATS_BUTTON = "//span[normalize-space(text())='Favourites' or normalize-space(text())='Favoritos']"
+GROUPS_CHATS_BUTTON = "//span[normalize-space(text())='Groups' or normalize-space(text())='Grupos']"
 
 # ==============================
 # Sidebar / Chat list (NUEVO DOM)
