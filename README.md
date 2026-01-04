@@ -17,6 +17,9 @@ Permite interactuar con mensajes no leídos, autenticar mediante código QR y re
 - **Filtros personalizados** para procesar solo los mensajes que te interesen.
 - **Extracción automática de código QR** para autenticación.
 - **Compatibilidad con servidores sin GUI** gracias a Playwright en modo *headless*.
+- **Detección robusta de mensajes no leídos** con múltiples heurísticas (aria-labels, badges, font-weight).
+- **Búsqueda mejorada** con estrategias de fallback para máxima compatibilidad.
+- **Selectores actualizados** compatibles con WhatsApp Web 2024-2025.
 
 ---
 
@@ -90,6 +93,19 @@ if __name__ == "__main__":
 
 ---
 
+## 📚 Ejemplos Adicionales
+
+La carpeta `/examples` incluye varios scripts de ejemplo para diferentes casos de uso:
+
+- **`simple_example.py`**: Ejemplo básico con eventos y auto-respuesta a mensajes no leídos
+- **`open_example.py`**: Cómo abrir un chat específico programáticamente
+- **`search_example.py`**: Búsqueda de conversaciones con resultados detallados
+- **`wsp.py`**: Herramienta CLI para envío rápido de mensajes desde terminal
+
+Consulta la documentación completa en `src/DOCUMENTACION.md` para instrucciones detalladas de cada ejemplo.
+
+---
+
 ## 📦 Dependencias
 
 ### Principales
@@ -121,8 +137,23 @@ if __name__ == "__main__":
 
 ## 🗺 Roadmap
 
+### Completado ✅
 * [✅] Soporte para mensajes multimedia (imágenes, videos, audios)
 * [✅] Filtros para mensajes (MessageFilter)
+* [✅] Detección robusta de chats no leídos
+* [✅] Búsqueda mejorada con múltiples estrategias
+* [✅] Selectores actualizados para WhatsApp Web 2024-2025
+* [✅] Soporte para listas virtualizadas
+
+### En desarrollo 🚧
+* [ ] Mejoras en detección de tipos de mensajes específicos
+* [ ] API para envío de archivos multimedia
+* [ ] Soporte para mensajes con reacciones
+
+### Planificado 🔮
+* [ ] Integración con webhooks
+* [ ] Dashboard web de monitoreo
+* [ ] Soporte para múltiples cuentas simultáneas
 
 ---
 

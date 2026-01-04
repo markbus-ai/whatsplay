@@ -281,26 +281,47 @@ class WhatsAppElements:
 
         return results
 
-    async def open(self, chat_name: str, timeout: int = 10000, force_open: bool = False) -> bool:
+    async def open(self, chat_name: str, timeout: int = 10000, open_via_url: bool = False) -> bool:
         """
         Abre un chat por su nombre visible o número. Si no está visible, lo busca.
         """
+        if open_via_url:
+            numero_limpio = re.sub(r"\D", "", chat_name)
+            # Asumimos que si no tiene +, es un número local que puede necesitar el prefijo de país.
+            # Esta lógica puede necesitar ser ajustada dependiendo del caso de uso.
+            # Por ahora, simplemente limpiamos y usamos el número.
+            url = f"https://web.whatsapp.com/send?phone={numero_limpio}"
+            print(f"🌐 Abriendo chat por URL: {url}")
+            try:
+                await self.page.goto(url, timeout=60000) # Timeout más largo para la navegación
+                
+                # Esperar a que la interfaz principal de WhatsApp cargue
+                await self.page.wait_for_selector(loc.LOGGED_IN, timeout=30000)
+                print("✅ Interfaz principal de WhatsApp cargada.")
+
+                # Esperar a que el input de chat aparezca o a un mensaje de "número inválido".
+                await self.page.wait_for_selector(
+                    f"{loc.CHAT_INPUT_BOX}|{loc.INVALID_NUMBER_WARNING}", 
+                    timeout=timeout
+                )
+                
+                # Verificar si el número es inválido
+                invalid_warning = await self.page.query_selector(loc.INVALID_NUMBER_WARNING)
+                if invalid_warning and await invalid_warning.is_visible():
+                    print(f"❌ El número de teléfono '{chat_name}' parece ser inválido.")
+                    return False
+
+                print(f"✅ Chat con '{chat_name}' abierto vía URL.")
+                return True
+            except PlaywrightTimeoutError:
+                print(f"⏱️❌ Timeout abriendo el chat con '{chat_name}' vía URL.")
+                return False
+            except Exception as e:
+                print(f"💥❌ Error abriendo el chat con '{chat_name}' vía URL: {e}")
+                return False
+
         es_numero = False
         chat_name_normalizado = None
-
-        # if chat_name.startswith("+"):
-        #     numero_limpio = re.sub(r"\D", "", chat_name)
-        #     chat_name_normalizado = f"+{numero_limpio}"
-        #     es_numero = bool(re.fullmatch(r"\+\d{6,}", chat_name_normalizado))  # mínimo 6 dígitos
-        #     print(f"📞 Detectado número: {chat_name_normalizado} → válido: {es_numero}")
-
-        # if es_numero or force_open:
-        #     numero = chat_name_normalizado.lstrip("+")
-        #     url = f"https://web.whatsapp.com/send?phone={numero}"
-        #     print(f"🌐 Abriendo chat por URL: {url}")
-        #     await self.page.goto(url)
-        #     await asyncio.sleep(20)
-        #     return True
 
         span_xpath = f"//span[contains(@title, {repr(chat_name)})]"
 
