@@ -3,6 +3,7 @@
 # ==============================
 AUTH = "//div[contains(., 'Steps to log in') or contains(., 'Pasos para iniciar sesión')]"
 QR_CODE = "//canvas[@aria-label='Scan this QR code to link a device!' or @aria-label='Escaneá este código QR para vincular un dispositivo']"
+INVALID_NUMBER_WARNING = "//div[contains(text(), 'invalid') or contains(text(), 'no es válido') or contains(text(), 'no está en WhatsApp')]"
 
 # Banner inferior de cifrado (cambió el data-icon a 'lock-outline' en algunos builds)
 LOADING = "//span[@data-icon='lock-outline' or @data-icon='lock-refreshed']/ancestor::div[contains(., 'End-to-end encrypted') or contains(., 'Cifrado de extremo a extremo')]"
