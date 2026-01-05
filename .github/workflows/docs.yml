@@ -39,4 +39,4 @@ jobs:
       # Step 4: Deploy the documentation
       - name: Deploy to GitHub Pages
         run: |
-          mkdocs gh-deploy --force --clean --commit-message "Deploy documentation from {sha}"
+          mkdocs gh-deploy --force --clean --message "Deploy documentation from {sha}"
