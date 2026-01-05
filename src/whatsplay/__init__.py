@@ -9,7 +9,9 @@ from whatsplay.auth.local_profile_auth import LocalProfileAuth
 from whatsplay.auth.no_auth import NoAuth
 from whatsplay.chat_manager import ChatManager
 from whatsplay.state_manager import StateManager
+from whatsplay.object.message import Message # Added for mkdocstrings discoverability
 
 __version__ = "0.1.0"
 
-__all__ = ["Client", "BaseWhatsAppClient", "EventHandler", "NoAuth", "LocalProfileAuth", "ChatManager", "StateManager"]
+__all__ = ["Client", "BaseWhatsAppClient", "EventHandler", "NoAuth", "LocalProfileAuth", "ChatManager", "StateManager", "Message"] # Added Message
+

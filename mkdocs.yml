@@ -1,0 +1,44 @@
+site_name: WhatsPlay
+site_description: 'A Python library to automate WhatsApp through Playwright.'
+site_author: 'Your Name Here'
+
+theme:
+  name: material
+  palette:
+    # Palette toggle for light vs dark mode
+    - scheme: default
+      toggle:
+        icon: material/brightness-7 
+        name: Switch to dark mode
+    - scheme: slate
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+  features:
+    - navigation.tabs
+    - navigation.top
+    - search.highlight
+
+nav:
+  - 'Home': 'index.md'
+  - 'Getting Started': 'getting-started.md'
+  - 'Guides':
+      - 'Handling Incoming Messages': 'guides/handling-messages.md'
+      - 'Group Management': 'guides/group-management.md'
+      - 'Sending & Receiving Media': 'guides/sending-media.md'
+  - 'API Reference': 'api-reference.md'
+
+plugins:
+  - mkdocstrings:
+      handlers:
+        python:
+          paths: ["src"] # Add the src directory to Python's sys.path
+          options:
+            show_root_heading: yes
+            show_source: yes
+
+markdown_extensions:
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.superfences
+  - mkdocstrings

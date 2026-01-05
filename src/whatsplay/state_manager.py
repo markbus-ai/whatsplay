@@ -38,7 +38,7 @@ class StateManager:
         qr_server_started: Flag indicating if QR server is running
     """
 
-    def __init__(self, client) -> None:
+    def __init__(self, client: "Client") -> None:
         """
         Initialize StateManager with client reference.
 

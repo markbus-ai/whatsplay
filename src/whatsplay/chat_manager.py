@@ -45,7 +45,7 @@ class ChatManager:
         wa_elements: WhatsApp Web elements helper
     """
 
-    def __init__(self, client) -> None:
+    def __init__(self, client: "Client") -> None:
         """
         Initialize ChatManager with client reference.
 
