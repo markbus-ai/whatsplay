@@ -4,6 +4,7 @@ site_author: 'Your Name Here'
 
 theme:
   name: material
+  language: en
   palette:
     # Palette toggle for light vs dark mode
     - scheme: default
@@ -18,6 +19,16 @@ theme:
     - navigation.tabs
     - navigation.top
     - search.highlight
+    - navigation.language
+
+extra:
+  alternate:
+    - name: English
+      link: /en/
+      lang: en
+    - name: Español
+      link: /es/
+      lang: es
 
 nav:
   - 'Home': 'index.md'
@@ -29,6 +40,7 @@ nav:
   - 'API Reference': 'api-reference.md'
 
 plugins:
+  - search
   - mkdocstrings:
       handlers:
         python:
@@ -36,6 +48,15 @@ plugins:
           options:
             show_root_heading: yes
             show_source: yes
+  - static-i18n:
+      default_language: en
+      languages:
+        - locale: en
+          name: English
+          build: true
+        - locale: es
+          name: Español
+          build: true
 
 markdown_extensions:
   - pymdownx.highlight:
