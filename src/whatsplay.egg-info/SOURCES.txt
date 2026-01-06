@@ -26,6 +26,7 @@ src/whatsplay/events/event_types.py
 src/whatsplay/filters/__init__.py
 src/whatsplay/filters/filters.py
 src/whatsplay/filters/message_filter.py
+src/whatsplay/object/__init__.py
 src/whatsplay/object/message.py
 tests/test_chat_manager.py
 tests/test_state_manager.py

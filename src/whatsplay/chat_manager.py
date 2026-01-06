@@ -451,17 +451,40 @@ class ChatManager:
 
         for elem in msg_elements:
             # Try to parse as FileMessage first
-            file_msg = await FileMessage.from_element(elem)
+            file_msg = await FileMessage.from_element(elem, self._page)
             if file_msg:
                 results.append(file_msg)
                 continue
 
             # Fall back to regular Message
-            simple_msg = await Message.from_element(elem)
+            simple_msg = await Message.from_element(elem, self._page)
             if simple_msg:
                 results.append(simple_msg)
 
         return results
+
+    async def react_to_last_message(self, emoji: str) -> bool:
+        """
+        React to the last visible message in the current chat.
+
+        Args:
+            emoji: The emoji to react with (e.g., "👍", "❤️")
+
+        Returns:
+            True if reaction was successful, False otherwise
+        """
+        try:
+            messages = await self.collect_messages()
+            if not messages:
+                await self.client.emit("on_warning", "No messages found to react to.")
+                return False
+            
+            last_message = messages[-1]
+            await last_message.react(emoji)
+            return True
+        except Exception as e:
+            await self.client.emit("on_error", f"Error reacting to last message: {e}")
+            return False
 
     async def download_all_files(
         self, carpeta: Optional[str] = None

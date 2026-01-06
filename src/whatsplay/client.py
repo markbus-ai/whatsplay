@@ -393,6 +393,18 @@ class Client(BaseWhatsAppClient):
         """
         return await self.chat_manager.send_file(chat_name, path)
 
+    async def react_to_last_message(self, emoji: str) -> bool:
+        """
+        React to the last visible message in the current chat.
+
+        Args:
+            emoji: The emoji to react with (e.g., "👍", "❤️")
+
+        Returns:
+            True if reaction was successful
+        """
+        return await self.chat_manager.react_to_last_message(emoji)
+
     async def new_group(self, group_name: str, members: List[str]) -> bool:
         """
         Create a new group.

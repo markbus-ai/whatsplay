@@ -4,10 +4,12 @@ from datetime import datetime
 from pathlib import Path
 from typing import Optional
 from playwright.async_api import Page, ElementHandle, Download
+import asyncio
 
 class Message:
-    def __init__(self, sender: str, timestamp: datetime, text: str, container: ElementHandle,
+    def __init__(self, page: Page, sender: str, timestamp: datetime, text: str, container: ElementHandle,
                  is_outgoing: bool = False, msg_id: str = ""):
+        self.page = page
         self.sender = sender
         self.timestamp = timestamp
         self.text = text
@@ -16,7 +18,7 @@ class Message:
         self.msg_id = msg_id
 
     @classmethod
-    async def from_element(cls, elem: ElementHandle) -> Optional["Message"]:
+    async def from_element(cls, elem: ElementHandle, page: Page) -> Optional["Message"]:
         try:
             # 0) Dirección (in/out) e ID si existe
             classes = (await elem.get_attribute("class")) or ""
@@ -66,11 +68,60 @@ class Message:
                         texto = raw_inner.strip()
 
             return cls(
-                sender=sender, timestamp=timestamp, text=texto, container=elem,
+                page=page, sender=sender, timestamp=timestamp, text=texto, container=elem,
                 is_outgoing=is_outgoing, msg_id=msg_id
             )
         except Exception:
             return None
+            
+    async def react(self, emoji: str):
+        """
+        Reacts to this message with the given emoji, following the user-verified workflow.
+        """
+ 
+        try:
+            # 1. Hover over the message to make the action bar appear.
+            await self.container.hover()
+            
+            # Take screenshot after hover
+            await self.container.screenshot(path="after_hover.png")
+            print("self.container: ", self.container)
+            await asyncio.sleep(1.5)
+            input("presiona enter para continuar")
+
+            # 2. The user confirmed a button with aria-label="Reaccionar" appears first.
+            # We wait for it to ensure the hover menu is open.
+            # This is likely the default reaction button, but it makes the '+' button visible.
+            reaction_bar = self.page.locator('[aria-label="Reaccionar"]')
+            if not reaction_bar:
+                print("Error: No se encontró el botón '[aria-label=\"Reaccionar\"]'.")
+                return None
+            await reaction_bar.click()
+
+            # 3. The user confirmed they must then click a button with aria-label="Más reacciones" to open the picker.
+            more_reactions_button_handle = self.page.locator('[aria-label="Más reacciones"]')
+            if not more_reactions_button_handle:
+                print("Error: No se encontró el botón '[aria-label=\"Más reacciones\"]'.")
+                return None
+            
+            await more_reactions_button_handle.click()
+
+            # 4. The emoji picker appears on the main page. We now use the main page object.
+            # We also use the correct selector for emojis, which is their aria-label.
+            
+            # The selector finds the picker and then the specific emoji inside it.
+            emoji_in_picker = self.page.locator(f'[data-emoji="{emoji}"]')
+
+            # 5. Wait for the emoji to be visible and click it.
+            await emoji_in_picker.wait_for(state="visible", timeout=5000)
+            await emoji_in_picker.click()
+
+            print(f"Successfully reacted with '{emoji}'")
+
+        except Exception as e:
+            print(f"An error occurred while reacting to message {self.msg_id}: {e}")
+
+
 
 
 
@@ -84,6 +135,7 @@ class FileMessage(Message):
 
     def __init__(
         self,
+        page: Page,
         sender: str,
         timestamp: datetime,
         text: str,
@@ -91,12 +143,12 @@ class FileMessage(Message):
         filename: str,
         download_icon: ElementHandle,
     ):
-        super().__init__(sender, timestamp, text, container)
+        super().__init__(page, sender, timestamp, text, container)
         self.filename = filename
         self.download_icon = download_icon
 
     @classmethod
-    async def from_element(cls, elem: ElementHandle) -> Optional["FileMessage"]:
+    async def from_element(cls, elem: ElementHandle, page: Page) -> Optional["FileMessage"]:
         """
         Dado el <div> que engloba un mensaje completo, intenta:
           1) Localizar un <span data-icon="audio-download"> dentro de `elem`.
@@ -141,11 +193,12 @@ class FileMessage(Message):
                 return None
 
             # 3) EXTRAER DATOS BASE DEL MENSAJE
-            base_msg = await Message.from_element(elem)
+            base_msg = await Message.from_element(elem, page)
             if not base_msg:
                 return None
 
             return cls(
+                page=page,
                 sender=base_msg.sender,
                 timestamp=base_msg.timestamp,
                 text=base_msg.text,
