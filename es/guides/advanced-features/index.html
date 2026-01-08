@@ -88,7 +88,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#guia-caracteristicas-avanzadas" class="md-skip">
+        <a href="#guia-caracteristica-avanzadas" class="md-skip">
           Saltar a contenido
         </a>
       
@@ -345,6 +345,25 @@
     
   
   Troubleshooting
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../contributing/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Contributing
 
       </a>
     </li>
@@ -713,6 +732,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#mensajes-directos-no-contactos" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Mensajes Directos (No Contactos)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#reaccionando-a-mensajes" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -795,6 +825,33 @@
   
   
     <li class="md-nav__item">
+      <a href="../../contributing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Contributing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../api-reference/" class="md-nav__link">
         
   
@@ -846,6 +903,17 @@
     <span class="md-ellipsis">
       
         Buscando Conversaciones
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#mensajes-directos-no-contactos" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Mensajes Directos (No Contactos)
       
     </span>
   </a>
@@ -905,7 +973,7 @@
   
 
 
-<h1 id="guia-caracteristicas-avanzadas">Guía: Características Avanzadas</h1>
+<h1 id="guia-caracteristica-avanzadas">Guía: Característica Avanzadas</h1>
 <p>Más allá de enviar y recibir mensajes, WhatsPlay ofrece varias características avanzadas para ayudarte a gestionar tus chats e interactuar de forma más natural.</p>
 <h2 id="buscando-conversaciones">Buscando Conversaciones</h2>
 <p>Si tienes una larga lista de chats, puedes usar la función de búsqueda para encontrar contactos o grupos específicos.</p>
@@ -918,34 +986,45 @@
 <a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>    <span class="c1"># Luego puedes abrirlo usando el nombre exacto</span>
 <a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a>    <span class="k">await</span> <span class="n">client</span><span class="o">.</span><span class="n">open</span><span class="p">(</span><span class="n">result</span><span class="p">[</span><span class="s1">&#39;name&#39;</span><span class="p">])</span>
 </code></pre></div>
+<h2 id="mensajes-directos-no-contactos">Mensajes Directos (No Contactos)</h2>
+<p>Puedes enviar mensajes a números de teléfono que no están en tu lista de contactos o que no son visibles actualmente en tu historial de chat usando el parámetro <code>open_via_url</code>.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="c1"># El número de teléfono debe incluir el código de país, sin &#39;+&#39; ni &#39;00&#39;</span>
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="n">numero_telefono</span> <span class="o">=</span> <span class="s2">&quot;1234567890&quot;</span> 
+<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>
+<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="c1"># Establecer open_via_url=True fuerza a WhatsApp Web a cargar el chat vía URL</span>
+<a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a><span class="n">success</span> <span class="o">=</span> <span class="k">await</span> <span class="n">client</span><span class="o">.</span><span class="n">send_message</span><span class="p">(</span><span class="n">numero_telefono</span><span class="p">,</span> <span class="s2">&quot;¡Hola extraño!&quot;</span><span class="p">,</span> <span class="n">open_via_url</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a>
+<a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a><span class="k">if</span> <span class="n">success</span><span class="p">:</span>
+<a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a>    <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;¡Mensaje enviado a número nuevo!&quot;</span><span class="p">)</span>
+</code></pre></div>
 <h2 id="reaccionando-a-mensajes">Reaccionando a Mensajes</h2>
 <p>Puedes reaccionar al último mensaje recibido en un chat usando emojis. Esto es genial para confirmar la recepción sin enviar un mensaje de texto completo.</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="k">await</span> <span class="n">client</span><span class="o">.</span><span class="n">open</span><span class="p">(</span><span class="s2">&quot;Mi Amigo&quot;</span><span class="p">)</span>
-<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>
-<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="c1"># Reaccionar con un pulgar arriba</span>
-<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="n">success</span> <span class="o">=</span> <span class="k">await</span> <span class="n">client</span><span class="o">.</span><span class="n">react_to_last_message</span><span class="p">(</span><span class="s2">&quot;👍&quot;</span><span class="p">)</span>
-<a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a>
-<a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a><span class="k">if</span> <span class="n">success</span><span class="p">:</span>
-<a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a>    <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;¡Reacción enviada exitosamente!&quot;</span><span class="p">)</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="k">await</span> <span class="n">client</span><span class="o">.</span><span class="n">open</span><span class="p">(</span><span class="s2">&quot;Mi Amigo&quot;</span><span class="p">)</span>
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>
+<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="c1"># Reaccionar con un pulgar arriba</span>
+<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a><span class="n">success</span> <span class="o">=</span> <span class="k">await</span> <span class="n">client</span><span class="o">.</span><span class="n">react_to_last_message</span><span class="p">(</span><span class="s2">&quot;👍&quot;</span><span class="p">)</span>
+<a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a>
+<a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a><span class="k">if</span> <span class="n">success</span><span class="p">:</span>
+<a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a>    <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;¡Reacción enviada exitosamente!&quot;</span><span class="p">)</span>
 </code></pre></div>
 <h2 id="descargando-todos-los-archivos">Descargando Todos los Archivos</h2>
 <p>Si necesitas archivar multimedia o documentos de un chat, <code>download_all_files</code> te permite obtener todos los adjuntos visibles en la vista actual.</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="k">await</span> <span class="n">client</span><span class="o">.</span><span class="n">open</span><span class="p">(</span><span class="s2">&quot;Grupo Familiar&quot;</span><span class="p">)</span>
-<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>
-<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="c1"># Descargar todos los archivos visibles a una carpeta específica</span>
-<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a><span class="n">saved_paths</span> <span class="o">=</span> <span class="k">await</span> <span class="n">client</span><span class="o">.</span><span class="n">download_all_files</span><span class="p">(</span><span class="n">carpeta</span><span class="o">=</span><span class="s2">&quot;./descargas/fotos_familia&quot;</span><span class="p">)</span>
-<a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a>
-<a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a><span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Descargados </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">saved_paths</span><span class="p">)</span><span class="si">}</span><span class="s2"> archivos.&quot;</span><span class="p">)</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="k">await</span> <span class="n">client</span><span class="o">.</span><span class="n">open</span><span class="p">(</span><span class="s2">&quot;Grupo Familiar&quot;</span><span class="p">)</span>
+<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>
+<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="c1"># Descargar todos los archivos visibles a una carpeta específica</span>
+<a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a><span class="n">saved_paths</span> <span class="o">=</span> <span class="k">await</span> <span class="n">client</span><span class="o">.</span><span class="n">download_all_files</span><span class="p">(</span><span class="n">carpeta</span><span class="o">=</span><span class="s2">&quot;./descargas/fotos_familia&quot;</span><span class="p">)</span>
+<a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a>
+<a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a><span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Descargados </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">saved_paths</span><span class="p">)</span><span class="si">}</span><span class="s2"> archivos.&quot;</span><span class="p">)</span>
 </code></pre></div>
 <h2 id="extrayendo-historial-de-chat-scraping">Extrayendo Historial de Chat (Scraping)</h2>
 <p>Puedes combinar <code>open</code> y <code>collect_messages</code> para extraer el historial de chat. Ten en cuenta que WhatsPlay interactúa actualmente con el DOM visible.</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="k">await</span> <span class="n">client</span><span class="o">.</span><span class="n">open</span><span class="p">(</span><span class="s2">&quot;Chat de Trabajo&quot;</span><span class="p">)</span>
-<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>
-<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="c1"># Obtener todos los mensajes cargados actualmente</span>
-<a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a><span class="n">messages</span> <span class="o">=</span> <span class="k">await</span> <span class="n">client</span><span class="o">.</span><span class="n">collect_messages</span><span class="p">()</span>
-<a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a>
-<a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a><span class="k">for</span> <span class="n">msg</span> <span class="ow">in</span> <span class="n">messages</span><span class="p">:</span>
-<a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a>    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;[</span><span class="si">{</span><span class="n">msg</span><span class="o">.</span><span class="n">timestamp</span><span class="si">}</span><span class="s2">] </span><span class="si">{</span><span class="n">msg</span><span class="o">.</span><span class="n">sender</span><span class="o">.</span><span class="n">name</span><span class="si">}</span><span class="s2">: </span><span class="si">{</span><span class="n">msg</span><span class="o">.</span><span class="n">text</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="k">await</span> <span class="n">client</span><span class="o">.</span><span class="n">open</span><span class="p">(</span><span class="s2">&quot;Chat de Trabajo&quot;</span><span class="p">)</span>
+<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>
+<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a><span class="c1"># Obtener todos los mensajes cargados actualmente</span>
+<a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a><span class="n">messages</span> <span class="o">=</span> <span class="k">await</span> <span class="n">client</span><span class="o">.</span><span class="n">collect_messages</span><span class="p">()</span>
+<a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a>
+<a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a><span class="k">for</span> <span class="n">msg</span> <span class="ow">in</span> <span class="n">messages</span><span class="p">:</span>
+<a id="__codelineno-4-7" name="__codelineno-4-7" href="#__codelineno-4-7"></a>    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;[</span><span class="si">{</span><span class="n">msg</span><span class="o">.</span><span class="n">timestamp</span><span class="si">}</span><span class="s2">] </span><span class="si">{</span><span class="n">msg</span><span class="o">.</span><span class="n">sender</span><span class="o">.</span><span class="n">name</span><span class="si">}</span><span class="s2">: </span><span class="si">{</span><span class="n">msg</span><span class="o">.</span><span class="n">text</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
 </code></pre></div>
 
 

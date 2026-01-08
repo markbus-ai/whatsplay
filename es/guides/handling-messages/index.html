@@ -357,6 +357,25 @@
   
   
     <li class="md-tabs__item">
+      <a href="../../contributing/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Contributing
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
       <a href="../../api-reference/" class="md-tabs__link">
         
   
@@ -630,6 +649,17 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
+  <a href="#estructura-de-la-informacion-payload" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Estructura de la Información (Payload)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#patron-basico-detectar-abrir-y-leer" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -829,6 +859,33 @@
   
   
     <li class="md-nav__item">
+      <a href="../../contributing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Contributing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../api-reference/" class="md-nav__link">
         
   
@@ -886,6 +943,17 @@
   
     <nav class="md-nav" aria-label="El Evento on_unread_chat">
       <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#estructura-de-la-informacion-payload" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Estructura de la Información (Payload)
+      
+    </span>
+  </a>
+  
+</li>
         
           <li class="md-nav__item">
   <a href="#patron-basico-detectar-abrir-y-leer" class="md-nav__link">
@@ -978,7 +1046,17 @@
 <p>Esto te da control total sobre cuándo y cómo procesas nuevas conversaciones.</p>
 <h2 id="el-evento-on_unread_chat">El Evento <code>on_unread_chat</code></h2>
 <p>Este es el evento principal para detectar nueva actividad. Se dispara cada vez que WhatsPlay encuentra uno o más chats con mensajes no leídos.</p>
-<p>El manejador del evento recibe una lista de diccionarios, donde cada diccionario contiene información básica sobre el chat no leído (nombre, vista previa del último mensaje, contador de no leídos, etc.).</p>
+<h3 id="estructura-de-la-informacion-payload">Estructura de la Información (Payload)</h3>
+<p>El manejador del evento recibe una lista de diccionarios. Cada diccionario representa un chat no leído y contiene las siguientes claves:</p>
+<ul>
+<li><strong><code>name</code></strong> (str): El nombre visible del chat (nombre del contacto, título del grupo o número de teléfono).</li>
+<li><strong><code>unread_count</code></strong> (str): El número de mensajes no leídos (ej. "3").</li>
+<li><strong><code>last_message</code></strong> (str): Una vista previa del último mensaje mostrado en la barra lateral.</li>
+<li><strong><code>last_activity</code></strong> (str): La hora o fecha del último mensaje (ej. "10:30 PM", "Ayer").</li>
+<li><strong><code>type</code></strong> (str): Usualmente "CHATS".</li>
+<li><strong><code>group</code></strong> (str o None): El nombre del grupo si es un chat grupal, o vacío si es un mensaje directo.</li>
+<li><strong><code>last_message_type</code></strong> (str): "text" o "audio" dependiendo del icono visible.</li>
+</ul>
 <h3 id="patron-basico-detectar-abrir-y-leer">Patrón Básico: Detectar, Abrir y Leer</h3>
 <p>Para leer el contenido real de los mensajes, necesitas:
 1.  Escuchar el evento <code>on_unread_chat</code>.
