@@ -1,129 +1,129 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:xhtml="http://www.w3.org/1999/xhtml">
     <url>
-        <loc>None./</loc>
+        <loc>https://markbus-ai.github.io/whatsplay/</loc>
         <lastmod>2026-01-08</lastmod>
         <changefreq>daily</changefreq>
-        <xhtml:link rel="alternate" hreflang="en" href="None"/>
-        <xhtml:link rel="alternate" hreflang="es" href="Nonees/"/>
+        <xhtml:link rel="alternate" hreflang="en" href="https://markbus-ai.github.io/whatsplay/"/>
+        <xhtml:link rel="alternate" hreflang="es" href="https://markbus-ai.github.io/whatsplay/es/"/>
     </url>
     <url>
-        <loc>Noneapi-reference/</loc>
+        <loc>https://markbus-ai.github.io/whatsplay/api-reference/</loc>
         <lastmod>2026-01-08</lastmod>
         <changefreq>daily</changefreq>
-        <xhtml:link rel="alternate" hreflang="en" href="Noneapi-reference/"/>
-        <xhtml:link rel="alternate" hreflang="es" href="Nonees/api-reference/"/>
+        <xhtml:link rel="alternate" hreflang="en" href="https://markbus-ai.github.io/whatsplay/api-reference/"/>
+        <xhtml:link rel="alternate" hreflang="es" href="https://markbus-ai.github.io/whatsplay/es/api-reference/"/>
     </url>
     <url>
-        <loc>Noneconfiguration/</loc>
+        <loc>https://markbus-ai.github.io/whatsplay/configuration/</loc>
         <lastmod>2026-01-08</lastmod>
         <changefreq>daily</changefreq>
-        <xhtml:link rel="alternate" hreflang="en" href="Noneconfiguration/"/>
-        <xhtml:link rel="alternate" hreflang="es" href="Nonees/configuration/"/>
+        <xhtml:link rel="alternate" hreflang="en" href="https://markbus-ai.github.io/whatsplay/configuration/"/>
+        <xhtml:link rel="alternate" hreflang="es" href="https://markbus-ai.github.io/whatsplay/es/configuration/"/>
     </url>
     <url>
-        <loc>Nonegetting-started/</loc>
+        <loc>https://markbus-ai.github.io/whatsplay/getting-started/</loc>
         <lastmod>2026-01-08</lastmod>
         <changefreq>daily</changefreq>
-        <xhtml:link rel="alternate" hreflang="en" href="Nonegetting-started/"/>
-        <xhtml:link rel="alternate" hreflang="es" href="Nonees/getting-started/"/>
+        <xhtml:link rel="alternate" hreflang="en" href="https://markbus-ai.github.io/whatsplay/getting-started/"/>
+        <xhtml:link rel="alternate" hreflang="es" href="https://markbus-ai.github.io/whatsplay/es/getting-started/"/>
     </url>
     <url>
-        <loc>Nonetroubleshooting/</loc>
+        <loc>https://markbus-ai.github.io/whatsplay/troubleshooting/</loc>
         <lastmod>2026-01-08</lastmod>
         <changefreq>daily</changefreq>
-        <xhtml:link rel="alternate" hreflang="en" href="Nonetroubleshooting/"/>
-        <xhtml:link rel="alternate" hreflang="es" href="Nonees/troubleshooting/"/>
+        <xhtml:link rel="alternate" hreflang="en" href="https://markbus-ai.github.io/whatsplay/troubleshooting/"/>
+        <xhtml:link rel="alternate" hreflang="es" href="https://markbus-ai.github.io/whatsplay/es/troubleshooting/"/>
     </url>
     <url>
-        <loc>Noneguides/advanced-features/</loc>
+        <loc>https://markbus-ai.github.io/whatsplay/guides/advanced-features/</loc>
         <lastmod>2026-01-08</lastmod>
         <changefreq>daily</changefreq>
-        <xhtml:link rel="alternate" hreflang="en" href="Noneguides/advanced-features/"/>
-        <xhtml:link rel="alternate" hreflang="es" href="Nonees/guides/advanced-features/"/>
+        <xhtml:link rel="alternate" hreflang="en" href="https://markbus-ai.github.io/whatsplay/guides/advanced-features/"/>
+        <xhtml:link rel="alternate" hreflang="es" href="https://markbus-ai.github.io/whatsplay/es/guides/advanced-features/"/>
     </url>
     <url>
-        <loc>Noneguides/group-management/</loc>
+        <loc>https://markbus-ai.github.io/whatsplay/guides/group-management/</loc>
         <lastmod>2026-01-08</lastmod>
         <changefreq>daily</changefreq>
-        <xhtml:link rel="alternate" hreflang="en" href="Noneguides/group-management/"/>
-        <xhtml:link rel="alternate" hreflang="es" href="Nonees/guides/group-management/"/>
+        <xhtml:link rel="alternate" hreflang="en" href="https://markbus-ai.github.io/whatsplay/guides/group-management/"/>
+        <xhtml:link rel="alternate" hreflang="es" href="https://markbus-ai.github.io/whatsplay/es/guides/group-management/"/>
     </url>
     <url>
-        <loc>Noneguides/handling-messages/</loc>
+        <loc>https://markbus-ai.github.io/whatsplay/guides/handling-messages/</loc>
         <lastmod>2026-01-08</lastmod>
         <changefreq>daily</changefreq>
-        <xhtml:link rel="alternate" hreflang="en" href="Noneguides/handling-messages/"/>
-        <xhtml:link rel="alternate" hreflang="es" href="Nonees/guides/handling-messages/"/>
+        <xhtml:link rel="alternate" hreflang="en" href="https://markbus-ai.github.io/whatsplay/guides/handling-messages/"/>
+        <xhtml:link rel="alternate" hreflang="es" href="https://markbus-ai.github.io/whatsplay/es/guides/handling-messages/"/>
     </url>
     <url>
-        <loc>Noneguides/sending-media/</loc>
+        <loc>https://markbus-ai.github.io/whatsplay/guides/sending-media/</loc>
         <lastmod>2026-01-08</lastmod>
         <changefreq>daily</changefreq>
-        <xhtml:link rel="alternate" hreflang="en" href="Noneguides/sending-media/"/>
-        <xhtml:link rel="alternate" hreflang="es" href="Nonees/guides/sending-media/"/>
+        <xhtml:link rel="alternate" hreflang="en" href="https://markbus-ai.github.io/whatsplay/guides/sending-media/"/>
+        <xhtml:link rel="alternate" hreflang="es" href="https://markbus-ai.github.io/whatsplay/es/guides/sending-media/"/>
     </url>
     <url>
-        <loc>Nonees/</loc>
+        <loc>https://markbus-ai.github.io/whatsplay/es/</loc>
         <lastmod>2026-01-08</lastmod>
         <changefreq>daily</changefreq>
-        <xhtml:link rel="alternate" hreflang="es" href="Nonees/"/>
-        <xhtml:link rel="alternate" hreflang="en" href="None"/>
+        <xhtml:link rel="alternate" hreflang="es" href="https://markbus-ai.github.io/whatsplay/es/"/>
+        <xhtml:link rel="alternate" hreflang="en" href="https://markbus-ai.github.io/whatsplay/"/>
     </url>
     <url>
-        <loc>Nonees/api-reference/</loc>
+        <loc>https://markbus-ai.github.io/whatsplay/es/api-reference/</loc>
         <lastmod>2026-01-08</lastmod>
         <changefreq>daily</changefreq>
-        <xhtml:link rel="alternate" hreflang="es" href="Nonees/api-reference/"/>
-        <xhtml:link rel="alternate" hreflang="en" href="Noneapi-reference/"/>
+        <xhtml:link rel="alternate" hreflang="es" href="https://markbus-ai.github.io/whatsplay/es/api-reference/"/>
+        <xhtml:link rel="alternate" hreflang="en" href="https://markbus-ai.github.io/whatsplay/api-reference/"/>
     </url>
     <url>
-        <loc>Nonees/configuration/</loc>
+        <loc>https://markbus-ai.github.io/whatsplay/es/configuration/</loc>
         <lastmod>2026-01-08</lastmod>
         <changefreq>daily</changefreq>
-        <xhtml:link rel="alternate" hreflang="es" href="Nonees/configuration/"/>
-        <xhtml:link rel="alternate" hreflang="en" href="Noneconfiguration/"/>
+        <xhtml:link rel="alternate" hreflang="es" href="https://markbus-ai.github.io/whatsplay/es/configuration/"/>
+        <xhtml:link rel="alternate" hreflang="en" href="https://markbus-ai.github.io/whatsplay/configuration/"/>
     </url>
     <url>
-        <loc>Nonees/getting-started/</loc>
+        <loc>https://markbus-ai.github.io/whatsplay/es/getting-started/</loc>
         <lastmod>2026-01-08</lastmod>
         <changefreq>daily</changefreq>
-        <xhtml:link rel="alternate" hreflang="es" href="Nonees/getting-started/"/>
-        <xhtml:link rel="alternate" hreflang="en" href="Nonegetting-started/"/>
+        <xhtml:link rel="alternate" hreflang="es" href="https://markbus-ai.github.io/whatsplay/es/getting-started/"/>
+        <xhtml:link rel="alternate" hreflang="en" href="https://markbus-ai.github.io/whatsplay/getting-started/"/>
     </url>
     <url>
-        <loc>Nonees/troubleshooting/</loc>
+        <loc>https://markbus-ai.github.io/whatsplay/es/troubleshooting/</loc>
         <lastmod>2026-01-08</lastmod>
         <changefreq>daily</changefreq>
-        <xhtml:link rel="alternate" hreflang="es" href="Nonees/troubleshooting/"/>
-        <xhtml:link rel="alternate" hreflang="en" href="Nonetroubleshooting/"/>
+        <xhtml:link rel="alternate" hreflang="es" href="https://markbus-ai.github.io/whatsplay/es/troubleshooting/"/>
+        <xhtml:link rel="alternate" hreflang="en" href="https://markbus-ai.github.io/whatsplay/troubleshooting/"/>
     </url>
     <url>
-        <loc>Nonees/guides/advanced-features/</loc>
+        <loc>https://markbus-ai.github.io/whatsplay/es/guides/advanced-features/</loc>
         <lastmod>2026-01-08</lastmod>
         <changefreq>daily</changefreq>
-        <xhtml:link rel="alternate" hreflang="es" href="Nonees/guides/advanced-features/"/>
-        <xhtml:link rel="alternate" hreflang="en" href="Noneguides/advanced-features/"/>
+        <xhtml:link rel="alternate" hreflang="es" href="https://markbus-ai.github.io/whatsplay/es/guides/advanced-features/"/>
+        <xhtml:link rel="alternate" hreflang="en" href="https://markbus-ai.github.io/whatsplay/guides/advanced-features/"/>
     </url>
     <url>
-        <loc>Nonees/guides/group-management/</loc>
+        <loc>https://markbus-ai.github.io/whatsplay/es/guides/group-management/</loc>
         <lastmod>2026-01-08</lastmod>
         <changefreq>daily</changefreq>
-        <xhtml:link rel="alternate" hreflang="es" href="Nonees/guides/group-management/"/>
-        <xhtml:link rel="alternate" hreflang="en" href="Noneguides/group-management/"/>
+        <xhtml:link rel="alternate" hreflang="es" href="https://markbus-ai.github.io/whatsplay/es/guides/group-management/"/>
+        <xhtml:link rel="alternate" hreflang="en" href="https://markbus-ai.github.io/whatsplay/guides/group-management/"/>
     </url>
     <url>
-        <loc>Nonees/guides/handling-messages/</loc>
+        <loc>https://markbus-ai.github.io/whatsplay/es/guides/handling-messages/</loc>
         <lastmod>2026-01-08</lastmod>
         <changefreq>daily</changefreq>
-        <xhtml:link rel="alternate" hreflang="es" href="Nonees/guides/handling-messages/"/>
-        <xhtml:link rel="alternate" hreflang="en" href="Noneguides/handling-messages/"/>
+        <xhtml:link rel="alternate" hreflang="es" href="https://markbus-ai.github.io/whatsplay/es/guides/handling-messages/"/>
+        <xhtml:link rel="alternate" hreflang="en" href="https://markbus-ai.github.io/whatsplay/guides/handling-messages/"/>
     </url>
     <url>
-        <loc>Nonees/guides/sending-media/</loc>
+        <loc>https://markbus-ai.github.io/whatsplay/es/guides/sending-media/</loc>
         <lastmod>2026-01-08</lastmod>
         <changefreq>daily</changefreq>
-        <xhtml:link rel="alternate" hreflang="es" href="Nonees/guides/sending-media/"/>
-        <xhtml:link rel="alternate" hreflang="en" href="Noneguides/sending-media/"/>
+        <xhtml:link rel="alternate" hreflang="es" href="https://markbus-ai.github.io/whatsplay/es/guides/sending-media/"/>
+        <xhtml:link rel="alternate" hreflang="en" href="https://markbus-ai.github.io/whatsplay/guides/sending-media/"/>
     </url>
 </urlset>
