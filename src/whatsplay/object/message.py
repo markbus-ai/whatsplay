@@ -54,7 +54,7 @@ class Message:
             # 1) Sender
             sender = ""
             remitente_span = await elem.query_selector(
-                'xpath=.//span[@aria-label and substring(@aria-label, string-length(@aria-label))=":"]
+                'xpath=.//span[@aria-label and substring(@aria-label, string-length(@aria-label))=":"]'
             )
             if remitente_span:
                 raw_label = await remitente_span.get_attribute("aria-label")
@@ -137,7 +137,7 @@ class Message:
             await more_reactions_button_handle.click()
 
             # 4. Find emoji in picker
-            emoji_in_picker = self.page.locator(f'[data-emoji="{emoji}"])
+            emoji_in_picker = self.page.locator(f'[data-emoji="{emoji}"]')
 
             # 5. Click emoji
             await emoji_in_picker.wait_for(state="visible", timeout=5000)
