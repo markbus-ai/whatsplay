@@ -7,6 +7,22 @@ from playwright.async_api import Page, ElementHandle, Download
 import asyncio
 
 class Message:
+    """
+    Represents a WhatsApp message.
+
+    This object encapsulates all data related to a single message in a chat,
+    including its content, sender, timestamp, and interactivity methods.
+
+    Attributes:
+        page (Page): The Playwright Page object.
+        sender (str): The name or phone number of the sender.
+        timestamp (datetime): The time the message was received.
+        text (str): The text content of the message.
+        container (ElementHandle): The DOM element containing the message.
+        is_outgoing (bool): True if the message was sent by the user, False otherwise.
+        msg_id (str): The unique identifier of the message.
+    """
+
     def __init__(self, page: Page, sender: str, timestamp: datetime, text: str, container: ElementHandle,
                  is_outgoing: bool = False, msg_id: str = ""):
         self.page = page
@@ -19,29 +35,39 @@ class Message:
 
     @classmethod
     async def from_element(cls, elem: ElementHandle, page: Page) -> Optional["Message"]:
+        """
+        Create a Message instance from a DOM element.
+
+        Args:
+            elem: The message container element.
+            page: The Playwright page.
+
+        Returns:
+            A new Message instance or None if parsing fails.
+        """
         try:
-            # 0) Dirección (in/out) e ID si existe
+            # 0) Direction (in/out) and ID if exists
             classes = (await elem.get_attribute("class")) or ""
-            is_outgoing = "message-out" in classes  # entrante: message-in
+            is_outgoing = "message-out" in classes  # incoming: message-in
             msg_id = (await elem.get_attribute("data-id")) or ""
 
-            # 1) remitente
+            # 1) Sender
             sender = ""
             remitente_span = await elem.query_selector(
-                'xpath=.//span[@aria-label and substring(@aria-label, string-length(@aria-label))=":"]'
+                'xpath=.//span[@aria-label and substring(@aria-label, string-length(@aria-label))=":"]
             )
             if remitente_span:
                 raw_label = await remitente_span.get_attribute("aria-label")
                 if raw_label:
                     sender = raw_label.rstrip(":").strip()
 
-            # 2) hora
+            # 2) Timestamp
             timestamp = datetime.now()
             time_span = await elem.query_selector('xpath=.//span[contains(@class,"x16dsc37")]')
             if time_span:
                 hora_text = (await time_span.inner_text()).strip().lower()
-                # Formatos esperados: "10:30", "10:30 am", "10:30 p.m."
-                match = re.match(r'(\d{1,2}):(\d{2})\s*(a\.?m\.?|p\.?m\.?|)?', hora_text)
+                # Expected formats: "10:30", "10:30 am", "10:30 p.m."
+                match = re.match(r'(\d{1,2}):(\d{2})\s*(a\.?.m\.?|p\.?.m\.?|)?', hora_text)
                 if match:
                     hh = int(match.group(1))
                     mm = int(match.group(2))
@@ -49,13 +75,13 @@ class Message:
 
                     if ampm == 'pm' and hh != 12:
                         hh += 12
-                    elif ampm == 'am' and hh == 12: # Medianoche
+                    elif ampm == 'am' and hh == 12: # Midnight
                         hh = 0
                     
                     ahora = datetime.now()
                     timestamp = ahora.replace(hour=hh, minute=mm, second=0, microsecond=0)
 
-            # 3) texto
+            # 3) Text
             texto = ""
             cuerpo_div = await elem.query_selector('xpath=.//div[contains(@class,"copyable-text")]/div')
             if cuerpo_div:
@@ -76,7 +102,13 @@ class Message:
             
     async def react(self, emoji: str):
         """
-        Reacts to this message with the given emoji, following the user-verified workflow.
+        Reacts to this message with the given emoji.
+
+        This method simulates the user interaction of hovering over the message,
+        clicking the reaction button, and selecting an emoji.
+
+        Args:
+            emoji (str): The emoji character to react with (e.g., "👍", "❤️").
         """
  
         try:
@@ -84,53 +116,49 @@ class Message:
             await self.container.hover()
             
             # Take screenshot after hover
-            await self.container.screenshot(path="after_hover.png")
-            print("self.container: ", self.container)
-            await asyncio.sleep(1.5)
-            input("presiona enter para continuar")
+            # await self.container.screenshot(path="after_hover.png")
+            # print("self.container: ", self.container)
+            await asyncio.sleep(0.5)
+            # input("presiona enter para continuar")
 
-            # 2. The user confirmed a button with aria-label="Reaccionar" appears first.
-            # We wait for it to ensure the hover menu is open.
-            # This is likely the default reaction button, but it makes the '+' button visible.
+            # 2. Find reaction button
             reaction_bar = self.page.locator('[aria-label="Reaccionar"]')
             if not reaction_bar:
-                print("Error: No se encontró el botón '[aria-label=\"Reaccionar\"]'.")
+                # print("Error: No se encontró el botón '[aria-label="Reaccionar"]'.")
                 return None
             await reaction_bar.click()
 
-            # 3. The user confirmed they must then click a button with aria-label="Más reacciones" to open the picker.
+            # 3. Find "More reactions" button
             more_reactions_button_handle = self.page.locator('[aria-label="Más reacciones"]')
             if not more_reactions_button_handle:
-                print("Error: No se encontró el botón '[aria-label=\"Más reacciones\"]'.")
+                # print("Error: No se encontró el botón '[aria-label="Más reacciones"]'.")
                 return None
             
             await more_reactions_button_handle.click()
 
-            # 4. The emoji picker appears on the main page. We now use the main page object.
-            # We also use the correct selector for emojis, which is their aria-label.
-            
-            # The selector finds the picker and then the specific emoji inside it.
-            emoji_in_picker = self.page.locator(f'[data-emoji="{emoji}"]')
+            # 4. Find emoji in picker
+            emoji_in_picker = self.page.locator(f'[data-emoji="{emoji}"])
 
-            # 5. Wait for the emoji to be visible and click it.
+            # 5. Click emoji
             await emoji_in_picker.wait_for(state="visible", timeout=5000)
             await emoji_in_picker.click()
 
-            print(f"Successfully reacted with '{emoji}'")
+            # print(f"Successfully reacted with '{emoji}'")
 
         except Exception as e:
             print(f"An error occurred while reacting to message {self.msg_id}: {e}")
 
 
-
-
-
 class FileMessage(Message):
     """
-    Representa un mensaje que contiene un archivo descargable.
-    Extiende a Message y añade:
-      - filename: nombre real del archivo (p.ej. "SoftwareDeveloper_JeanRoa_ES.pdf")
-      - download_icon: ElementHandle apuntando al <span data-icon="audio-download">
+    Represents a message containing a downloadable file.
+
+    Inherits from `Message` and adds specific functionality for handling
+    media and document attachments.
+
+    Attributes:
+        filename (str): The name of the file (e.g., "document.pdf").
+        download_icon (ElementHandle): The DOM element for the download button.
     """
 
     def __init__(
@@ -150,20 +178,24 @@ class FileMessage(Message):
     @classmethod
     async def from_element(cls, elem: ElementHandle, page: Page) -> Optional["FileMessage"]:
         """
-        Dado el <div> que engloba un mensaje completo, intenta:
-          1) Localizar un <span data-icon="audio-download"> dentro de `elem`.
-          2) Si existe, determina el filename leyendo el atributo title del ancestro más cercano
-             que tenga algo como title="Download \"NombreDelArchivo.ext\"".
-          3) Llama internamente a Message.from_element para extraer remitente, timestamp y texto.
-          4) Si todo OK, retorna FileMessage; de lo contrario, retorna None.
+        Create a FileMessage from a DOM element.
+
+        Checks for the presence of a download icon and attempts to parse the filename.
+
+        Args:
+            elem: The message container element.
+            page: The Playwright page.
+
+        Returns:
+            A new FileMessage instance or None if not a valid file message.
         """
         try:
-            # 1) ¿HAY ICONO DE DESCARGA?
+            # 1) Check for download icon
             icon = await elem.query_selector('span[data-icon="audio-download"]')
             if not icon:
                 return None
 
-            # 2) BUSCAR NOMBRE DE ARCHIVO
+            # 2) Find filename
             filename = ""
             title_handle = await icon.evaluate_handle(
                 """
@@ -192,7 +224,7 @@ class FileMessage(Message):
             if not filename:
                 return None
 
-            # 3) EXTRAER DATOS BASE DEL MENSAJE
+            # 3) Extract base message data
             base_msg = await Message.from_element(elem, page)
             if not base_msg:
                 return None
@@ -212,24 +244,31 @@ class FileMessage(Message):
 
     async def download(self, page: Page, downloads_dir: Path) -> Optional[Path]:
         """
-        Hace clic en self.download_icon y espera el evento de descarga.
-        Luego guarda el archivo en `downloads_dir/filename` y retorna la Path resultante.
-        Si algo falla, devuelve None.
+        Download the attached file.
+
+        Clicks the download icon and waits for the download to complete.
+
+        Args:
+            page: The Playwright Page object.
+            downloads_dir: The directory where the file should be saved.
+
+        Returns:
+            The Path to the saved file, or None if the download failed.
         """
         try:
-            # 1) CREAR DIRECTORIO SI NO EXISTE
+            # 1) Create directory
             downloads_dir.mkdir(parents=True, exist_ok=True)
 
-            # 2) ESPERAR DESCARGA
+            # 2) Wait for download
             async with page.expect_download() as evento:
                 await self.download_icon.click()
             descarga: Download = await evento.value
 
-            # 3) OBTENER NOMBRE SUGERIDO
+            # 3) Get filename and path
             suggested = descarga.suggested_filename or self.filename
             destino = downloads_dir / suggested
 
-            # 4) GUARDAR EN DISCO
+            # 4) Save to disk
             await descarga.save_as(str(destino))
             return destino
 
