@@ -1,6 +1,10 @@
 site_name: WhatsPlay
+site_url: https://markbus-ai.github.io/whatsplay/
 site_description: 'A Python library to automate WhatsApp through Playwright.'
 site_author: 'Your Name Here'
+repo_url: https://github.com/markbus-ai/whatsplay
+repo_name: markbus-ai/whatsplay
+edit_uri: edit/main/docs/
 
 theme:
   name: material
