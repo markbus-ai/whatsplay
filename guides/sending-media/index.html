@@ -303,6 +303,25 @@
   
   
     <li class="md-tabs__item">
+      <a href="../../troubleshooting/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Troubleshooting
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
       <a href="../../api-reference/" class="md-tabs__link">
         
   
@@ -621,10 +640,38 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
+  <a href="#using-messagedownload_media" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Using message.download_media()
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Using message.download_media()">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
   <a href="#example-auto-downloader-bot" class="md-nav__link">
     <span class="md-ellipsis">
       
         Example: Auto-downloader Bot
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#using-clientdownload_file_by_index" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Using client.download_file_by_index()
       
     </span>
   </a>
@@ -676,6 +723,33 @@
           </ul>
         </nav>
       
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../troubleshooting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Troubleshooting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
     </li>
   
 
@@ -774,10 +848,38 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
+  <a href="#using-messagedownload_media" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Using message.download_media()
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Using message.download_media()">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
   <a href="#example-auto-downloader-bot" class="md-nav__link">
     <span class="md-ellipsis">
       
         Example: Auto-downloader Bot
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#using-clientdownload_file_by_index" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Using client.download_file_by_index()
       
     </span>
   </a>
@@ -863,12 +965,14 @@
 *   Audio files (<code>.mp3</code>, <code>.ogg</code>, etc.)</p>
 <h2 id="downloading-media">Downloading Media</h2>
 <p>When you receive a message that contains media, the <code>Message</code> object provides a convenient way to download it.</p>
+<h3 id="using-messagedownload_media">Using <code>message.download_media()</code></h3>
+<p>This is the standard way to download a specific media message.</p>
 <ol>
 <li>Check if the message contains media using <code>message.is_media</code>.</li>
 <li>If it does, call the <code>await message.download_media()</code> method.</li>
 </ol>
 <p>This method downloads the file to a specified location. If no path is provided, it may use a default directory.</p>
-<h3 id="example-auto-downloader-bot">Example: Auto-downloader Bot</h3>
+<h4 id="example-auto-downloader-bot">Example: Auto-downloader Bot</h4>
 <p>This bot automatically downloads any media it receives.</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="kn">import</span><span class="w"> </span><span class="nn">asyncio</span>
 <a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="kn">from</span><span class="w"> </span><span class="nn">pathlib</span><span class="w"> </span><span class="kn">import</span> <span class="n">Path</span>
@@ -890,35 +994,46 @@
 <a id="__codelineno-1-18" name="__codelineno-1-18" href="#__codelineno-1-18"></a>    <span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">on_start</span><span class="p">():</span>
 <a id="__codelineno-1-19" name="__codelineno-1-19" href="#__codelineno-1-19"></a>        <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Downloader bot started. Waiting for media...&quot;</span><span class="p">)</span>
 <a id="__codelineno-1-20" name="__codelineno-1-20" href="#__codelineno-1-20"></a>
-<a id="__codelineno-1-21" name="__codelineno-1-21" href="#__codelineno-1-21"></a>    <span class="nd">@client</span><span class="o">.</span><span class="n">event</span><span class="p">(</span><span class="s2">&quot;on_message&quot;</span><span class="p">)</span>
-<a id="__codelineno-1-22" name="__codelineno-1-22" href="#__codelineno-1-22"></a>    <span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">handle_message</span><span class="p">(</span><span class="n">message</span><span class="p">:</span> <span class="n">Message</span><span class="p">):</span>
-<a id="__codelineno-1-23" name="__codelineno-1-23" href="#__codelineno-1-23"></a>        <span class="k">if</span> <span class="n">message</span><span class="o">.</span><span class="n">is_media</span><span class="p">:</span>
-<a id="__codelineno-1-24" name="__codelineno-1-24" href="#__codelineno-1-24"></a>            <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Received media of type &#39;</span><span class="si">{</span><span class="n">message</span><span class="o">.</span><span class="n">media_type</span><span class="si">}</span><span class="s2">&#39; from </span><span class="si">{</span><span class="n">message</span><span class="o">.</span><span class="n">sender</span><span class="o">.</span><span class="n">name</span><span class="w"> </span><span class="ow">or</span><span class="w"> </span><span class="n">message</span><span class="o">.</span><span class="n">sender</span><span class="o">.</span><span class="n">id</span><span class="si">}</span><span class="s2">.&quot;</span><span class="p">)</span>
-<a id="__codelineno-1-25" name="__codelineno-1-25" href="#__codelineno-1-25"></a>
-<a id="__codelineno-1-26" name="__codelineno-1-26" href="#__codelineno-1-26"></a>            <span class="c1"># Define a path to save the file</span>
-<a id="__codelineno-1-27" name="__codelineno-1-27" href="#__codelineno-1-27"></a>            <span class="c1"># You can customize the filename, here we use the message ID</span>
-<a id="__codelineno-1-28" name="__codelineno-1-28" href="#__codelineno-1-28"></a>            <span class="n">save_path</span> <span class="o">=</span> <span class="n">download_dir</span> <span class="o">/</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">message</span><span class="o">.</span><span class="n">id</span><span class="si">}</span><span class="s2">-</span><span class="si">{</span><span class="n">message</span><span class="o">.</span><span class="n">media_filename</span><span class="w"> </span><span class="ow">or</span><span class="w"> </span><span class="s1">&#39;download&#39;</span><span class="si">}</span><span class="s2">&quot;</span>
-<a id="__codelineno-1-29" name="__codelineno-1-29" href="#__codelineno-1-29"></a>
-<a id="__codelineno-1-30" name="__codelineno-1-30" href="#__codelineno-1-30"></a>            <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Downloading to </span><span class="si">{</span><span class="n">save_path</span><span class="si">}</span><span class="s2">...&quot;</span><span class="p">)</span>
-<a id="__codelineno-1-31" name="__codelineno-1-31" href="#__codelineno-1-31"></a>
-<a id="__codelineno-1-32" name="__codelineno-1-32" href="#__codelineno-1-32"></a>            <span class="k">try</span><span class="p">:</span>
-<a id="__codelineno-1-33" name="__codelineno-1-33" href="#__codelineno-1-33"></a>                <span class="k">await</span> <span class="n">message</span><span class="o">.</span><span class="n">download_media</span><span class="p">(</span><span class="n">save_path</span><span class="p">)</span>
-<a id="__codelineno-1-34" name="__codelineno-1-34" href="#__codelineno-1-34"></a>                <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Download successful!&quot;</span><span class="p">)</span>
-<a id="__codelineno-1-35" name="__codelineno-1-35" href="#__codelineno-1-35"></a>                <span class="k">await</span> <span class="n">message</span><span class="o">.</span><span class="n">reply</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Thanks! I&#39;ve saved the file as </span><span class="si">{</span><span class="n">save_path</span><span class="o">.</span><span class="n">name</span><span class="si">}</span><span class="s2">.&quot;</span><span class="p">)</span>
-<a id="__codelineno-1-36" name="__codelineno-1-36" href="#__codelineno-1-36"></a>            <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
-<a id="__codelineno-1-37" name="__codelineno-1-37" href="#__codelineno-1-37"></a>                <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Error downloading file: </span><span class="si">{</span><span class="n">e</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
-<a id="__codelineno-1-38" name="__codelineno-1-38" href="#__codelineno-1-38"></a>                <span class="k">await</span> <span class="n">message</span><span class="o">.</span><span class="n">reply</span><span class="p">(</span><span class="s2">&quot;Sorry, I had an error trying to download your file.&quot;</span><span class="p">)</span>
-<a id="__codelineno-1-39" name="__codelineno-1-39" href="#__codelineno-1-39"></a>
-<a id="__codelineno-1-40" name="__codelineno-1-40" href="#__codelineno-1-40"></a>    <span class="nd">@client</span><span class="o">.</span><span class="n">event</span><span class="p">(</span><span class="s2">&quot;on_qr&quot;</span><span class="p">)</span>
-<a id="__codelineno-1-41" name="__codelineno-1-41" href="#__codelineno-1-41"></a>    <span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">on_qr</span><span class="p">(</span><span class="n">qr</span><span class="p">):</span>
-<a id="__codelineno-1-42" name="__codelineno-1-42" href="#__codelineno-1-42"></a>        <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Please scan the QR code to log in.&quot;</span><span class="p">)</span>
-<a id="__codelineno-1-43" name="__codelineno-1-43" href="#__codelineno-1-43"></a>
-<a id="__codelineno-1-44" name="__codelineno-1-44" href="#__codelineno-1-44"></a>    <span class="k">await</span> <span class="n">client</span><span class="o">.</span><span class="n">start</span><span class="p">()</span>
-<a id="__codelineno-1-45" name="__codelineno-1-45" href="#__codelineno-1-45"></a>
-<a id="__codelineno-1-46" name="__codelineno-1-46" href="#__codelineno-1-46"></a><span class="k">if</span> <span class="vm">__name__</span> <span class="o">==</span> <span class="s2">&quot;__main__&quot;</span><span class="p">:</span>
-<a id="__codelineno-1-47" name="__codelineno-1-47" href="#__codelineno-1-47"></a>    <span class="n">asyncio</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">media_downloader_bot</span><span class="p">())</span>
+<a id="__codelineno-1-21" name="__codelineno-1-21" href="#__codelineno-1-21"></a>    <span class="nd">@client</span><span class="o">.</span><span class="n">event</span><span class="p">(</span><span class="s2">&quot;on_unread_chat&quot;</span><span class="p">)</span>
+<a id="__codelineno-1-22" name="__codelineno-1-22" href="#__codelineno-1-22"></a>    <span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">on_unread_chat</span><span class="p">(</span><span class="n">chats</span><span class="p">):</span>
+<a id="__codelineno-1-23" name="__codelineno-1-23" href="#__codelineno-1-23"></a>        <span class="k">for</span> <span class="n">chat</span> <span class="ow">in</span> <span class="n">chats</span><span class="p">:</span>
+<a id="__codelineno-1-24" name="__codelineno-1-24" href="#__codelineno-1-24"></a>            <span class="k">if</span> <span class="k">await</span> <span class="n">client</span><span class="o">.</span><span class="n">open</span><span class="p">(</span><span class="n">chat</span><span class="p">[</span><span class="s1">&#39;name&#39;</span><span class="p">]):</span>
+<a id="__codelineno-1-25" name="__codelineno-1-25" href="#__codelineno-1-25"></a>                <span class="n">messages</span> <span class="o">=</span> <span class="k">await</span> <span class="n">client</span><span class="o">.</span><span class="n">collect_messages</span><span class="p">()</span>
+<a id="__codelineno-1-26" name="__codelineno-1-26" href="#__codelineno-1-26"></a>                <span class="k">for</span> <span class="n">message</span> <span class="ow">in</span> <span class="n">messages</span><span class="p">:</span>
+<a id="__codelineno-1-27" name="__codelineno-1-27" href="#__codelineno-1-27"></a>                    <span class="k">if</span> <span class="n">message</span><span class="o">.</span><span class="n">is_media</span><span class="p">:</span>
+<a id="__codelineno-1-28" name="__codelineno-1-28" href="#__codelineno-1-28"></a>                        <span class="c1"># Define a path to save the file</span>
+<a id="__codelineno-1-29" name="__codelineno-1-29" href="#__codelineno-1-29"></a>                        <span class="n">save_path</span> <span class="o">=</span> <span class="n">download_dir</span> <span class="o">/</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">message</span><span class="o">.</span><span class="n">id</span><span class="si">}</span><span class="s2">-</span><span class="si">{</span><span class="n">message</span><span class="o">.</span><span class="n">media_filename</span><span class="w"> </span><span class="ow">or</span><span class="w"> </span><span class="s1">&#39;download&#39;</span><span class="si">}</span><span class="s2">&quot;</span>
+<a id="__codelineno-1-30" name="__codelineno-1-30" href="#__codelineno-1-30"></a>
+<a id="__codelineno-1-31" name="__codelineno-1-31" href="#__codelineno-1-31"></a>                        <span class="k">try</span><span class="p">:</span>
+<a id="__codelineno-1-32" name="__codelineno-1-32" href="#__codelineno-1-32"></a>                            <span class="k">await</span> <span class="n">message</span><span class="o">.</span><span class="n">download_media</span><span class="p">(</span><span class="n">save_path</span><span class="p">)</span>
+<a id="__codelineno-1-33" name="__codelineno-1-33" href="#__codelineno-1-33"></a>                            <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Downloaded: </span><span class="si">{</span><span class="n">save_path</span><span class="o">.</span><span class="n">name</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+<a id="__codelineno-1-34" name="__codelineno-1-34" href="#__codelineno-1-34"></a>                        <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+<a id="__codelineno-1-35" name="__codelineno-1-35" href="#__codelineno-1-35"></a>                            <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Error: </span><span class="si">{</span><span class="n">e</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+<a id="__codelineno-1-36" name="__codelineno-1-36" href="#__codelineno-1-36"></a>
+<a id="__codelineno-1-37" name="__codelineno-1-37" href="#__codelineno-1-37"></a>    <span class="nd">@client</span><span class="o">.</span><span class="n">event</span><span class="p">(</span><span class="s2">&quot;on_qr&quot;</span><span class="p">)</span>
+<a id="__codelineno-1-38" name="__codelineno-1-38" href="#__codelineno-1-38"></a>    <span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">on_qr</span><span class="p">(</span><span class="n">qr</span><span class="p">):</span>
+<a id="__codelineno-1-39" name="__codelineno-1-39" href="#__codelineno-1-39"></a>        <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Please scan the QR code to log in.&quot;</span><span class="p">)</span>
+<a id="__codelineno-1-40" name="__codelineno-1-40" href="#__codelineno-1-40"></a>
+<a id="__codelineno-1-41" name="__codelineno-1-41" href="#__codelineno-1-41"></a>    <span class="k">await</span> <span class="n">client</span><span class="o">.</span><span class="n">start</span><span class="p">()</span>
+<a id="__codelineno-1-42" name="__codelineno-1-42" href="#__codelineno-1-42"></a>
+<a id="__codelineno-1-43" name="__codelineno-1-43" href="#__codelineno-1-43"></a><span class="k">if</span> <span class="vm">__name__</span> <span class="o">==</span> <span class="s2">&quot;__main__&quot;</span><span class="p">:</span>
+<a id="__codelineno-1-44" name="__codelineno-1-44" href="#__codelineno-1-44"></a>    <span class="n">asyncio</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">media_downloader_bot</span><span class="p">())</span>
 </code></pre></div>
-<p>This bot will listen for incoming messages, and if one contains media, it will attempt to download it into the <code>media_downloads</code> folder in your project directory.</p>
+<h3 id="using-clientdownload_file_by_index">Using <code>client.download_file_by_index()</code></h3>
+<p>If you want to download a file based on its position in the list of currently visible messages (e.g., "download the last file sent"), you can use <code>client.download_file_by_index()</code>.</p>
+<ul>
+<li><code>index=0</code>: The first visible file (oldest).</li>
+<li><code>index=-1</code>: The last visible file (newest).</li>
+</ul>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="c1"># Open the chat first</span>
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="k">await</span> <span class="n">client</span><span class="o">.</span><span class="n">open</span><span class="p">(</span><span class="s2">&quot;My Group&quot;</span><span class="p">)</span>
+<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>
+<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a><span class="c1"># Download the most recent file</span>
+<a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a><span class="n">file_path</span> <span class="o">=</span> <span class="k">await</span> <span class="n">client</span><span class="o">.</span><span class="n">download_file_by_index</span><span class="p">(</span><span class="n">index</span><span class="o">=-</span><span class="mi">1</span><span class="p">,</span> <span class="n">carpeta</span><span class="o">=</span><span class="s2">&quot;./downloads&quot;</span><span class="p">)</span>
+<a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a>
+<a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a><span class="k">if</span> <span class="n">file_path</span><span class="p">:</span>
+<a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a>    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Last file saved to: </span><span class="si">{</span><span class="n">file_path</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+</code></pre></div>
 
 
 
