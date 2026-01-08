@@ -15,6 +15,13 @@
         <xhtml:link rel="alternate" hreflang="es" href="Nonees/api-reference/"/>
     </url>
     <url>
+        <loc>Noneconfiguration/</loc>
+        <lastmod>2026-01-08</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="en" href="Noneconfiguration/"/>
+        <xhtml:link rel="alternate" hreflang="es" href="Nonees/configuration/"/>
+    </url>
+    <url>
         <loc>Nonegetting-started/</loc>
         <lastmod>2026-01-08</lastmod>
         <changefreq>daily</changefreq>
@@ -69,6 +76,13 @@
         <changefreq>daily</changefreq>
         <xhtml:link rel="alternate" hreflang="es" href="Nonees/api-reference/"/>
         <xhtml:link rel="alternate" hreflang="en" href="Noneapi-reference/"/>
+    </url>
+    <url>
+        <loc>Nonees/configuration/</loc>
+        <lastmod>2026-01-08</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="es" href="Nonees/configuration/"/>
+        <xhtml:link rel="alternate" hreflang="en" href="Noneconfiguration/"/>
     </url>
     <url>
         <loc>Nonees/getting-started/</loc>
