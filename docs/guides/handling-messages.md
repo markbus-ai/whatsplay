@@ -8,7 +8,17 @@ This gives you full control over when and how you process new conversations.
 
 This is the primary event for detecting new activity. It is triggered whenever WhatsPlay finds one or more chats with unread messages.
 
-The event handler receives a list of dictionaries, where each dictionary contains basic information about the unread chat (name, last message preview, unread count, etc.).
+### Payload Structure
+
+The event handler receives a list of dictionaries. Each dictionary represents an unread chat and contains the following keys:
+
+*   **`name`** (str): The visible name of the chat (contact name, group title, or phone number).
+*   **`unread_count`** (str): The number of unread messages (e.g., "3").
+*   **`last_message`** (str): A preview of the last message shown in the sidebar.
+*   **`last_activity`** (str): The time or date of the last message (e.g., "10:30 PM", "Yesterday").
+*   **`type`** (str): Usually "CHATS".
+*   **`group`** (str or None): The group name if it's a group chat, or empty if it's a direct message.
+*   **`last_message_type`** (str): "text" or "audio" depending on the icon visible.
 
 ### Basic Pattern: Detect, Open, and Read
 

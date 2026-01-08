@@ -17,6 +17,21 @@ for result in results:
     await client.open(result['name'])
 ```
 
+## Direct Messaging (Non-Contacts)
+
+You can send messages to phone numbers that are not in your contact list or not currently visible in your chat history using the `open_via_url` parameter.
+
+```python
+# Phone number must include country code, without '+' or '00'
+phone_number = "1234567890" 
+
+# Setting open_via_url=True forces WhatsApp Web to load the chat via URL
+success = await client.send_message(phone_number, "Hello stranger!", open_via_url=True)
+
+if success:
+    print("Message sent to new number!")
+```
+
 ## Reacting to Messages
 
 You can react to the last received message in a chat using emojis. This is great for acknowledging receipt without sending a full text message.

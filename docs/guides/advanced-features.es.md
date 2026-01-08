@@ -1,4 +1,4 @@
-# Guía: Características Avanzadas
+# Guía: Característica Avanzadas
 
 Más allá de enviar y recibir mensajes, WhatsPlay ofrece varias características avanzadas para ayudarte a gestionar tus chats e interactuar de forma más natural.
 
@@ -15,6 +15,21 @@ for result in results:
     print(f"Encontrado: {result['name']}")
     # Luego puedes abrirlo usando el nombre exacto
     await client.open(result['name'])
+```
+
+## Mensajes Directos (No Contactos)
+
+Puedes enviar mensajes a números de teléfono que no están en tu lista de contactos o que no son visibles actualmente en tu historial de chat usando el parámetro `open_via_url`.
+
+```python
+# El número de teléfono debe incluir el código de país, sin '+' ni '00'
+numero_telefono = "1234567890" 
+
+# Establecer open_via_url=True fuerza a WhatsApp Web a cargar el chat vía URL
+success = await client.send_message(numero_telefono, "¡Hola extraño!", open_via_url=True)
+
+if success:
+    print("¡Mensaje enviado a número nuevo!")
 ```
 
 ## Reaccionando a Mensajes

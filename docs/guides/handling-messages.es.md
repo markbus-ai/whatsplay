@@ -8,7 +8,17 @@ Esto te da control total sobre cuándo y cómo procesas nuevas conversaciones.
 
 Este es el evento principal para detectar nueva actividad. Se dispara cada vez que WhatsPlay encuentra uno o más chats con mensajes no leídos.
 
-El manejador del evento recibe una lista de diccionarios, donde cada diccionario contiene información básica sobre el chat no leído (nombre, vista previa del último mensaje, contador de no leídos, etc.).
+### Estructura de la Información (Payload)
+
+El manejador del evento recibe una lista de diccionarios. Cada diccionario representa un chat no leído y contiene las siguientes claves:
+
+*   **`name`** (str): El nombre visible del chat (nombre del contacto, título del grupo o número de teléfono).
+*   **`unread_count`** (str): El número de mensajes no leídos (ej. "3").
+*   **`last_message`** (str): Una vista previa del último mensaje mostrado en la barra lateral.
+*   **`last_activity`** (str): La hora o fecha del último mensaje (ej. "10:30 PM", "Ayer").
+*   **`type`** (str): Usualmente "CHATS".
+*   **`group`** (str o None): El nombre del grupo si es un chat grupal, o vacío si es un mensaje directo.
+*   **`last_message_type`** (str): "text" o "audio" dependiendo del icono visible.
 
 ### Patrón Básico: Detectar, Abrir y Leer
 

@@ -44,6 +44,7 @@ nav:
       - 'Sending & Receiving Media': 'guides/sending-media.md'
       - 'Advanced Features': 'guides/advanced-features.md'
   - 'Troubleshooting': 'troubleshooting.md'
+  - 'Contributing': 'contributing.md'
   - 'API Reference': 'api-reference.md'
 
 plugins:
