@@ -1,165 +1,104 @@
 # Guía: Manejo de Mensajes Entrantes
 
-La arquitectura basada en eventos de WhatsPlay hace fácil reaccionar a mensajes entrantes en tiempo real. Esta guía te mostrará cómo configurar manejadores para mensajes y cómo filtrarlos.
+WhatsPlay utiliza un mecanismo de sondeo (polling) activo para detectar nuevos mensajes. En lugar de esperar pasivamente un evento de mensaje, el cliente verifica periódicamente si hay indicadores de "no leído" en tu lista de chats.
 
-## El Evento `on_message`
+Esto te da control total sobre cuándo y cómo procesas nuevas conversaciones.
 
-El núcleo del manejo de mensajes entrantes es suscribirse al evento `on_message`. Tu función manejadora recibirá un objeto `message` que contiene todos los detalles sobre el mensaje entrante.
+## El Evento `on_unread_chat`
 
-```python
-import asyncio
-from whatsplay import Client
-from whatsplay.auth import LocalProfileAuth
-from whatsplay.event import Message
+Este es el evento principal para detectar nueva actividad. Se dispara cada vez que WhatsPlay encuentra uno o más chats con mensajes no leídos.
 
-async def basic_message_handler():
-    auth = LocalProfileAuth(user_data_dir="./whatsapp_session")
-    client = Client(auth=auth, headless=True)
+El manejador del evento recibe una lista de diccionarios, donde cada diccionario contiene información básica sobre el chat no leído (nombre, vista previa del último mensaje, contador de no leídos, etc.).
 
-    @client.event("on_start")
-    async def on_start():
-        print("Cliente listo. Esperando mensajes...")
+### Patrón Básico: Detectar, Abrir y Leer
 
-    # Este manejador será llamado para cada mensaje entrante
-    @client.event("on_message")
-    async def handle_any_message(message: Message):
-        print(f"¡Recibí un mensaje!")
-        print(f"  De: {message.sender.name or message.sender.id}")
-        print(f"  Chat: {message.chat.name or message.chat.id}")
-        print(f"  Texto: {message.text}")
-        
-        # Ejemplo: Responder al remitente
-        if message.text and "hola" in message.text.lower():
-            await message.reply("¡Hola! ¿Cómo puedo ayudarte?")
-
-    @client.event("on_qr")
-    async def on_qr(qr):
-        print("Por favor escanea el código QR para iniciar sesión.")
-
-    # Mantén el cliente corriendo indefinidamente para escuchar mensajes
-    await client.start()
-    # Podrías querer añadir client.run_forever() aquí si tu script es solo para escuchar
-    # Sin embargo, para ejemplos simples, client.start() es suficiente si no llamas a client.stop() inmediatamente.
-
-if __name__ == "__main__":
-    asyncio.run(basic_message_handler())
-```
-
-## Filtrando Mensajes
-
-WhatsPlay proporciona capacidades de filtrado potentes para ayudarte a procesar solo los mensajes que te interesan. Puedes pasar un objeto filtro al decorador del evento `on_message`.
-
-### Usando Filtros Predefinidos
-
-El módulo `whatsplay.filters` ofrece varios filtros listos para usar.
+Para leer el contenido real de los mensajes, necesitas:
+1.  Escuchar el evento `on_unread_chat`.
+2.  Iterar a través de los chats detectados.
+3.  **Abrir** cada chat usando `client.open()`.
+4.  **Recolectar** los mensajes usando `client.collect_messages()`.
 
 ```python
 import asyncio
 from whatsplay import Client
 from whatsplay.auth import LocalProfileAuth
-from whatsplay.event import Message
-from whatsplay.filters import message_filter
 
-async def filtered_message_handler():
+async def auto_reply_bot():
     auth = LocalProfileAuth(user_data_dir="./whatsapp_session")
     client = Client(auth=auth, headless=True)
 
     @client.event("on_start")
     async def on_start():
-        print("Cliente listo. Esperando mensajes filtrados...")
+        print("¡Bot iniciado! Buscando nuevos mensajes...")
 
-    # Solo manejar mensajes que son texto (no multimedia, etc.)
-    @client.event("on_message", message_filter.text)
-    async def handle_text_message(message: Message):
-        print(f"Recibí un mensaje de TEXTO de {message.sender.name or message.sender.id}: {message.text}")
+    @client.event("on_unread_chat")
+    async def on_unread_chat(chats):
+        """
+        Se dispara cuando hay chats no leídos.
+        'chats' es una lista de dicts: [{'name': 'Juan', 'unread_count': '2', ...}, ...]
+        """
+        print(f"Se encontraron {len(chats)} chats con nuevos mensajes.")
 
-    # Solo manejar mensajes de un remitente específico (por nombre o ID)
-    @client.event("on_message", message_filter.sender("Juan Pérez"))
-    async def handle_message_from_john(message: Message):
-        print(f"Recibí un mensaje de Juan Pérez: {message.text}")
+        for chat_info in chats:
+            chat_name = chat_info.get('name')
+            print(f"Procesando chat: {chat_name}")
 
-    # Solo manejar mensajes que coincidan con una expresión regular
-    @client.event("on_message", message_filter.regex(r"^\/comando"))
-    async def handle_command_message(message: Message):
-        print(f"Recibí un comando: {message.text}")
-        await message.reply("¡Comando recibido!")
+            # 1. Abrir el chat para cargar los mensajes
+            if await client.open(chat_name):
+                
+                # 2. Recolectar mensajes visibles
+                messages = await client.collect_messages()
+                
+                if messages:
+                    last_message = messages[-1]
+                    sender = last_message.sender.name or "Desconocido"
+                    text = last_message.text
+                    
+                    print(f"  Último mensaje de {sender}: {text}")
+
+                    # 3. Lógica simple de Auto-respuesta
+                    if text and "hola" in text.lower():
+                        await client.send_message(chat_name, "¡Hola! Soy un bot de WhatsPlay. 🤖")
+                        print(f"  -> Respondido a {chat_name}")
+                    
+                    # Opcional: Marcar como leído o archivar (la lógica depende de tus necesidades)
+                    # Actualmente, abrir el chat lo marca como leído en WhatsApp.
+            else:
+                print(f"  Falló al abrir el chat: {chat_name}")
 
     @client.event("on_qr")
     async def on_qr(qr):
-        print("Por favor escanea el código QR para iniciar sesión.")
+        print("Por favor escanea el código QR.")
 
     await client.start()
 
 if __name__ == "__main__":
-    asyncio.run(filtered_message_handler())
+    asyncio.run(auto_reply_bot())
 ```
 
-### Creando Filtros Personalizados
+## Procesando Mensajes
 
-También puedes definir tus propias funciones de filtro o clases para lógica más compleja. Una función de filtro debe aceptar un objeto `message` y devolver `True` si el mensaje debe ser procesado por el manejador, `False` en caso contrario.
+El método `client.collect_messages()` devuelve una lista de objetos `Message`. Estos son los mismos objetos descritos en la Referencia de la API.
+
+### Atributos Comunes de `Message`
+
+*   `message.text`: El contenido de texto.
+*   `message.timestamp`: Hora en que se recibió el mensaje.
+*   `message.sender.name`: Nombre del remitente.
+*   `message.is_media`: `True` si es una imagen, video, etc.
+
+### Filtrado
+
+Dado que obtienes una lista de mensajes (usualmente los últimos visibles), podrías querer filtrarlos. Aunque los filtros de `on_message` (mencionados en otros contextos) son para futuras APIs de streaming, puedes filtrar fácilmente la lista manualmente o usando herramientas integradas de Python.
 
 ```python
-import asyncio
-from whatsplay import Client
-from whatsplay.auth import LocalProfileAuth
-from whatsplay.event import Message
-from whatsplay.filters import CustomFilter
-
-# Función de filtro personalizada
-def my_custom_filter(message: Message) -> bool:
-    # Solo procesar mensajes que contengan "importante" y sean de un tipo de chat específico
-    return message.text and "importante" in message.text.lower() and message.chat.is_group
-
-# O una clase CustomFilter (más potente para filtros reutilizables y con estado)
-class MyChatIdFilter(CustomFilter):
-    def __init__(self, chat_id_to_match: str):
-        self.chat_id_to_match = chat_id_to_match
-
-    def __call__(self, message: Message) -> bool:
-        return message.chat.id == self.chat_id_to_match
-
-
-async def custom_filtered_message_handler():
-    auth = LocalProfileAuth(user_data_dir="./whatsapp_session")
-    client = Client(auth=auth, headless=True)
-
-    @client.event("on_start")
-    async def on_start():
-        print("Cliente listo. Esperando mensajes filtrados personalizados...")
-
-    # Usando la función de filtro personalizada
-    @client.event("on_message", my_custom_filter)
-    async def handle_custom_filtered_message(message: Message):
-        print(f"Recibí un mensaje 'importante' en un grupo de {message.sender.name}: {message.text}")
-
-    # Usando la clase de filtro personalizada
-    target_chat_id = "1234567890@g.us" # Reemplaza con un ID de chat real
-    @client.event("on_message", MyChatIdFilter(target_chat_id))
-    async def handle_specific_chat_message(message: Message):
-        print(f"Recibí mensaje en chat específico ({target_chat_id}): {message.text}")
-
-    @client.event("on_qr")
-    async def on_qr(qr):
-        print("Por favor escanea el código QR para iniciar sesión.")
-
-    await client.start()
-
-if __name__ == "__main__":
-    asyncio.run(custom_filtered_message_handler())
+# Ejemplo: Obtener solo mensajes que contengan "urgente"
+mensajes_relevantes = [
+    m for m in messages 
+    if "urgente" in (m.text or "").lower()
+]
 ```
 
-## Accediendo a Datos del Mensaje
+## Nota sobre `on_message`
 
-El objeto `Message` pasado a tu manejador contiene una gran cantidad de información sobre el mensaje entrante. Algunos atributos clave incluyen:
-
-*   `message.id`: ID único del mensaje.
-*   `message.text`: El contenido de texto del mensaje (si hay).
-*   `message.sender`: Un objeto `User` representando al remitente (con `name` e `id`).
-*   `message.chat`: Un objeto `Chat` representando la conversación (con `name`, `id`, `is_group`, `is_user`).
-*   `message.timestamp`: Cuándo fue enviado el mensaje.
-*   `message.is_media`: Booleano, `True` si el mensaje contiene multimedia (imagen, video, etc.).
-*   `message.media_type`: Tipo de medio, ej., 'image', 'video', 'document'.
-*   `message.download_media()`: Un método "awaitable" para descargar medios adjuntos.
-*   `message.reply(text)`: Un método "awaitable" para responder directamente a este mensaje.
-
-¡Esta guía proporciona la base para construir aplicaciones de WhatsPlay interactivas y receptivas. Combina el manejo de mensajes con filtros para crear escenarios de automatización potentes!
+Podrías ver referencias a un evento `on_message` en el código fuente. Este evento está actualmente **reservado para uso futuro** y no es emitido automáticamente por el bucle principal. Por favor, utiliza el patrón `on_unread_chat` descrito anteriormente para construir bots y herramientas de automatización.

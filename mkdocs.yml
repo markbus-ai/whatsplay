@@ -34,9 +34,10 @@ nav:
   - 'Home': 'index.md'
   - 'Getting Started': 'getting-started.md'
   - 'Guides':
-      - 'Handling Incoming Messages': 'guides/handling-messages.md'
+      - 'Handling Messages & Automation': 'guides/handling-messages.md'
       - 'Group Management': 'guides/group-management.md'
       - 'Sending & Receiving Media': 'guides/sending-media.md'
+      - 'Advanced Features': 'guides/advanced-features.md'
   - 'API Reference': 'api-reference.md'
 
 plugins:
