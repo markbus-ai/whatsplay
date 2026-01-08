@@ -1,0 +1,87 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:xhtml="http://www.w3.org/1999/xhtml">
+    <url>
+        <loc>None./</loc>
+        <lastmod>2026-01-08</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="en" href="None"/>
+        <xhtml:link rel="alternate" hreflang="es" href="Nonees/"/>
+    </url>
+    <url>
+        <loc>Noneapi-reference/</loc>
+        <lastmod>2026-01-08</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="en" href="Noneapi-reference/"/>
+        <xhtml:link rel="alternate" hreflang="es" href="Nonees/api-reference/"/>
+    </url>
+    <url>
+        <loc>Nonegetting-started/</loc>
+        <lastmod>2026-01-08</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="en" href="Nonegetting-started/"/>
+        <xhtml:link rel="alternate" hreflang="es" href="Nonees/getting-started/"/>
+    </url>
+    <url>
+        <loc>Noneguides/group-management/</loc>
+        <lastmod>2026-01-08</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="en" href="Noneguides/group-management/"/>
+        <xhtml:link rel="alternate" hreflang="es" href="Nonees/guides/group-management/"/>
+    </url>
+    <url>
+        <loc>Noneguides/handling-messages/</loc>
+        <lastmod>2026-01-08</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="en" href="Noneguides/handling-messages/"/>
+        <xhtml:link rel="alternate" hreflang="es" href="Nonees/guides/handling-messages/"/>
+    </url>
+    <url>
+        <loc>Noneguides/sending-media/</loc>
+        <lastmod>2026-01-08</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="en" href="Noneguides/sending-media/"/>
+        <xhtml:link rel="alternate" hreflang="es" href="Nonees/guides/sending-media/"/>
+    </url>
+    <url>
+        <loc>Nonees/</loc>
+        <lastmod>2026-01-08</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="es" href="Nonees/"/>
+        <xhtml:link rel="alternate" hreflang="en" href="None"/>
+    </url>
+    <url>
+        <loc>Nonees/api-reference/</loc>
+        <lastmod>2026-01-08</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="es" href="Nonees/api-reference/"/>
+        <xhtml:link rel="alternate" hreflang="en" href="Noneapi-reference/"/>
+    </url>
+    <url>
+        <loc>Nonees/getting-started/</loc>
+        <lastmod>2026-01-08</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="es" href="Nonees/getting-started/"/>
+        <xhtml:link rel="alternate" hreflang="en" href="Nonegetting-started/"/>
+    </url>
+    <url>
+        <loc>Nonees/guides/group-management/</loc>
+        <lastmod>2026-01-08</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="es" href="Nonees/guides/group-management/"/>
+        <xhtml:link rel="alternate" hreflang="en" href="Noneguides/group-management/"/>
+    </url>
+    <url>
+        <loc>Nonees/guides/handling-messages/</loc>
+        <lastmod>2026-01-08</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="es" href="Nonees/guides/handling-messages/"/>
+        <xhtml:link rel="alternate" hreflang="en" href="Noneguides/handling-messages/"/>
+    </url>
+    <url>
+        <loc>Nonees/guides/sending-media/</loc>
+        <lastmod>2026-01-08</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="es" href="Nonees/guides/sending-media/"/>
+        <xhtml:link rel="alternate" hreflang="en" href="Noneguides/sending-media/"/>
+    </url>
+</urlset>
