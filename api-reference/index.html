@@ -824,6 +824,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#events" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Events
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#event-objects" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1597,6 +1608,17 @@
         
       </ul>
     </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#events" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Events
+      
+    </span>
+  </a>
   
 </li>
       
@@ -4979,10 +5001,100 @@ browser instances, pages, and the Playwright instance.</p>
     </div>
 
 </div><hr />
+<h2 id="events">Events</h2>
+<p>These events are emitted by the <code>Client</code> and can be handled using the <code>@client.event</code> decorator.</p>
+<table>
+<thead>
+<tr>
+<th style="text-align: left;">Event Name</th>
+<th style="text-align: left;">Trigger Condition</th>
+<th style="text-align: left;">Arguments</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;"><code>on_start</code></td>
+<td style="text-align: left;">The client has successfully initialized and the browser page is open.</td>
+<td style="text-align: left;">None</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>on_auth</code></td>
+<td style="text-align: left;">The authentication screen (QR code page) is displayed.</td>
+<td style="text-align: left;">None</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>on_qr</code></td>
+<td style="text-align: left;">A new QR code is detected for the first time.</td>
+<td style="text-align: left;"><code>qr_binary</code> (bytes)</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>on_qr_change</code></td>
+<td style="text-align: left;">The displayed QR code has been refreshed/changed.</td>
+<td style="text-align: left;"><code>qr_binary</code> (bytes)</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>on_logged_in</code></td>
+<td style="text-align: left;">The client has successfully logged in to WhatsApp Web.</td>
+<td style="text-align: left;">None</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>on_loading</code></td>
+<td style="text-align: left;">The "Loading chats" screen is visible.</td>
+<td style="text-align: left;"><code>is_loading</code> (bool)</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>on_unread_chat</code></td>
+<td style="text-align: left;">Unread chats are detected in the sidebar. This check runs periodically.</td>
+<td style="text-align: left;"><code>chats</code> (List[Dict])</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>on_stop</code></td>
+<td style="text-align: left;">The client is stopping and cleaning up resources.</td>
+<td style="text-align: left;">None</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>on_disconnect</code></td>
+<td style="text-align: left;">The client has lost connection to the browser/WhatsApp.</td>
+<td style="text-align: left;">None</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>on_reconnect</code></td>
+<td style="text-align: left;">The client has successfully reconnected.</td>
+<td style="text-align: left;">None</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>on_state_change</code></td>
+<td style="text-align: left;">The client's internal state (e.g., AUTH, LOGGED_IN) has changed.</td>
+<td style="text-align: left;"><code>state</code> (State enum)</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>on_tick</code></td>
+<td style="text-align: left;">Emitted on every iteration of the main event loop.</td>
+<td style="text-align: left;">None</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>on_error</code></td>
+<td style="text-align: left;">An error occurred.</td>
+<td style="text-align: left;"><code>message</code> (str)</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>on_warning</code></td>
+<td style="text-align: left;">A non-critical issue occurred.</td>
+<td style="text-align: left;"><code>message</code> (str)</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>on_info</code></td>
+<td style="text-align: left;">Informational message.</td>
+<td style="text-align: left;"><code>message</code> (str)</td>
+</tr>
+</tbody>
+</table>
+<p><em><strong>Note:</strong> The <code>on_message</code> event is reserved for future use. Currently, use <code>on_unread_chat</code> to detect new activity.</em></p>
+<hr />
 <h2 id="event-objects">Event Objects</h2>
 <p>These are the objects passed to your event handlers.</p>
 <h3 id="message">Message</h3>
-<p>The <code>Message</code> object is what you receive in <code>on_message</code> event handlers.</p>
+<p>The <code>Message</code> object represents a message retrieved from a chat (e.g., via <code>chat_manager.collect_messages()</code>).</p>
 
 
 <div class="doc doc-object doc-class">
