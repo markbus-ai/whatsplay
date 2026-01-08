@@ -67,12 +67,16 @@ Puedes usar el mismo método `client.send_file()` para cualquier tipo de archivo
 
 Cuando recibes un mensaje que contiene multimedia, el objeto `Message` proporciona una forma conveniente de descargarlo.
 
+### Usando `message.download_media()`
+
+Esta es la forma estándar de descargar un mensaje multimedia específico.
+
 1.  Verifica si el mensaje contiene medios usando `message.is_media`.
 2.  Si lo hace, llama al método `await message.download_media()`.
 
 Este método descarga el archivo a una ubicación especificada. Si no se proporciona una ruta, puede usar un directorio por defecto.
 
-### Ejemplo: Bot Auto-descargador
+#### Ejemplo: Bot Auto-descargador
 
 Este bot descarga automáticamente cualquier medio que recibe.
 
@@ -97,24 +101,21 @@ async def media_downloader_bot():
     async def on_start():
         print("Bot descargador iniciado. Esperando medios...")
 
-    @client.event("on_message")
-    async def handle_message(message: Message):
-        if message.is_media:
-            print(f"Recibí medio de tipo '{message.media_type}' de {message.sender.name or message.sender.id}.")
-            
-            # Definir una ruta para guardar el archivo
-            # Puedes personalizar el nombre de archivo, aquí usamos el ID del mensaje
-            save_path = download_dir / f"{message.id}-{message.media_filename or 'download'}"
-            
-            print(f"Descargando a {save_path}...")
-            
-            try:
-                await message.download_media(save_path)
-                print("¡Descarga exitosa!")
-                await message.reply(f"¡Gracias! He guardado el archivo como {save_path.name}.")
-            except Exception as e:
-                print(f"Error descargando archivo: {e}")
-                await message.reply("Lo siento, tuve un error intentando descargar tu archivo.")
+    @client.event("on_unread_chat")
+    async def on_unread_chat(chats):
+        for chat in chats:
+            if await client.open(chat['name']):
+                messages = await client.collect_messages()
+                for message in messages:
+                    if message.is_media:
+                        # Definir ruta de guardado
+                        save_path = download_dir / f"{message.id}-{message.media_filename or 'download'}"
+                        
+                        try:
+                            await message.download_media(save_path)
+                            print(f"Descargado: {save_path.name}")
+                        except Exception as e:
+                            print(f"Error: {e}")
 
     @client.event("on_qr")
     async def on_qr(qr):
@@ -126,4 +127,20 @@ if __name__ == "__main__":
     asyncio.run(media_downloader_bot())
 ```
 
-Este bot escuchará mensajes entrantes, y si uno contiene multimedia, intentará descargarlo en la carpeta `media_downloads` en tu directorio de proyecto.
+### Usando `client.download_file_by_index()`
+
+Si deseas descargar un archivo basado en su posición en la lista de mensajes actualmente visibles (por ejemplo, "descargar el último archivo enviado"), puedes usar `client.download_file_by_index()`.
+
+*   `index=0`: El primer archivo visible (el más antiguo).
+*   `index=-1`: El último archivo visible (el más reciente).
+
+```python
+# Abrir el chat primero
+await client.open("Mi Grupo")
+
+# Descargar el archivo más reciente
+file_path = await client.download_file_by_index(index=-1, carpeta="./descargas")
+
+if file_path:
+    print(f"Último archivo guardado en: {file_path}")
+```

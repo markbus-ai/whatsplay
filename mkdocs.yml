@@ -38,6 +38,7 @@ nav:
       - 'Group Management': 'guides/group-management.md'
       - 'Sending & Receiving Media': 'guides/sending-media.md'
       - 'Advanced Features': 'guides/advanced-features.md'
+  - 'Troubleshooting': 'troubleshooting.md'
   - 'API Reference': 'api-reference.md'
 
 plugins:
