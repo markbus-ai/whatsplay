@@ -57,9 +57,13 @@ plugins:
           name: English
           build: true
           default: true
+          site_name: WhatsPlay
+          site_description: 'A Python library to automate WhatsApp through Playwright.'
         - locale: es
           name: Español
           build: true
+          site_name: WhatsPlay
+          site_description: 'Una librería de Python para automatizar WhatsApp mediante Playwright.'
 
 markdown_extensions:
   - pymdownx.highlight:
