@@ -40,4 +40,5 @@ htmlcov/
 # IDEs
 .idea/
 .vscode/
-whatsapp_sessionsite/
+whatsapp_session
+site/

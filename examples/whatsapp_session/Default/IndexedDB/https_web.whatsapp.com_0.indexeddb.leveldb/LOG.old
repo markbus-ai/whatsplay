@@ -1,0 +1,15 @@
+2026/01/05-22:49:28.389 7b7d Reusing MANIFEST /home/markbusking/proyectos/whatsplay/examples/whatsapp_session/Default/IndexedDB/https_web.whatsapp.com_0.indexeddb.leveldb/MANIFEST-000001
+2026/01/05-22:49:28.390 7b7d Recovering log #465
+2026/01/05-22:49:28.463 7b7d Reusing old log /home/markbusking/proyectos/whatsplay/examples/whatsapp_session/Default/IndexedDB/https_web.whatsapp.com_0.indexeddb.leveldb/000465.log 
+2026/01/05-22:49:32.067 7b7d Level-0 table #471: started
+2026/01/05-22:49:32.074 7b7d Level-0 table #471: 165112 bytes OK
+2026/01/05-22:49:32.077 7b7d Delete type=0 #465
+2026/01/05-22:49:32.077 7b7d Manual compaction at level-0 from '\x00\x99\x00\x00\x00' @ 72057594037927935 : 1 .. '\x00\x9a\x00\x00\x00' @ 0 : 0; will stop at (end)
+2026/01/05-22:49:32.169 7b7e Compacting 1@1 + 2@2 files
+2026/01/05-22:49:32.266 7b7e Generated table #472@1: 57557 keys, 2240360 bytes
+2026/01/05-22:49:32.303 7b7e Generated table #473@1: 23229 keys, 420490 bytes
+2026/01/05-22:49:32.303 7b7e Compacted 1@1 + 2@2 files => 2660850 bytes
+2026/01/05-22:49:32.305 7b7e compacted to: files[ 0 0 2 0 0 0 0 ]
+2026/01/05-22:49:32.306 7b7e Delete type=2 #467
+2026/01/05-22:49:32.306 7b7e Delete type=2 #468
+2026/01/05-22:49:32.306 7b7e Delete type=2 #471
