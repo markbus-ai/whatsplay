@@ -1,12 +1,10 @@
 # Guía: Manejo de Mensajes Entrantes
 
-Este es un placeholder para la traducción al español.
+La arquitectura basada en eventos de WhatsPlay hace fácil reaccionar a mensajes entrantes en tiempo real. Esta guía te mostrará cómo configurar manejadores para mensajes y cómo filtrarlos.
 
-WhatsPlay's event-driven architecture makes it easy to react to incoming messages in real-time. This guide will show you how to set up handlers for messages and how to filter them.
+## El Evento `on_message`
 
-## The `on_message` Event
-
-The core of handling incoming messages is subscribing to the `on_message` event. Your handler function will receive a `message` object which contains all the details about the incoming message.
+El núcleo del manejo de mensajes entrantes es suscribirse al evento `on_message`. Tu función manejadora recibirá un objeto `message` que contiene todos los detalles sobre el mensaje entrante.
 
 ```python
 import asyncio
@@ -20,40 +18,40 @@ async def basic_message_handler():
 
     @client.event("on_start")
     async def on_start():
-        print("Client ready. Waiting for messages...")
+        print("Cliente listo. Esperando mensajes...")
 
-    # This handler will be called for every incoming message
+    # Este manejador será llamado para cada mensaje entrante
     @client.event("on_message")
     async def handle_any_message(message: Message):
-        print(f"Received a message!")
-        print(f"  From: {message.sender.name or message.sender.id}")
+        print(f"¡Recibí un mensaje!")
+        print(f"  De: {message.sender.name or message.sender.id}")
         print(f"  Chat: {message.chat.name or message.chat.id}")
-        print(f"  Text: {message.text}")
+        print(f"  Texto: {message.text}")
         
-        # Example: Reply to the sender
-        if message.text and "hello" in message.text.lower():
-            await message.reply("Hello there! How can I help you?")
+        # Ejemplo: Responder al remitente
+        if message.text and "hola" in message.text.lower():
+            await message.reply("¡Hola! ¿Cómo puedo ayudarte?")
 
     @client.event("on_qr")
     async def on_qr(qr):
-        print("Please scan the QR code to log in.")
+        print("Por favor escanea el código QR para iniciar sesión.")
 
-    # Keep the client running indefinitely to listen for messages
+    # Mantén el cliente corriendo indefinidamente para escuchar mensajes
     await client.start()
-    # You might want to add client.run_forever() here if your script is only for listening
-    # However, for simple examples, client.start() is sufficient if you don't call client.stop() immediately.
+    # Podrías querer añadir client.run_forever() aquí si tu script es solo para escuchar
+    # Sin embargo, para ejemplos simples, client.start() es suficiente si no llamas a client.stop() inmediatamente.
 
 if __name__ == "__main__":
     asyncio.run(basic_message_handler())
 ```
 
-## Filtering Messages
+## Filtrando Mensajes
 
-WhatsPlay provides powerful filtering capabilities to help you process only the messages you care about. You can pass a filter object to the `on_message` event decorator.
+WhatsPlay proporciona capacidades de filtrado potentes para ayudarte a procesar solo los mensajes que te interesan. Puedes pasar un objeto filtro al decorador del evento `on_message`.
 
-### Using Predefined Filters
+### Usando Filtros Predefinidos
 
-The `whatsplay.filters` module offers several ready-to-use filters.
+El módulo `whatsplay.filters` ofrece varios filtros listos para usar.
 
 ```python
 import asyncio
@@ -68,27 +66,27 @@ async def filtered_message_handler():
 
     @client.event("on_start")
     async def on_start():
-        print("Client ready. Waiting for filtered messages...")
+        print("Cliente listo. Esperando mensajes filtrados...")
 
-    # Only handle messages that are text (not media, etc.)
+    # Solo manejar mensajes que son texto (no multimedia, etc.)
     @client.event("on_message", message_filter.text)
     async def handle_text_message(message: Message):
-        print(f"Received a TEXT message from {message.sender.name or message.sender.id}: {message.text}")
+        print(f"Recibí un mensaje de TEXTO de {message.sender.name or message.sender.id}: {message.text}")
 
-    # Only handle messages from a specific sender (by name or ID)
-    @client.event("on_message", message_filter.sender("John Doe"))
+    # Solo manejar mensajes de un remitente específico (por nombre o ID)
+    @client.event("on_message", message_filter.sender("Juan Pérez"))
     async def handle_message_from_john(message: Message):
-        print(f"Received a message from John Doe: {message.text}")
+        print(f"Recibí un mensaje de Juan Pérez: {message.text}")
 
-    # Only handle messages matching a regular expression
-    @client.event("on_message", message_filter.regex(r"^\/command"))
+    # Solo manejar mensajes que coincidan con una expresión regular
+    @client.event("on_message", message_filter.regex(r"^\/comando"))
     async def handle_command_message(message: Message):
-        print(f"Received a command: {message.text}")
-        await message.reply("Command received!")
+        print(f"Recibí un comando: {message.text}")
+        await message.reply("¡Comando recibido!")
 
     @client.event("on_qr")
     async def on_qr(qr):
-        print("Please scan the QR code to log in.")
+        print("Por favor escanea el código QR para iniciar sesión.")
 
     await client.start()
 
@@ -96,9 +94,9 @@ if __name__ == "__main__":
     asyncio.run(filtered_message_handler())
 ```
 
-### Creating Custom Filters
+### Creando Filtros Personalizados
 
-You can also define your own custom filter functions or classes for more complex logic. A filter function should accept a `message` object and return `True` if the message should be processed by the handler, `False` otherwise.
+También puedes definir tus propias funciones de filtro o clases para lógica más compleja. Una función de filtro debe aceptar un objeto `message` y devolver `True` si el mensaje debe ser procesado por el manejador, `False` en caso contrario.
 
 ```python
 import asyncio
@@ -107,12 +105,12 @@ from whatsplay.auth import LocalProfileAuth
 from whatsplay.event import Message
 from whatsplay.filters import CustomFilter
 
-# Custom filter function
+# Función de filtro personalizada
 def my_custom_filter(message: Message) -> bool:
-    # Only process messages that contain "important" and are from a specific chat type
-    return message.text and "important" in message.text.lower() and message.chat.is_group
+    # Solo procesar mensajes que contengan "importante" y sean de un tipo de chat específico
+    return message.text and "importante" in message.text.lower() and message.chat.is_group
 
-# Or a CustomFilter class (more powerful for reusable, stateful filters)
+# O una clase CustomFilter (más potente para filtros reutilizables y con estado)
 class MyChatIdFilter(CustomFilter):
     def __init__(self, chat_id_to_match: str):
         self.chat_id_to_match = chat_id_to_match
@@ -127,22 +125,22 @@ async def custom_filtered_message_handler():
 
     @client.event("on_start")
     async def on_start():
-        print("Client ready. Waiting for custom filtered messages...")
+        print("Cliente listo. Esperando mensajes filtrados personalizados...")
 
-    # Using the custom filter function
+    # Usando la función de filtro personalizada
     @client.event("on_message", my_custom_filter)
     async def handle_custom_filtered_message(message: Message):
-        print(f"Received an 'important' message in a group from {message.sender.name}: {message.text}")
+        print(f"Recibí un mensaje 'importante' en un grupo de {message.sender.name}: {message.text}")
 
-    # Using the custom filter class
-    target_chat_id = "1234567890@g.us" # Replace with a real chat ID
+    # Usando la clase de filtro personalizada
+    target_chat_id = "1234567890@g.us" # Reemplaza con un ID de chat real
     @client.event("on_message", MyChatIdFilter(target_chat_id))
     async def handle_specific_chat_message(message: Message):
-        print(f"Received message in specific chat ({target_chat_id}): {message.text}")
+        print(f"Recibí mensaje en chat específico ({target_chat_id}): {message.text}")
 
     @client.event("on_qr")
     async def on_qr(qr):
-        print("Please scan the QR code to log in.")
+        print("Por favor escanea el código QR para iniciar sesión.")
 
     await client.start()
 
@@ -150,18 +148,18 @@ if __name__ == "__main__":
     asyncio.run(custom_filtered_message_handler())
 ```
 
-## Accessing Message Data
+## Accediendo a Datos del Mensaje
 
-The `Message` object passed to your handler contains a wealth of information about the incoming message. Some key attributes include:
+El objeto `Message` pasado a tu manejador contiene una gran cantidad de información sobre el mensaje entrante. Algunos atributos clave incluyen:
 
-*   `message.id`: Unique ID of the message.
-*   `message.text`: The text content of the message (if any).
-*   `message.sender`: A `User` object representing the sender (with `name` and `id`).
-*   `message.chat`: A `Chat` object representing the conversation (with `name`, `id`, `is_group`, `is_user`).
-*   `message.timestamp`: When the message was sent.
-*   `message.is_media`: Boolean, `True` if the message contains media (image, video, etc.).
-*   `message.media_type`: Type of media, e.g., 'image', 'video', 'document'.
-*   `message.download_media()`: An awaitable method to download attached media.
-*   `message.reply(text)`: An awaitable method to reply directly to this message.
+*   `message.id`: ID único del mensaje.
+*   `message.text`: El contenido de texto del mensaje (si hay).
+*   `message.sender`: Un objeto `User` representando al remitente (con `name` e `id`).
+*   `message.chat`: Un objeto `Chat` representando la conversación (con `name`, `id`, `is_group`, `is_user`).
+*   `message.timestamp`: Cuándo fue enviado el mensaje.
+*   `message.is_media`: Booleano, `True` si el mensaje contiene multimedia (imagen, video, etc.).
+*   `message.media_type`: Tipo de medio, ej., 'image', 'video', 'document'.
+*   `message.download_media()`: Un método "awaitable" para descargar medios adjuntos.
+*   `message.reply(text)`: Un método "awaitable" para responder directamente a este mensaje.
 
-This guide provides the foundation for building interactive and responsive WhatsPlay applications. Combine message handling with filters to create powerful automation scenarios!
+¡Esta guía proporciona la base para construir aplicaciones de WhatsPlay interactivas y receptivas. Combina el manejo de mensajes con filtros para crear escenarios de automatización potentes!

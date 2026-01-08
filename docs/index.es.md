@@ -1,22 +1,20 @@
 # Bienvenido a WhatsPlay
 
-Este es un placeholder para la traducción al español.
+WhatsPlay es una biblioteca de Python para automatizar WhatsApp Web usando Playwright. Proporciona una interfaz simple y basada en eventos para interactuar con chats, enviar mensajes, gestionar grupos y mucho más.
 
-WhatsPlay is a Python library for automating WhatsApp Web using Playwright. It provides a simple, event-driven interface to interact with chats, send messages, manage groups, and much more.
+Ya sea que quieras construir un bot, automatizar tus reportes diarios o extraer datos de chats, WhatsPlay te da las herramientas para hacerlo eficientemente.
 
-Whether you want to build a bot, automate your daily reports, or scrape chat data, WhatsPlay gives you the tools to do it efficiently.
+## Características Principales
 
-## Key Features
+*   **Basado en Eventos:** Maneja fácilmente eventos como mensajes entrantes, escaneos QR o cuando el cliente está listo.
+*   **API Asíncrona Moderna:** Construido con `asyncio` para un alto rendimiento.
+*   **Gestión de Sesión:** Guarda tu sesión localmente para que no tengas que escanear el código QR cada vez.
+*   **Gestión de Grupos:** Crea grupos, añade/elimina miembros y más.
+*   **Soporte de Archivos y Multimedia:** Envía imágenes, documentos y otros archivos con facilidad.
 
-*   **Event-Driven:** Easily handle events like incoming messages, QR scans, or when the client is ready.
-*   **Modern Async API:** Built with `asyncio` for high performance.
-*   **Session Management:** Saves your session locally so you don't have to scan the QR code every time.
-*   **Group Management:** Create groups, add/remove members, and more.
-*   **File & Media Support:** Send images, documents, and other files with ease.
+## Un Ejemplo Rápido
 
-## A Quick Example
-
-Here's a simple script to send a message to a contact:
+Aquí tienes un script simple para enviar un mensaje a un contacto:
 
 ```python
 import asyncio
@@ -29,29 +27,29 @@ async def main():
 
     @client.event("on_start")
     async def on_start():
-        print("Client started! Sending message...")
+        print("¡Cliente iniciado! Enviando mensaje...")
         
-        # Use a phone number (e.g., "1234567890") or a saved contact name
-        # For phone numbers, include the country code without '+' or '00'
-        recipient = "PHONE_NUMBER_OR_CONTACT_NAME"
-        message = "Hello from WhatsPlay! 🚀"
+        # Usa un número de teléfono (ej., "1234567890") o un nombre de contacto guardado
+        # Para números de teléfono, incluye el código de país sin '+' ni '00'
+        recipient = "NUMERO_DE_TELEFONO_O_NOMBRE_DE_CONTACTO"
+        message = "¡Hola desde WhatsPlay! 🚀"
         
         success = await client.send_message(recipient, message)
         
         if success:
-            print(f"Message sent successfully to {recipient}.")
+            print(f"Mensaje enviado exitosamente a {recipient}.")
         else:
-            print(f"Failed to send message to {recipient}.")
+            print(f"Falló el envío del mensaje a {recipient}.")
             
         await client.stop()
 
-    # This event is triggered if you need to scan the QR code
+    # Este evento se dispara si necesitas escanear el código QR
     @client.event("on_qr")
     async def on_qr(qr):
-        print("QR code scan is required. Please scan the QR in the browser.")
+        print("Se requiere escaneo de código QR. Por favor escanea el QR en el navegador.")
 
     await client.start()
-    print("Script finished.")
+    print("Script finalizado.")
 
 if __name__ == "__main__":
     asyncio.run(main())

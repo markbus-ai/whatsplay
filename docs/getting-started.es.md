@@ -1,30 +1,28 @@
 # Empezando con WhatsPlay
 
-Este es un placeholder para la traducción al español.
+Esta guía te llevará a través de la instalación de WhatsPlay y la escritura de tu primer script para enviar un mensaje de WhatsApp.
 
-This guide will walk you through installing WhatsPlay and writing your first script to send a WhatsApp message.
+## 1. Instalación
 
-## 1. Installation
+WhatsPlay requiere Python 3.8 o superior. Puedes instalarlo directamente desde PyPI. También recomendamos instalar las dependencias del navegador de Playwright.
 
-WhatsPlay requires Python 3.8 or newer. You can install it directly from PyPI. We also recommend installing Playwright's browser dependencies.
-
-First, install the library:
+Primero, instala la biblioteca:
 
 ```bash
 pip install whatsplay
 ```
 
-Next, install the necessary browser binaries for Playwright (this will download a browser like Chromium):
+Luego, instala los binarios del navegador necesarios para Playwright (esto descargará un navegador como Chromium):
 
 ```bash
 playwright install
 ```
 
-## 2. Your First Script: Sending a Message
+## 2. Tu Primer Script: Enviando un Mensaje
 
-Let's create a simple script that logs into WhatsApp and sends a message.
+Vamos a crear un script simple que inicie sesión en WhatsApp y envíe un mensaje.
 
-Create a new Python file, for example `send_hello.py`, and add the following code.
+Crea un nuevo archivo Python, por ejemplo `enviar_hola.py`, y añade el siguiente código.
 
 ```python
 import asyncio
@@ -33,76 +31,76 @@ from whatsplay.auth import LocalProfileAuth
 
 async def main():
     """
-    Main function to initialize the client, send a message, and stop.
+    Función principal para inicializar el cliente, enviar un mensaje y detenerse.
     """
     
-    # --- Step 1: Set up Authentication ---
-    # This tells WhatsPlay to save session data in a folder named "whatsapp_session".
-    # This way, you only need to scan the QR code once.
+    # --- Paso 1: Configurar Autenticación ---
+    # Esto le dice a WhatsPlay que guarde los datos de sesión en una carpeta llamada "whatsapp_session".
+    # De esta manera, solo necesitas escanear el código QR una vez.
     auth = LocalProfileAuth(user_data_dir="./whatsapp_session")
     
-    # --- Step 2: Initialize the Client ---
-    # We run in headless=False for the first time to make it easy to scan the QR code.
-    # You can set it to headless=True later for background execution.
+    # --- Paso 2: Inicializar el Cliente ---
+    # Ejecutamos en headless=False la primera vez para facilitar el escaneo del código QR.
+    # Puedes cambiarlo a headless=True después para ejecución en segundo plano.
     client = Client(auth=auth, headless=False)
 
-    # --- Step 3: Define Event Handlers ---
-    # `on_start` is triggered once the client is logged in and ready.
+    # --- Paso 3: Definir Manejadores de Eventos ---
+    # `on_start` se dispara una vez que el cliente ha iniciado sesión y está listo.
     @client.event("on_start")
     async def on_start():
-        print("Client is ready! Preparing to send a message...")
+        print("¡El cliente está listo! Preparando para enviar un mensaje...")
         
-        # Define your recipient and message
-        # IMPORTANT: Replace with a real phone number or contact name.
-        # For phone numbers, use the format with country code but no '+' or '00'.
+        # Define tu destinatario y mensaje
+        # IMPORTANTE: Reemplaza con un número de teléfono real o nombre de contacto.
+        # Para números de teléfono, usa el formato con código de país pero sin '+' ni '00'.
         recipient = "1234567890" 
-        message = "This is my first message from WhatsPlay! 🎉"
+        message = "¡Este es mi primer mensaje desde WhatsPlay! 🎉"
         
-        # Send the message
+        # Enviar el mensaje
         success = await client.send_message(recipient, message)
         
         if success:
-            print(f"Message sent successfully to {recipient}!")
+            print(f"¡Mensaje enviado exitosamente a {recipient}!")
         else:
-            print(f"Oops! Failed to send message to {recipient}.")
+            print(f"¡Ups! Falló el envío del mensaje a {recipient}.")
             
-        # Stop the client after the job is done
-        print("Work complete. Shutting down...")
+        # Detener el cliente después de terminar el trabajo
+        print("Trabajo completo. Apagando...")
         await client.stop()
 
-    # `on_qr` is triggered if a QR scan is needed.
+    # `on_qr` se dispara si se necesita un escaneo QR.
     @client.event("on_qr")
     async def on_qr(qr):
-        print("Login required. A browser window should open for you to scan the QR code.")
+        print("Inicio de sesión requerido. Se debería abrir una ventana del navegador para escanear el código QR.")
 
-    # `on_auth` is triggered if authentication is required
+    # `on_auth` se dispara si se requiere autenticación
     @client.event("on_auth")
     async def on_auth():
-        print("Authentication is required.")
+        print("Se requiere autenticación.")
 
-    # `on_error` catches potential errors during execution
+    # `on_error` captura errores potenciales durante la ejecución
     @client.event("on_error")
     async def on_error(error):
-        print(f"An error occurred: {error}")
+        print(f"Ocurrió un error: {error}")
         await client.stop()
 
-    # --- Step 4: Start the Client ---
-    # This call starts the browser and begins the login process.
+    # --- Paso 4: Iniciar el Cliente ---
+    # Esta llamada inicia el navegador y comienza el proceso de inicio de sesión.
     await client.start()
-    print("Script has finished executing.")
+    print("El script ha terminado de ejecutarse.")
 
-# --- Run the main function ---
+# --- Ejecutar la función principal ---
 if __name__ == "__main__":
     asyncio.run(main())
 ```
 
-### How to Run It
+### Cómo Ejecutarlo
 
-1.  **Save the code:** Save the script as `send_hello.py`.
-2.  **Modify the recipient:** Change `"1234567890"` to a real phone number or a contact name saved in your WhatsApp.
-3.  **Execute from your terminal:**
+1.  **Guarda el código:** Guarda el script como `enviar_hola.py`.
+2.  **Modifica el destinatario:** Cambia `"1234567890"` a un número de teléfono real o un nombre de contacto guardado en tu WhatsApp.
+3.  **Ejecuta desde tu terminal:**
     ```bash
-    python send_hello.py
+    python enviar_hola.py
     ```
-4.  **First-time Login:** A browser window will open. Scan the WhatsApp Web QR code with your phone.
-5.  **Subsequent Runs:** The script will reuse the session and should log in automatically. The message will be sent, and the script will exit.
+4.  **Inicio de sesión por primera vez:** Se abrirá una ventana del navegador. Escanea el código QR de WhatsApp Web con tu teléfono.
+5.  **Ejecuciones subsiguientes:** El script reutilizará la sesión y debería iniciar sesión automáticamente. El mensaje se enviará y el script saldrá.

@@ -1,18 +1,16 @@
 # Guía: Envío y Recepción de Archivos Multimedia
 
-Este es un placeholder para la traducción al español.
+WhatsPlay hace fácil trabajar con multimedia como imágenes, videos y documentos. Esta guía cubre tanto el envío de archivos desde tu disco local como la descarga de medios de mensajes entrantes.
 
-WhatsPlay makes it easy to work with media like images, videos, and documents. This guide covers both sending files from your local disk and downloading media from incoming messages.
+## Enviando Multimedia
 
-## Sending Media
+El método principal para enviar cualquier tipo de archivo es `client.send_file()`. Necesitas proporcionar el destinatario (nombre de chat o ID) y la ruta local al archivo. WhatsPlay manejará el resto.
 
-The primary method for sending any kind of file is `client.send_file()`. You need to provide the recipient (chat name or ID) and the local path to the file. WhatsPlay will handle the rest.
+También puedes proporcionar un `caption` opcional para el medio.
 
-You can also provide an optional `caption` for the media.
+### Ejemplo: Enviando una Imagen con una Leyenda
 
-### Example: Sending an Image with a Caption
-
-This script sends a local image file to a specified recipient.
+Este script envía un archivo de imagen local a un destinatario especificado.
 
 ```python
 import asyncio
@@ -26,32 +24,32 @@ async def send_media_file():
 
     @client.event("on_start")
     async def on_start():
-        print("Client ready. Sending an image...")
+        print("Cliente listo. Enviando una imagen...")
         
-        recipient = "PHONE_NUMBER_OR_CONTACT_NAME"
+        recipient = "NUMERO_DE_TELEFONO_O_NOMBRE_DE_CONTACTO"
         
-        # Ensure you have an image at this path
-        # For example: /home/user/pictures/my_image.jpg
+        # Asegúrate de tener una imagen en esta ruta
+        # Por ejemplo: /home/user/pictures/mi_imagen.jpg
         file_path = Path("/path/to/your/image.jpg")
-        caption = "Here is a picture from WhatsPlay! 🖼️"
+        caption = "¡Aquí hay una foto desde WhatsPlay! 🖼️"
 
         if not file_path.exists():
-            print(f"Error: File not found at {file_path}")
+            print(f"Error: Archivo no encontrado en {file_path}")
             await client.stop()
             return
 
         success = await client.send_file(recipient, file_path, caption=caption)
         
         if success:
-            print(f"Media sent successfully to {recipient}.")
+            print(f"Multimedia enviada exitosamente a {recipient}.")
         else:
-            print(f"Failed to send media to {recipient}.")
+            print(f"Falló el envío de multimedia a {recipient}.")
             
         await client.stop()
 
     @client.event("on_qr")
     async def on_qr(qr):
-        print("Please scan the QR code to log in.")
+        print("Por favor escanea el código QR para iniciar sesión.")
 
     await client.start()
 
@@ -59,24 +57,24 @@ if __name__ == "__main__":
     asyncio.run(send_media_file())
 ```
 
-You can use the same `client.send_file()` method for any file type, including:
-*   Images (`.jpg`, `.png`, etc.)
+Puedes usar el mismo método `client.send_file()` para cualquier tipo de archivo, incluyendo:
+*   Imágenes (`.jpg`, `.png`, etc.)
 *   Videos (`.mp4`, `.mov`, etc.)
-*   Documents (`.pdf`, `.docx`, `.zip`, etc.)
-*   Audio files (`.mp3`, `.ogg`, etc.)
+*   Documentos (`.pdf`, `.docx`, `.zip`, etc.)
+*   Archivos de audio (`.mp3`, `.ogg`, etc.)
 
-## Downloading Media
+## Descargando Multimedia
 
-When you receive a message that contains media, the `Message` object provides a convenient way to download it.
+Cuando recibes un mensaje que contiene multimedia, el objeto `Message` proporciona una forma conveniente de descargarlo.
 
-1.  Check if the message contains media using `message.is_media`.
-2.  If it does, call the `await message.download_media()` method.
+1.  Verifica si el mensaje contiene medios usando `message.is_media`.
+2.  Si lo hace, llama al método `await message.download_media()`.
 
-This method downloads the file to a specified location. If no path is provided, it may use a default directory.
+Este método descarga el archivo a una ubicación especificada. Si no se proporciona una ruta, puede usar un directorio por defecto.
 
-### Example: Auto-downloader Bot
+### Ejemplo: Bot Auto-descargador
 
-This bot automatically downloads any media it receives.
+Este bot descarga automáticamente cualquier medio que recibe.
 
 ```python
 import asyncio
@@ -86,41 +84,41 @@ from whatsplay.auth import LocalProfileAuth
 from whatsplay.event import Message
 
 async def media_downloader_bot():
-    # Create a directory to save downloaded files
+    # Crear un directorio para guardar archivos descargados
     download_dir = Path("./media_downloads")
     download_dir.mkdir(exist_ok=True)
     
-    print(f"Will save downloaded media to: {download_dir.resolve()}")
+    print(f"Guardaré los medios descargados en: {download_dir.resolve()}")
 
     auth = LocalProfileAuth(user_data_dir="./whatsapp_session")
     client = Client(auth=auth, headless=True)
 
     @client.event("on_start")
     async def on_start():
-        print("Downloader bot started. Waiting for media...")
+        print("Bot descargador iniciado. Esperando medios...")
 
     @client.event("on_message")
     async def handle_message(message: Message):
         if message.is_media:
-            print(f"Received media of type '{message.media_type}' from {message.sender.name or message.sender.id}.")
+            print(f"Recibí medio de tipo '{message.media_type}' de {message.sender.name or message.sender.id}.")
             
-            # Define a path to save the file
-            # You can customize the filename, here we use the message ID
+            # Definir una ruta para guardar el archivo
+            # Puedes personalizar el nombre de archivo, aquí usamos el ID del mensaje
             save_path = download_dir / f"{message.id}-{message.media_filename or 'download'}"
             
-            print(f"Downloading to {save_path}...")
+            print(f"Descargando a {save_path}...")
             
             try:
                 await message.download_media(save_path)
-                print("Download successful!")
-                await message.reply(f"Thanks! I've saved the file as {save_path.name}.")
+                print("¡Descarga exitosa!")
+                await message.reply(f"¡Gracias! He guardado el archivo como {save_path.name}.")
             except Exception as e:
-                print(f"Error downloading file: {e}")
-                await message.reply("Sorry, I had an error trying to download your file.")
+                print(f"Error descargando archivo: {e}")
+                await message.reply("Lo siento, tuve un error intentando descargar tu archivo.")
 
     @client.event("on_qr")
     async def on_qr(qr):
-        print("Please scan the QR code to log in.")
+        print("Por favor escanea el código QR para iniciar sesión.")
 
     await client.start()
 
@@ -128,4 +126,4 @@ if __name__ == "__main__":
     asyncio.run(media_downloader_bot())
 ```
 
-This bot will listen for incoming messages, and if one contains media, it will attempt to download it into the `media_downloads` folder in your project directory.
+Este bot escuchará mensajes entrantes, y si uno contiene multimedia, intentará descargarlo en la carpeta `media_downloads` en tu directorio de proyecto.

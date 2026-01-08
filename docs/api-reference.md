@@ -9,11 +9,36 @@ The `Client` is the main entry point for interacting with WhatsApp.
 
 ---
 
+## Events
+These events are emitted by the `Client` and can be handled using the `@client.event` decorator.
+
+| Event Name | Trigger Condition | Arguments |
+| :--- | :--- | :--- |
+| `on_start` | The client has successfully initialized and the browser page is open. | None |
+| `on_auth` | The authentication screen (QR code page) is displayed. | None |
+| `on_qr` | A new QR code is detected for the first time. | `qr_binary` (bytes) |
+| `on_qr_change` | The displayed QR code has been refreshed/changed. | `qr_binary` (bytes) |
+| `on_logged_in` | The client has successfully logged in to WhatsApp Web. | None |
+| `on_loading` | The "Loading chats" screen is visible. | `is_loading` (bool) |
+| `on_unread_chat` | Unread chats are detected in the sidebar. This check runs periodically. | `chats` (List[Dict]) |
+| `on_stop` | The client is stopping and cleaning up resources. | None |
+| `on_disconnect` | The client has lost connection to the browser/WhatsApp. | None |
+| `on_reconnect` | The client has successfully reconnected. | None |
+| `on_state_change` | The client's internal state (e.g., AUTH, LOGGED_IN) has changed. | `state` (State enum) |
+| `on_tick` | Emitted on every iteration of the main event loop. | None |
+| `on_error` | An error occurred. | `message` (str) |
+| `on_warning` | A non-critical issue occurred. | `message` (str) |
+| `on_info` | Informational message. | `message` (str) |
+
+***Note:** The `on_message` event is reserved for future use. Currently, use `on_unread_chat` to detect new activity.*
+
+---
+
 ## Event Objects
 These are the objects passed to your event handlers.
 
 ### Message
-The `Message` object is what you receive in `on_message` event handlers.
+The `Message` object represents a message retrieved from a chat (e.g., via `chat_manager.collect_messages()`).
 
 ::: whatsplay.object.message.Message
 

@@ -48,12 +48,12 @@ plugins:
           options:
             show_root_heading: yes
             show_source: yes
-  - static-i18n:
-      default_language: en
+  - i18n:
       languages:
         - locale: en
           name: English
           build: true
+          default: true
         - locale: es
           name: Español
           build: true

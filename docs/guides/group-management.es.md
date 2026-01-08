@@ -1,14 +1,12 @@
 # Guía: Administración de Grupos
 
-Este es un placeholder para la traducción al español.
+WhatsPlay proporciona una funcionalidad robusta para gestionar grupos de WhatsApp, permitiéndote crear nuevos grupos y gestionar sus miembros programáticamente.
 
-WhatsPlay provides robust functionality for managing WhatsApp groups, allowing you to create new groups and manage their members programmatically.
+## Creando un Nuevo Grupo
 
-## Creating a New Group
+Puedes crear un nuevo grupo de WhatsApp usando el método `client.new_group()`. Este método requiere un nombre de grupo y una lista de nombres de contacto o números de teléfono para los miembros iniciales.
 
-You can create a new WhatsApp group by using the `client.new_group()` method. This method requires a group name and a list of contact names or phone numbers for the initial members.
-
-**Important:** The contacts in the `members` list must already be in your WhatsApp contacts or be valid phone numbers (including country code, without '+' or '00').
+**Importante:** Los contactos en la lista `members` ya deben estar en tus contactos de WhatsApp o ser números de teléfono válidos (incluyendo código de país, sin '+' ni '00').
 
 ```python
 import asyncio
@@ -17,28 +15,28 @@ from whatsplay.auth import LocalProfileAuth
 
 async def create_my_group():
     auth = LocalProfileAuth(user_data_dir="./whatsapp_session")
-    client = Client(auth=auth, headless=True) # Set headless=False if you want to see the browser
+    client = Client(auth=auth, headless=True) # Establece headless=False si quieres ver el navegador
 
     @client.event("on_start")
     async def on_start():
-        print("Client ready. Attempting to create a new group...")
+        print("Cliente listo. Intentando crear un nuevo grupo...")
         
-        group_name = "My Awesome WhatsPlay Group"
-        # Use existing contact names or phone numbers
-        initial_members = ["Contact Name 1", "5491123456789"] # Example: "54911..." for Argentina mobile
+        group_name = "Mi Grupo Increíble de WhatsPlay"
+        # Usa nombres de contacto existentes o números de teléfono
+        initial_members = ["Nombre Contacto 1", "5491123456789"] # Ejemplo: "54911..." para móvil de Argentina
         
         success = await client.new_group(group_name, initial_members)
         
         if success:
-            print(f"Group '{group_name}' created successfully with initial members.")
+            print(f"Grupo '{group_name}' creado exitosamente con miembros iniciales.")
         else:
-            print(f"Failed to create group '{group_name}'.")
+            print(f"Falló la creación del grupo '{group_name}'.")
             
         await client.stop()
 
     @client.event("on_qr")
     async def on_qr(qr):
-        print("Please scan the QR code to log in.")
+        print("Por favor escanea el código QR para iniciar sesión.")
 
     await client.start()
 
@@ -46,9 +44,9 @@ if __name__ == "__main__":
     asyncio.run(create_my_group())
 ```
 
-## Adding Members to an Existing Group
+## Añadiendo Miembros a un Grupo Existente
 
-To add more members to an already existing group, use the `client.add_members_to_group()` method. You need to provide the name of the group and a list of members to add.
+Para añadir más miembros a un grupo ya existente, usa el método `client.add_members_to_group()`. Necesitas proporcionar el nombre del grupo y una lista de miembros para añadir.
 
 ```python
 import asyncio
@@ -61,23 +59,23 @@ async def add_members_to_existing_group():
 
     @client.event("on_start")
     async def on_start():
-        print("Client ready. Attempting to add members to a group...")
+        print("Cliente listo. Intentando añadir miembros a un grupo...")
         
-        group_name = "My Awesome WhatsPlay Group" # Must be an existing group
-        new_members = ["New Contact Name 1", "5491198765432"]
+        group_name = "Mi Grupo Increíble de WhatsPlay" # Debe ser un grupo existente
+        new_members = ["Nuevo Nombre Contacto 1", "5491198765432"]
         
         success = await client.add_members_to_group(group_name, new_members)
         
         if success:
-            print(f"Members added successfully to '{group_name}'.")
+            print(f"Miembros añadidos exitosamente a '{group_name}'.")
         else:
-            print(f"Failed to add members to '{group_name}'.")
+            print(f"Falló al añadir miembros a '{group_name}'.")
             
         await client.stop()
 
     @client.event("on_qr")
     async def on_qr(qr):
-        print("Please scan the QR code to log in.")
+        print("Por favor escanea el código QR para iniciar sesión.")
 
     await client.start()
 
@@ -85,9 +83,9 @@ if __name__ == "__main__":
     asyncio.run(add_members_to_existing_group())
 ```
 
-## Removing Members from a Group
+## Eliminando Miembros de un Grupo
 
-You can remove members from a group using the `client.del_members_from_group()` method. Provide the group name and a list of members to remove.
+Puedes eliminar miembros de un grupo usando el método `client.del_members_from_group()`. Proporciona el nombre del grupo y una lista de miembros a eliminar.
 
 ```python
 import asyncio
@@ -100,23 +98,23 @@ async def remove_members_from_group():
 
     @client.event("on_start")
     async def on_start():
-        print("Client ready. Attempting to remove members from a group...")
+        print("Cliente listo. Intentando eliminar miembros de un grupo...")
         
-        group_name = "My Awesome WhatsPlay Group" # Must be an existing group
-        members_to_remove = ["Contact Name To Remove", "5491112345678"]
+        group_name = "Mi Grupo Increíble de WhatsPlay" # Debe ser un grupo existente
+        members_to_remove = ["Nombre Contacto A Eliminar", "5491112345678"]
         
         success = await client.del_members_from_group(group_name, members_to_remove)
         
         if success:
-            print(f"Members removed successfully from '{group_name}'.")
+            print(f"Miembros eliminados exitosamente de '{group_name}'.")
         else:
-            print(f"Failed to remove members from '{group_name}'.")
+            print(f"Falló al eliminar miembros de '{group_name}'.")
             
         await client.stop()
 
     @client.event("on_qr")
     async def on_qr(qr):
-        print("Please scan the QR code to log in.")
+        print("Por favor escanea el código QR para iniciar sesión.")
 
     await client.start()
 
@@ -124,12 +122,12 @@ if __name__ == "__main__":
     asyncio.run(remove_members_from_group())
 ```
 
-## Further Group Management Features (Under Consideration)
+## Características Futuras de Gestión de Grupos (Bajo Consideración)
 
-While WhatsPlay provides core group management capabilities, future enhancements could include:
+Aunque WhatsPlay proporciona capacidades centrales de gestión de grupos, mejoras futuras podrían incluir:
 
-*   **Promote/Demote Group Administrators:** Functionality to change a member's administrative status.
-*   **Update Group Information:** Methods to change the group's subject (name) or description after creation.
-*   **Retrieve Detailed Participant List:** A way to get a full list of group members along with their roles (admin/participant).
+*   **Promover/Degradar Administradores de Grupo:** Funcionalidad para cambiar el estado administrativo de un miembro.
+*   **Actualizar Información del Grupo:** Métodos para cambiar el asunto (nombre) o descripción del grupo después de la creación.
+*   **Obtener Lista Detallada de Participantes:** Una forma de obtener una lista completa de miembros del grupo junto con sus roles (admin/participante).
 
-Stay tuned for updates as WhatsPlay evolves!
+¡Mantente atento a las actualizaciones a medida que WhatsPlay evoluciona!
