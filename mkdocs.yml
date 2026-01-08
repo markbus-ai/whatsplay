@@ -33,6 +33,7 @@ extra:
 nav:
   - 'Home': 'index.md'
   - 'Getting Started': 'getting-started.md'
+  - 'Configuration': 'configuration.md'
   - 'Guides':
       - 'Handling Messages & Automation': 'guides/handling-messages.md'
       - 'Group Management': 'guides/group-management.md'
