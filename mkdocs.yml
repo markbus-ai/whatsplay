@@ -25,15 +25,6 @@ theme:
     - search.highlight
     - navigation.language
 
-extra:
-  alternate:
-    - name: English
-      link: /en/
-      lang: en
-    - name: Español
-      link: /es/
-      lang: es
-
 nav:
   - 'Home': 'index.md'
   - 'Getting Started': 'getting-started.md'
