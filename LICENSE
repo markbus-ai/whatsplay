@@ -213,11 +213,6 @@ Apache License
       - Copyright: Microsoft Corporation
       - Used for: Browser automation
 
-   3. OpenCV (https://opencv.org/)
-      - License: Apache License 2.0
-      - Copyright: OpenCV Contributors
-      - Used for: Image processing and computer vision features
-
    For the complete list of dependencies and their licenses, see the project's
    requirements.txt and package.json files.
 
@@ -228,5 +223,4 @@ Apache License
    Special thanks to:
    - The RedShot project team for pioneering WhatsApp Web automation
    - The Playwright team for providing excellent browser automation tools
-   - The OpenCV community for computer vision capabilities
    - All contributors to the open source ecosystem that made this project possible

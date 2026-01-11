@@ -1,6 +1,6 @@
 # WhatsPlay 🚀
 
-Automatización avanzada de WhatsApp Web usando Playwright, Python y visión por computadora (OpenCV).  
+Automatización avanzada de WhatsApp Web usando Playwright y Python.  
 Permite interactuar con mensajes no leídos, autenticar mediante código QR y realizar acciones complejas a través de eventos personalizados y filtrado de mensajes.
 
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)  
@@ -111,8 +111,6 @@ Consulta la documentación completa en `src/DOCUMENTACION.md` para instrucciones
 ### Principales
 
 * `playwright` – Automatización de navegador
-* `opencv-python` – Procesamiento de imágenes (opcional)
-* `numpy` – Operaciones numéricas utilizadas por OpenCV
 
 ### Desarrollo
 
