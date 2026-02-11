@@ -25,8 +25,8 @@ async def main():
     auth = LocalProfileAuth("./whatsapp_session")
     client = Client(auth=auth, headless=True)
 
-    @client.event("on_start")
-    async def on_start():
+    @client.event("on_logged_in")
+    async def on_logged_in():
         print("Client started! Sending message...")
         
         # Use a phone number (e.g., "1234567890") or a saved contact name

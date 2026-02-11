@@ -240,7 +240,9 @@ class Client(BaseWhatsAppClient):
                 if curr_state != state:
                     await self.state_manager._handle_state_change(curr_state, state)
                     state = curr_state
-                    self._consecutive_errors = 0  # Reset error counter on successful state change
+                    self._consecutive_errors = (
+                        0  # Reset error counter on successful state change
+                    )
                 else:
                     await self.state_manager._handle_same_state(curr_state)
 
@@ -311,7 +313,9 @@ class Client(BaseWhatsAppClient):
         Returns:
             True if chat was opened successfully
         """
-        return await self.chat_manager.open(chat_name, timeout, open_via_url=open_via_url)
+        return await self.chat_manager.open(
+            chat_name, timeout, open_via_url=open_via_url
+        )
 
     async def search_conversations(
         self, query: str, close: bool = True
@@ -378,7 +382,9 @@ class Client(BaseWhatsAppClient):
         Returns:
             True if message was sent successfully
         """
-        return await self.chat_manager.send_message(chat_query, message, open_via_url=open_via_url)
+        return await self.chat_manager.send_message(
+            chat_query, message, open_via_url=open_via_url
+        )
 
     async def send_file(self, chat_name: str, path: str) -> bool:
         """
@@ -418,9 +424,7 @@ class Client(BaseWhatsAppClient):
         """
         return await self.wa_elements.new_group(group_name, members)
 
-    async def add_members_to_group(
-        self, group_name: str, members: List[str]
-    ) -> bool:
+    async def add_members_to_group(self, group_name: str, members: List[str]) -> bool:
         """
         Add members to an existing group.
 
@@ -433,17 +437,17 @@ class Client(BaseWhatsAppClient):
         """
         return await self.wa_elements.add_members_to_group(group_name, members)
 
-    async def del_members_from_group(
-        self, group_name: str, members: List[str]
-    ) -> bool:
+    async def del_members_from_group(self, group_name: str, members: List[str]) -> bool:
         """
-        Remove members from a group.
-
-        Args:
-            group_name: Name of the group
-            members: List of member names to remove
-
-        Returns:
-            True if members were removed successfully
+        Elimina varios miembros de un grupo procesando la lista completa.
         """
-        return await self.wa_elements.del_member_group(group_name, members)
+        if not await self.wait_until_logged_in():
+            return False
+
+        results = []
+        for member in members:
+            # pasamos el nombre individual, no la lista
+            success = await self.wa_elements.del_member_group(group_name, member)
+            results.append(success)
+
+        return all(results)  # devuelve True solo si todos fueron eliminados

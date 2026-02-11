@@ -45,9 +45,9 @@ async def main():
     client = Client(auth=auth, headless=False)
 
     # --- Step 3: Define Event Handlers ---
-    # `on_start` is triggered once the client is logged in and ready.
-    @client.event("on_start")
-    async def on_start():
+    # `on_logged_in` is triggered once the client is logged in and ready.
+    @client.event("on_logged_in")
+    async def on_logged_in():
         print("Client is ready! Preparing to send a message...")
         
         # Define your recipient and message

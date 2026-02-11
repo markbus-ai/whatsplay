@@ -45,9 +45,9 @@ async def main():
     client = Client(auth=auth, headless=False)
 
     # --- Paso 3: Definir Manejadores de Eventos ---
-    # `on_start` se dispara una vez que el cliente ha iniciado sesión y está listo.
-    @client.event("on_start")
-    async def on_start():
+    # `on_logged_in` se dispara una vez que el cliente ha iniciado sesión y está listo.
+    @client.event("on_logged_in")
+    async def on_logged_in():
         print("¡El cliente está listo! Preparando para enviar un mensaje...")
         
         # Define tu destinatario y mensaje

@@ -147,7 +147,7 @@ class Message:
 
         except Exception as e:
             print(f"An error occurred while reacting to message {self.msg_id}: {e}")
-
+    
 
 class FileMessage(Message):
     """

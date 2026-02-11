@@ -1,0 +1,19 @@
+{
+  "output": {
+    "filePath": "repomix-output.xml",
+    "style": "xml",
+    "removeComments": true,
+    "removeEmptyLines": true,
+    "topFilesLength": 5
+  },
+  "include": ["src/**/*.py"],
+  "ignore": {
+    "customPatterns": [
+      "**/tests/**",
+      "LICENSE",
+      "*.md",
+      "**/__pycache__/**",
+      ".env"
+    ]
+  }
+}

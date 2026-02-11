@@ -598,7 +598,26 @@ class ChatManager:
             return False
         finally:
             await self.close()
+    async def wait_for_whatsapp_ready(self, timeout=10000) -> bool:
+        """
+        Espera a que aparezca el tick (uno solo) o el doble tick en el último mensaje.
+        Sirve para texto y archivos.
+        """
+        # Buscamos cualquiera de los dos estados: Enviado (check) o Recibido (dblcheck)
+        # Usamos .last para asegurarnos de que estamos mirando EL NUEVO mensaje, no uno viejo.
+        selector_exito = 'span[data-icon="msg-check"], span[data-icon="msg-dblcheck"]'
+        
+        try:
+            # Wait for the tick to be visible in the DOM
+            await self._page.locator(selector_exito).last.wait_for(state="visible", timeout=timeout)
+            print("✅ Message confirmed by the server (Tick seen)")
+            return True
+        except Exception as e:
+            print(f"❌ Error: The message did not show confirmation in {timeout}ms. Is the internet slow?")
+            # You could add retry logic if you want
+            return False        
 
+# You continue with the message sending...
     async def send_file(self, chat_name: str, path: str) -> bool:
         """
         Send a file attachment to a chat.
@@ -640,22 +659,15 @@ class ChatManager:
                 return False
 
             await input_files[0].set_input_files(path)
-            await asyncio.sleep(1)
-
-            send_btn = await self._page.wait_for_selector(
-                loc.SEND_BUTTON, timeout=DEFAULT_WAIT_TIMEOUT
-            )
+            await asyncio.sleep(5)
+            send_btn = await self._page.locator(loc.SEND_BUTTON).last.wait_for(state="visible", timeout=DEFAULT_WAIT_TIMEOUT)   
             await send_btn.click()
-
+            await asyncio.sleep(1)
+            await self.wait_for_whatsapp_ready(timeout=DEFAULT_WAIT_TIMEOUT )
             return True
-
         except Exception as e:
-            msg = f"Unexpected error in send_file: {str(e)}"
-            await self.client.emit("on_error", msg)
-            await self._page.screenshot(path="send_file_error.png")
+            await self.client.emit("on_error", f"Error sending file: {e}")
             return False
-        finally:
-            await self.close()
 
     async def new_group(self, group_name: str, members: List[str]) -> bool:
         """
