@@ -2,9 +2,12 @@
 import re
 from datetime import datetime
 from pathlib import Path
-from typing import Optional
+from typing import Optional, Dict, Any
 from playwright.async_api import Page, ElementHandle, Download
 import asyncio
+
+from ..codec_detector import detect_codec
+
 
 class Message:
     """
@@ -23,8 +26,16 @@ class Message:
         msg_id (str): The unique identifier of the message.
     """
 
-    def __init__(self, page: Page, sender: str, timestamp: datetime, text: str, container: ElementHandle,
-                 is_outgoing: bool = False, msg_id: str = ""):
+    def __init__(
+        self,
+        page: Page,
+        sender: str,
+        timestamp: datetime,
+        text: str,
+        container: ElementHandle,
+        is_outgoing: bool = False,
+        msg_id: str = "",
+    ):
         self.page = page
         self.sender = sender
         self.timestamp = timestamp
@@ -63,43 +74,58 @@ class Message:
 
             # 2) Timestamp
             timestamp = datetime.now()
-            time_span = await elem.query_selector('xpath=.//span[contains(@class,"x16dsc37")]')
+            time_span = await elem.query_selector(
+                'xpath=.//span[contains(@class,"x16dsc37")]'
+            )
             if time_span:
                 hora_text = (await time_span.inner_text()).strip().lower()
                 # Expected formats: "10:30", "10:30 am", "10:30 p.m."
-                match = re.match(r'(\d{1,2}):(\d{2})\s*(a\.?.m\.?|p\.?.m\.?|)?', hora_text)
+                match = re.match(
+                    r"(\d{1,2}):(\d{2})\s*(a\.?.m\.?|p\.?.m\.?|)?", hora_text
+                )
                 if match:
                     hh = int(match.group(1))
                     mm = int(match.group(2))
                     ampm = (match.group(3) or "").replace(".", "")
 
-                    if ampm == 'pm' and hh != 12:
+                    if ampm == "pm" and hh != 12:
                         hh += 12
-                    elif ampm == 'am' and hh == 12: # Midnight
+                    elif ampm == "am" and hh == 12:  # Midnight
                         hh = 0
-                    
+
                     ahora = datetime.now()
-                    timestamp = ahora.replace(hour=hh, minute=mm, second=0, microsecond=0)
+                    timestamp = ahora.replace(
+                        hour=hh, minute=mm, second=0, microsecond=0
+                    )
 
             # 3) Text
             texto = ""
-            cuerpo_div = await elem.query_selector('xpath=.//div[contains(@class,"copyable-text")]/div')
+            cuerpo_div = await elem.query_selector(
+                'xpath=.//div[contains(@class,"copyable-text")]/div'
+            )
             if cuerpo_div:
                 raw_inner = await cuerpo_div.inner_text()
                 if raw_inner:
                     lineas = raw_inner.split("\n")
-                    if len(lineas) > 1 and (lineas[0].strip().startswith(sender) or ":" in lineas[0]):
+                    if len(lineas) > 1 and (
+                        lineas[0].strip().startswith(sender) or ":" in lineas[0]
+                    ):
                         texto = "\n".join(lineas[1:]).strip()
                     else:
                         texto = raw_inner.strip()
 
             return cls(
-                page=page, sender=sender, timestamp=timestamp, text=texto, container=elem,
-                is_outgoing=is_outgoing, msg_id=msg_id
+                page=page,
+                sender=sender,
+                timestamp=timestamp,
+                text=texto,
+                container=elem,
+                is_outgoing=is_outgoing,
+                msg_id=msg_id,
             )
         except Exception:
             return None
-            
+
     async def react(self, emoji: str):
         """
         Reacts to this message with the given emoji.
@@ -110,11 +136,11 @@ class Message:
         Args:
             emoji (str): The emoji character to react with (e.g., "👍", "❤️").
         """
- 
+
         try:
             # 1. Hover over the message to make the action bar appear.
             await self.container.hover()
-            
+
             # Take screenshot after hover
             # await self.container.screenshot(path="after_hover.png")
             # print("self.container: ", self.container)
@@ -129,11 +155,13 @@ class Message:
             await reaction_bar.click()
 
             # 3. Find "More reactions" button
-            more_reactions_button_handle = self.page.locator('[aria-label="Más reacciones"]')
+            more_reactions_button_handle = self.page.locator(
+                '[aria-label="Más reacciones"]'
+            )
             if not more_reactions_button_handle:
                 # print("Error: No se encontró el botón '[aria-label="Más reacciones"]'.")
                 return None
-            
+
             await more_reactions_button_handle.click()
 
             # 4. Find emoji in picker
@@ -147,7 +175,7 @@ class Message:
 
         except Exception as e:
             print(f"An error occurred while reacting to message {self.msg_id}: {e}")
-    
+
 
 class FileMessage(Message):
     """
@@ -176,7 +204,9 @@ class FileMessage(Message):
         self.download_icon = download_icon
 
     @classmethod
-    async def from_element(cls, elem: ElementHandle, page: Page) -> Optional["FileMessage"]:
+    async def from_element(
+        cls, elem: ElementHandle, page: Page
+    ) -> Optional["FileMessage"]:
         """
         Create a FileMessage from a DOM element.
 
@@ -274,3 +304,269 @@ class FileMessage(Message):
 
         except Exception:
             return None
+
+    def get_codec_info(self, file_path: Path) -> Optional[Dict[str, Any]]:
+        """
+        Get codec information from a downloaded audio file.
+
+        Args:
+            file_path: Path to the downloaded audio file
+
+        Returns:
+            Dict with codec info or None if detection fails
+        """
+        return detect_codec(file_path)
+
+
+class VoiceMessage(Message):
+    """
+    Represents a voice message without visible download icon.
+
+    This class handles voice messages that need to be played first
+    to trigger the download capability.
+    """
+
+    def __init__(
+        self,
+        page: Page,
+        sender: str,
+        timestamp: datetime,
+        text: str,
+        container: ElementHandle,
+        duration: str = "",
+    ):
+        super().__init__(page, sender, timestamp, text, container)
+        self.duration = duration
+
+    @classmethod
+    async def from_element(
+        cls, elem: ElementHandle, page: Page
+    ) -> Optional["VoiceMessage"]:
+        """
+        Create a VoiceMessage from a DOM element.
+
+        Checks for voice message indicators (mic icon, voice container).
+
+        Args:
+            elem: The message container element.
+            page: The Playwright page.
+
+        Returns:
+            A new VoiceMessage instance or None if not a valid voice message.
+        """
+        try:
+            is_quoted = await elem.query_selector('[aria-label="Mensaje citado"]')
+            if is_quoted:
+                return None
+
+            has_play_button = await elem.query_selector(
+                'button[aria-label="Reproducir mensaje de voz"]'
+            )
+            has_voice_container = await elem.query_selector(
+                'span[aria-label="Mensaje de voz"]'
+            )
+
+            # Check for voice icon using evaluate (more reliable than :has selector)
+            has_voice_icon = await elem.evaluate(
+                """(el) => {
+                    const svgs = el.querySelectorAll('svg');
+                    for (const svg of svgs) {
+                        const title = svg.querySelector('title');
+                        if (title && title.textContent.includes('ic-keyboard-voice')) {
+                            return true;
+                        }
+                    }
+                    return false;
+                }"""
+            )
+
+            if not has_play_button and not has_voice_container and not has_voice_icon:
+                return None
+
+            duration = ""
+            duration_elem = await elem.query_selector(
+                'xpath=.//div[contains(@class,"x10l6tqk") and not(contains(@class,"x13vifvy"))]'
+            )
+            if duration_elem:
+                duration = (await duration_elem.inner_text()).strip()
+
+            base_msg = await Message.from_element(elem, page)
+            if not base_msg:
+                return None
+
+            return cls(
+                page=page,
+                sender=base_msg.sender,
+                timestamp=base_msg.timestamp,
+                text=base_msg.text,
+                container=elem,
+                duration=duration,
+            )
+
+        except Exception:
+            return None
+
+    async def download_via_play(
+        self, page: Page, downloads_dir: Path
+    ) -> Optional[Path]:
+        """
+        Download voice message by clicking play first, then download.
+
+        Method 1: Click play button → wait for download icon → download
+
+        Args:
+            page: The Playwright Page object.
+            downloads_dir: The directory where the file should be saved.
+
+        Returns:
+            The Path to the saved file, or None if download failed.
+        """
+        try:
+            downloads_dir.mkdir(parents=True, exist_ok=True)
+
+            play_button = await self.container.query_selector(
+                'button[aria-label="Reproducir mensaje de voz"]'
+            )
+            if not play_button:
+                return None
+
+            await play_button.click()
+            await asyncio.sleep(1)
+
+            download_icon = await self.container.query_selector(
+                'span[data-icon="audio-download"]'
+            )
+            if not download_icon:
+                return None
+
+            async with page.expect_download() as evento:
+                await download_icon.click()
+            descarga: Download = await evento.value
+
+            filename = (
+                descarga.suggested_filename
+                or f"voice_{self.timestamp.strftime('%Y%m%d_%H%M%S')}.ogg"
+            )
+            destino = downloads_dir / filename
+
+            await descarga.save_as(str(destino))
+            return destino
+
+        except Exception:
+            return None
+
+    async def download_via_blob(
+        self, page: Page, downloads_dir: Path
+    ) -> Optional[Path]:
+        """
+        Download voice message by extracting audio blob directly.
+
+        Method 2: Extract audio src/blob via JavaScript → download
+
+        Args:
+            page: The Playwright Page object.
+            downloads_dir: The directory where the file should be saved.
+
+        Returns:
+            The Path to the saved file, or None if download failed.
+        """
+        try:
+            downloads_dir.mkdir(parents=True, exist_ok=True)
+
+            audio_data = await self.container.evaluate(
+                """
+                () => {
+                    const audio = this.querySelector('audio') || this.querySelector('video');
+                    if (!audio) return null;
+                    
+                    if (audio.src && audio.src.startsWith('blob:')) {
+                        return { type: 'blob', src: audio.src };
+                    }
+                    if (audio.currentSrc) {
+                        return { type: 'src', src: audio.currentSrc };
+                    }
+                    return null;
+                }
+                """
+            )
+
+            if not audio_data or not audio_data.get("src"):
+                return None
+
+            filename = f"voice_{self.timestamp.strftime('%Y%m%d_%H%M%S')}.ogg"
+            destino = downloads_dir / filename
+
+            if audio_data["type"] == "blob":
+                return await self._download_blob_audio(page, audio_data["src"], destino)
+            else:
+                return await self._download_url_audio(page, audio_data["src"], destino)
+
+        except Exception:
+            return None
+
+    async def _download_blob_audio(
+        self, page: Page, blob_url: str, destino: Path
+    ) -> Optional[Path]:
+        """Download audio from blob URL."""
+        try:
+            import base64
+
+            audio_base64 = await page.evaluate(
+                f"""
+                async () => {{
+                    const response = await fetch('{blob_url}');
+                    const blob = await response.blob();
+                    return new Promise((resolve) => {{
+                        const reader = new FileReader();
+                        reader.onloadend = () => resolve(reader.result.split(',')[1]);
+                        reader.readAsDataURL(blob);
+                    }});
+                }}
+                """
+            )
+
+            if audio_base64:
+                audio_bytes = base64.b64decode(audio_base64)
+                destino.write_bytes(audio_bytes)
+                return destino
+
+            return None
+        except Exception:
+            return None
+
+    async def _download_url_audio(
+        self, page: Page, audio_url: str, destino: Path
+    ) -> Optional[Path]:
+        """Download audio from direct URL."""
+        try:
+            import httpx
+
+            response = await httpx.AsyncClient().get(audio_url)
+            if response.status_code == 200:
+                destino.write_bytes(response.content)
+                return destino
+            return None
+        except Exception:
+            return None
+
+    async def download(self, page: Page, downloads_dir: Path) -> Optional[Path]:
+        """
+        Download voice message using combined methods.
+
+        Tries Method 1 (play → download) first, falls back to Method 2 (blob).
+
+        Args:
+            page: The Playwright Page object.
+            downloads_dir: The directory where the file should be saved.
+
+        Returns:
+            The Path to the saved file, or None if download failed.
+        """
+        file_path = await self.download_via_play(page, downloads_dir)
+        if not file_path:
+            file_path = await self.download_via_blob(page, downloads_dir)
+        return file_path
+
+    def get_codec_info(self, file_path: Path) -> Optional[Dict[str, Any]]:
+        """Get codec information from downloaded audio file."""
+        return detect_codec(file_path)

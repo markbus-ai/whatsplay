@@ -18,7 +18,8 @@ from playwright.async_api import (
 )
 
 from .constants import locator as loc
-from .object.message import FileMessage, Message
+from .object.message import FileMessage, Message, VoiceMessage
+from .codec_detector import detect_codec
 
 # Constants
 DEFAULT_DOWNLOADS_DIR = Path.home() / "Downloads" / "WhatsAppFiles"
@@ -391,14 +392,17 @@ class ChatManager:
         if self._page:
             try:
                 await self._page.keyboard.press("Escape")
-                await asyncio.sleep(0.5) # Allow UI to react
+                await asyncio.sleep(0.5)  # Allow UI to react
             except Exception as e:
                 await self.client.emit(
                     "on_warning", f"Error trying to close chat with Escape: {e}"
                 )
 
     async def open(
-        self, chat_name: str, timeout: int = DEFAULT_WAIT_TIMEOUT, open_via_url: bool = False
+        self,
+        chat_name: str,
+        timeout: int = DEFAULT_WAIT_TIMEOUT,
+        open_via_url: bool = False,
     ) -> bool:
         """
         Open a chat by name.
@@ -411,7 +415,9 @@ class ChatManager:
         Returns:
             True if chat was opened successfully, False otherwise
         """
-        return await self.wa_elements.open(chat_name, timeout, open_via_url=open_via_url)
+        return await self.wa_elements.open(
+            chat_name, timeout, open_via_url=open_via_url
+        )
 
     async def search_conversations(
         self, query: str, close: bool = True
@@ -434,29 +440,32 @@ class ChatManager:
             await self.client.emit("on_error", f"Search error: {e}")
             return []
 
-    async def collect_messages(self) -> List[Union[Message, FileMessage]]:
+    async def collect_messages(self) -> List[Union[Message, FileMessage, VoiceMessage]]:
         """
         Collect all currently visible messages in the active chat.
 
         Scans all visible message containers (message-in/message-out) and
-        returns a list of Message or FileMessage instances.
+        returns a list of Message, FileMessage, or VoiceMessage instances.
 
         Returns:
-            List of Message or FileMessage objects
+            List of Message, FileMessage, or VoiceMessage objects
         """
-        results: List[Union[Message, FileMessage]] = []
+        results: List[Union[Message, FileMessage, VoiceMessage]] = []
         msg_elements = await self._page.query_selector_all(
             'div[class*="message-in"], div[class*="message-out"]'
         )
 
         for elem in msg_elements:
-            # Try to parse as FileMessage first
+            voice_msg = await VoiceMessage.from_element(elem, self._page)
+            if voice_msg:
+                results.append(voice_msg)
+                continue
+
             file_msg = await FileMessage.from_element(elem, self._page)
             if file_msg:
                 results.append(file_msg)
                 continue
 
-            # Fall back to regular Message
             simple_msg = await Message.from_element(elem, self._page)
             if simple_msg:
                 results.append(simple_msg)
@@ -478,7 +487,7 @@ class ChatManager:
             if not messages:
                 await self.client.emit("on_warning", "No messages found to react to.")
                 return False
-            
+
             last_message = messages[-1]
             await last_message.react(emoji)
             return True
@@ -487,62 +496,79 @@ class ChatManager:
             return False
 
     async def download_all_files(
-        self, carpeta: Optional[str] = None
-    ) -> List[Path]:
+        self, carpeta: Optional[str] = None, detect_codecs: bool = True
+    ) -> List[Dict[str, Any]]:
         """
         Download all file attachments from the current chat.
 
         Args:
             carpeta: Optional custom download directory path
+            detect_codecs: If True, detect codec info for each file
 
         Returns:
-            List of Path objects where files were saved
+            List of dicts with file path and codec info
         """
         if not await self.client.wait_until_logged_in():
             return []
 
-        downloads_dir = (
-            Path(carpeta) if carpeta else DEFAULT_DOWNLOADS_DIR
-        )
+        downloads_dir = Path(carpeta) if carpeta else DEFAULT_DOWNLOADS_DIR
 
-        saved_files: List[Path] = []
+        saved_files: List[Dict[str, Any]] = []
         messages = await self.collect_messages()
 
         for msg in messages:
+            file_path = None
             if isinstance(msg, FileMessage):
                 file_path = await msg.download(self._page, downloads_dir)
-                if file_path:
-                    saved_files.append(file_path)
+            elif isinstance(msg, VoiceMessage):
+                file_path = await msg.download(self._page, downloads_dir)
+
+            if file_path:
+                file_info = {"path": file_path, "type": type(msg).__name__}
+                if detect_codecs:
+                    file_info["codec"] = detect_codec(file_path)
+                saved_files.append(file_info)
 
         return saved_files
 
     async def download_file_by_index(
-        self, index: int, carpeta: Optional[str] = None
-    ) -> Optional[Path]:
+        self, index: int, carpeta: Optional[str] = None, detect_codecs: bool = True
+    ) -> Optional[Dict[str, Any]]:
         """
         Download a specific file by its index in the message list.
 
         Args:
             index: Zero-based index of the file to download
             carpeta: Optional custom download directory path
+            detect_codecs: If True, detect codec info for the file
 
         Returns:
-            Path to the downloaded file or None if failed
+            Dict with path, type, and codec info, or None if failed
         """
         if not await self.client.wait_until_logged_in():
             return None
 
-        downloads_dir = (
-            Path(carpeta) if carpeta else DEFAULT_DOWNLOADS_DIR
-        )
+        downloads_dir = Path(carpeta) if carpeta else DEFAULT_DOWNLOADS_DIR
 
         messages = await self.collect_messages()
-        files = [m for m in messages if isinstance(m, FileMessage)]
+        downloadable = [
+            m for m in messages if isinstance(m, (FileMessage, VoiceMessage))
+        ]
 
-        if index < 0 or index >= len(files):
+        if index < 0 or index >= len(downloadable):
             return None
 
-        return await files[index].download(self._page, downloads_dir)
+        msg = downloadable[index]
+        file_path = await msg.download(self._page, downloads_dir)
+
+        if not file_path:
+            return None
+
+        result = {"path": file_path, "type": type(msg).__name__}
+        if detect_codecs:
+            result["codec"] = detect_codec(file_path)
+
+        return result
 
     async def send_message(
         self, chat_query: str, message: str, open_via_url: bool = False
@@ -565,15 +591,15 @@ class ChatManager:
         try:
             opened = await self.open(chat_query, open_via_url=open_via_url)
             if not opened:
-                await self.client.emit(
-                    "on_error", f"Could not open chat: {chat_query}"
-                )
+                await self.client.emit("on_error", f"Could not open chat: {chat_query}")
                 return False
             print(f"✓ Chat '{chat_query}' opened, sending message")
 
-            await self._page.wait_for_selector(loc.CHAT_INPUT_BOX, timeout=DEFAULT_WAIT_TIMEOUT)
+            await self._page.wait_for_selector(
+                loc.xpath(loc.CHAT_INPUT_BOX), timeout=DEFAULT_WAIT_TIMEOUT
+            )
             input_box = await self._page.wait_for_selector(
-                loc.CHAT_INPUT_BOX, timeout=DEFAULT_WAIT_TIMEOUT
+                loc.xpath(loc.CHAT_INPUT_BOX), timeout=DEFAULT_WAIT_TIMEOUT
             )
 
             if not input_box:
@@ -586,10 +612,10 @@ class ChatManager:
             await input_box.click()
             await input_box.fill(message)
             await self._page.keyboard.press("Enter")
-            
+
             # Add a short delay to allow the message to be processed by WhatsApp Web UI
             await asyncio.sleep(2)
-            
+
             return True
 
         except Exception as e:
@@ -598,6 +624,7 @@ class ChatManager:
             return False
         finally:
             await self.close()
+
     async def wait_for_whatsapp_ready(self, timeout=10000) -> bool:
         """
         Espera a que aparezca el tick (uno solo) o el doble tick en el último mensaje.
@@ -606,18 +633,22 @@ class ChatManager:
         # Buscamos cualquiera de los dos estados: Enviado (check) o Recibido (dblcheck)
         # Usamos .last para asegurarnos de que estamos mirando EL NUEVO mensaje, no uno viejo.
         selector_exito = 'span[data-icon="msg-check"], span[data-icon="msg-dblcheck"]'
-        
+
         try:
             # Wait for the tick to be visible in the DOM
-            await self._page.locator(selector_exito).last.wait_for(state="visible", timeout=timeout)
+            await self._page.locator(selector_exito).last.wait_for(
+                state="visible", timeout=timeout
+            )
             print("✅ Message confirmed by the server (Tick seen)")
             return True
         except Exception as e:
-            print(f"❌ Error: The message did not show confirmation in {timeout}ms. Is the internet slow?")
+            print(
+                f"❌ Error: The message did not show confirmation in {timeout}ms. Is the internet slow?"
+            )
             # You could add retry logic if you want
-            return False        
+            return False
 
-# You continue with the message sending...
+    # You continue with the message sending...
     async def send_file(self, chat_name: str, path: str) -> bool:
         """
         Send a file attachment to a chat.
@@ -645,7 +676,9 @@ class ChatManager:
                 await self.client.emit("on_error", msg)
                 return False
 
-            await self._page.wait_for_selector(loc.CHAT_INPUT_BOX, timeout=DEFAULT_WAIT_TIMEOUT)
+            await self._page.wait_for_selector(
+                loc.xpath(loc.CHAT_INPUT_BOX), timeout=DEFAULT_WAIT_TIMEOUT
+            )
 
             attach_btn = await self._page.wait_for_selector(
                 loc.ATTACH_BUTTON, timeout=5000
@@ -660,10 +693,12 @@ class ChatManager:
 
             await input_files[0].set_input_files(path)
             await asyncio.sleep(5)
-            send_btn = await self._page.locator(loc.SEND_BUTTON).last.wait_for(state="visible", timeout=DEFAULT_WAIT_TIMEOUT)   
+            send_btn = await self._page.locator(loc.SEND_BUTTON).last.wait_for(
+                state="visible", timeout=DEFAULT_WAIT_TIMEOUT
+            )
             await send_btn.click()
             await asyncio.sleep(1)
-            await self.wait_for_whatsapp_ready(timeout=DEFAULT_WAIT_TIMEOUT )
+            await self.wait_for_whatsapp_ready(timeout=DEFAULT_WAIT_TIMEOUT)
             return True
         except Exception as e:
             await self.client.emit("on_error", f"Error sending file: {e}")
@@ -682,9 +717,7 @@ class ChatManager:
         """
         return await self.wa_elements.new_group(group_name, members)
 
-    async def add_members_to_group(
-        self, group_name: str, members: List[str]
-    ) -> bool:
+    async def add_members_to_group(self, group_name: str, members: List[str]) -> bool:
         """
         Add members to an existing group.
 

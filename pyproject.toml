@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "whatsplay"
-version = "1.9.8"
+version = "2.0.5"
 description = "A modern Python library for automating WhatsApp Web using Playwright"
 readme = "README.md"
 requires-python = ">=3.8"
@@ -26,7 +26,9 @@ classifiers = [
     "Topic :: Communications :: Chat",
 ]
 dependencies = [
-    "playwright>=1.35.0"
+    "playwright>=1.35.0",
+    "mutagen>=1.47.0",
+    "httpx>=0.24.0"
 ]
 
 [tool.setuptools.packages.find]
@@ -41,11 +43,6 @@ Issues = "https://github.com/markbus-ai/whatsplay/issues"
 [tool.hatch.build.targets.wheel]
 packages = ["whatsplay"]
 
-[tool.hatch.envs.default]
-dependencies = [
-    "pytest>=7.0.0",
-    "pytest-asyncio>=0.21.0",
-    "black>=23.0.0",
-    "mypy>=1.0.0",
-    "requests>=2.32.3",
-]
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+asyncio_mode = "auto"
