@@ -455,6 +455,77 @@ class VoiceMessage(Message):
         except Exception:
             return None
 
+    async def download_via_context_menu(
+        self, page: Page, downloads_dir: Path
+    ) -> Optional[Path]:
+        """
+        Download voice message via right-click context menu.
+
+        Method 3: Right-click → select "Descargar" → download
+
+        Args:
+            page: The Playwright page.
+            downloads_dir: The directory where the file should be saved.
+
+        Returns:
+            The Path to the saved file, or None if download failed.
+        """
+        try:
+            downloads_dir.mkdir(parents=True, exist_ok=True)
+
+            await self.container.scroll_into_view_if_needed()
+            await asyncio.sleep(0.3)
+
+            async with page.expect_download() as download_info:
+                await page.evaluate(
+                    """(el) => {
+                        const voiceContainer = el.querySelector('[class*="_ak4"]');
+                        if (voiceContainer) {
+                            const rect = voiceContainer.getBoundingClientRect();
+                            const event = new MouseEvent('contextmenu', {
+                                bubbles: true,
+                                cancelable: true,
+                                view: window,
+                                clientX: rect.left + rect.width / 2,
+                                clientY: rect.top + rect.height / 2
+                            });
+                            voiceContainer.dispatchEvent(event);
+                        }
+                    }""",
+                    self.container,
+                )
+
+                await asyncio.sleep(0.5)
+
+                await page.evaluate(
+                    """
+                    () => {
+                        const menu = document.querySelector('[role="menu"]');
+                        if (menu) {
+                            const items = menu.querySelectorAll('[role="menuitem"]');
+                            for (const item of items) {
+                                if (item.textContent.includes('Descargar')) {
+                                    item.click();
+                                }
+                            }
+                        }
+                    }"""
+                )
+
+            download = await download_info.value
+
+            filename = (
+                download.suggested_filename
+                or f"voice_{self.timestamp.strftime('%Y%m%d_%H%M%S')}.ogg"
+            )
+            destino = downloads_dir / filename
+
+            await download.save_as(str(destino))
+            return destino
+
+        except Exception:
+            return None
+
     async def download_via_blob(
         self, page: Page, downloads_dir: Path
     ) -> Optional[Path]:
@@ -553,16 +624,18 @@ class VoiceMessage(Message):
         """
         Download voice message using combined methods.
 
-        Tries Method 1 (play → download) first, falls back to Method 2 (blob).
+        Tries: 1) play → download icon, 2) context menu, 3) blob.
 
         Args:
-            page: The Playwright Page object.
+            page: The Playwright page.
             downloads_dir: The directory where the file should be saved.
 
         Returns:
             The Path to the saved file, or None if download failed.
         """
         file_path = await self.download_via_play(page, downloads_dir)
+        if not file_path:
+            file_path = await self.download_via_context_menu(page, downloads_dir)
         if not file_path:
             file_path = await self.download_via_blob(page, downloads_dir)
         return file_path

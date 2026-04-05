@@ -341,21 +341,24 @@ class Client(BaseWhatsAppClient):
         """
         return await self.chat_manager.collect_messages()
 
-    async def download_all_files(self, carpeta: Optional[str] = None) -> List[Path]:
+    async def download_all_files(
+        self, carpeta: Optional[str] = None, detect_codecs: bool = True
+    ) -> List[Dict[str, Any]]:
         """
         Download all files from the current chat.
 
         Args:
             carpeta: Optional custom download directory
+            detect_codecs: If True, detect codec info for each file
 
         Returns:
-            List of paths to downloaded files
+            List of dicts with path, type, and codec info
         """
-        return await self.chat_manager.download_all_files(carpeta)
+        return await self.chat_manager.download_all_files(carpeta, detect_codecs)
 
     async def download_file_by_index(
         self, index: int, carpeta: Optional[str] = None
-    ) -> Optional[Path]:
+    ) -> Optional[Dict[str, Any]]:
         """
         Download a specific file by index.
 
@@ -364,7 +367,7 @@ class Client(BaseWhatsAppClient):
             carpeta: Optional custom download directory
 
         Returns:
-            Path to downloaded file or None if failed
+            Dict with path and codec info, or None if failed
         """
         return await self.chat_manager.download_file_by_index(index, carpeta)
 
