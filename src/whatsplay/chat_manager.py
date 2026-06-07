@@ -460,6 +460,8 @@ class ChatManager:
             if count > 0:
                 break
             await asyncio.sleep(0.5)
+        else:
+            print("[WARN] collect_messages: no message containers found after 5s")
 
         msg_elements = await self._page.query_selector_all(
             'div[data-testid^="conv-msg-"]'
