@@ -607,3 +607,24 @@ class WhatsAppElements:
             print(f"❌ Error eliminando miembro '{member_name}' de '{group_name}': {e}")
             await self.page.keyboard.press("Escape")
             return False
+
+    async def click_chat_filter(self, filter_type: str) -> bool:
+        """Hace click en los filtros de chat (Todos, Grupos, No leídos)"""
+        filter_map = {
+            "all": loc.ALL_CHATS_BUTTON,
+            "groups": loc.GROUPS_CHATS_BUTTON,
+            "unread": loc.UNREAD_CHATS_BUTTON,
+        }
+        xpath = filter_map.get(filter_type)
+        if not xpath:
+            return False
+        try:
+            el = await self.wait_for_selector(xpath, timeout=5000)
+            if el:
+                await el.click()
+                await asyncio.sleep(0.3)
+                return True
+            return False
+        except Exception:
+            print(f"⚠️ No se encontró el filtro '{filter_type}'")
+            return False

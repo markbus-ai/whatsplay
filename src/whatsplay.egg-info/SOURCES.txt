@@ -5,6 +5,7 @@ src/whatsplay/__init__.py
 src/whatsplay/base_client.py
 src/whatsplay/chat_manager.py
 src/whatsplay/client.py
+src/whatsplay/codec_detector.py
 src/whatsplay/event.py
 src/whatsplay/state_manager.py
 src/whatsplay/utils.py

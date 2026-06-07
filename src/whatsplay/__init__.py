@@ -9,9 +9,23 @@ from whatsplay.auth.local_profile_auth import LocalProfileAuth
 from whatsplay.auth.no_auth import NoAuth
 from whatsplay.chat_manager import ChatManager
 from whatsplay.state_manager import StateManager
-from whatsplay.object.message import Message # Added for mkdocstrings discoverability
+from whatsplay.object.message import Message, FileMessage, VoiceMessage
+from whatsplay.codec_detector import detect_codec, get_codec_name
 
-__version__ = "1.9.8"
+__version__ = "2.0.8"
 
-__all__ = ["Client", "BaseWhatsAppClient", "EventHandler", "NoAuth", "LocalProfileAuth", "ChatManager", "StateManager", "Message"] # Added Message
+__all__ = [
+    "Client",
+    "BaseWhatsAppClient",
+    "EventHandler",
+    "NoAuth",
+    "LocalProfileAuth",
+    "ChatManager",
+    "StateManager",
+    "Message",
+    "FileMessage",
+    "VoiceMessage",
+    "detect_codec",
+    "get_codec_name",
+]
 
