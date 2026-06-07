@@ -444,79 +444,42 @@ class ChatManager:
         """
         Collect all currently visible messages in the active chat.
 
-        Scans all visible message containers (message-in/message-out) and
-        returns a list of Message, FileMessage, or VoiceMessage instances.
+        Scans all visible message containers and returns a list of Message,
+        FileMessage, or VoiceMessage instances.
 
         Returns:
             List of Message, FileMessage, or VoiceMessage instances
         """
         results: List[Union[Message, FileMessage, VoiceMessage]] = []
 
-        # Esperar hasta que aparezcan contenedores de mensaje en el DOM
+        # Wait for message containers to appear in the DOM
         for _ in range(10):
             count = await self._page.evaluate(
                 """() => document.querySelectorAll('div[data-testid^="conv-msg-"]').length"""
             )
-            print(f"[DEBUG_wait] conv-msg containers: {count}", flush=True)
             if count > 0:
                 break
             await asyncio.sleep(0.5)
-        else:
-            print("[DEBUG_wait] Timeout esperando conv-msg containers", flush=True)
-
-        # DEBUG: dump DOM info
-        dom_info = await self._page.evaluate("""() => {
-            const by_testid = document.querySelectorAll('div[data-testid^="conv-msg-"]');
-            const by_msg_container = document.querySelectorAll('[data-testid="msg-container"]');
-            const by_selectable = document.querySelectorAll('[data-testid="selectable-text"]');
-            const by_old_class = document.querySelectorAll('div[class*="message-in"], div[class*="message-out"]');
-            const by_all_divs = document.querySelectorAll('div[data-testid]').length;
-            const details = [];
-            for (const c of by_testid) {
-                details.push({
-                    testid: c.getAttribute('data-testid'),
-                    class: (c.getAttribute('class')||'').substring(0,80),
-                    data_id: c.getAttribute('data-id'),
-                    text_len: (c.textContent||'').length,
-                });
-            }
-            return {
-                conv_msg_count: by_testid.length,
-                msg_container: by_msg_container.length,
-                selectable_text: by_selectable.length,
-                old_class_count: by_old_class.length,
-                all_divs_with_testid: by_all_divs,
-                details: details.slice(0,5),
-            };
-        }""")
-        print(f"[DEBUG_DOM] {dom_info}", flush=True)
 
         msg_elements = await self._page.query_selector_all(
             'div[data-testid^="conv-msg-"]'
         )
-        print(f"[DEBUG_DOM] msg_elements query returned {len(msg_elements)} elements", flush=True)
 
         for elem in msg_elements:
             voice_msg = await VoiceMessage.from_element(elem, self._page)
             if voice_msg:
-                print(f"[DEBUG_DOM] -> VoiceMessage", flush=True)
                 results.append(voice_msg)
                 continue
 
             file_msg = await FileMessage.from_element(elem, self._page)
             if file_msg:
-                print(f"[DEBUG_DOM] -> FileMessage", flush=True)
                 results.append(file_msg)
                 continue
 
             simple_msg = await Message.from_element(elem, self._page)
             if simple_msg:
-                print(f"[DEBUG_DOM] -> Message: out={simple_msg.is_outgoing} text='{simple_msg.text[:50]}'", flush=True)
                 results.append(simple_msg)
-            else:
-                print(f"[DEBUG_DOM] -> Message.from_element returned None", flush=True)
 
-        print(f"[DEBUG_DOM] collect_messages returning {len(results)} messages", flush=True)
         return results
 
     async def react_to_last_message(self, emoji: str) -> bool:
