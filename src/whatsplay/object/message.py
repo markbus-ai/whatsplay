@@ -58,8 +58,8 @@ class Message:
         """
         try:
             # 0) Direction (in/out) and ID if exists
-            classes = (await elem.get_attribute("class")) or ""
-            is_outgoing = "message-out" in classes  # incoming: message-in
+            testid = (await elem.get_attribute("data-testid")) or ""
+            is_outgoing = testid == "conv-msg-right"  # left=incoming, right=outgoing
             msg_id = (await elem.get_attribute("data-id")) or ""
 
             # 1) Sender
@@ -100,11 +100,11 @@ class Message:
 
             # 3) Text
             texto = ""
-            cuerpo_div = await elem.query_selector(
-                'xpath=.//div[contains(@class,"copyable-text")]/div'
+            selectable = await elem.query_selector(
+                '[data-testid="selectable-text"]'
             )
-            if cuerpo_div:
-                raw_inner = await cuerpo_div.inner_text()
+            if selectable:
+                raw_inner = await selectable.inner_text()
                 if raw_inner:
                     lineas = raw_inner.split("\n")
                     if len(lineas) > 1 and (
@@ -113,6 +113,21 @@ class Message:
                         texto = "\n".join(lineas[1:]).strip()
                     else:
                         texto = raw_inner.strip()
+            else:
+                # Fallback: intentar con el selector viejo
+                cuerpo_div = await elem.query_selector(
+                    'xpath=.//div[contains(@class,"copyable-text")]/div'
+                )
+                if cuerpo_div:
+                    raw_inner = await cuerpo_div.inner_text()
+                    if raw_inner:
+                        lineas = raw_inner.split("\n")
+                        if len(lineas) > 1 and (
+                            lineas[0].strip().startswith(sender) or ":" in lineas[0]
+                        ):
+                            texto = "\n".join(lineas[1:]).strip()
+                        else:
+                            texto = raw_inner.strip()
 
             return cls(
                 page=page,
