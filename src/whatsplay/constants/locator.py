@@ -25,6 +25,11 @@ ALL_CHATS_BUTTON = "//span[normalize-space(text())='All' or normalize-space(text
 UNREAD_CHATS_BUTTON = "//span[normalize-space(text())='Unread' or normalize-space(text())='No leídos']"
 FAVOURITES_CHATS_BUTTON = "//span[normalize-space(text())='Favourites' or normalize-space(text())='Favoritos']"
 GROUPS_CHATS_BUTTON = "//span[normalize-space(text())='Groups' or normalize-space(text())='Grupos']"
+# Selectores semánticos por role (más estables)
+ALL_CHATS_ROLE = "button[role='tab']:has-text('All'), button[role='tab']:has-text('Todos')"
+UNREAD_CHATS_ROLE = "button[role='tab']:has-text('Unread'), button[role='tab']:has-text('No leídos')"
+GROUPS_CHATS_ROLE = "button[role='tab']:has-text('Groups'), button[role='tab']:has-text('Grupos')"
+ADDITIONAL_FILTERS_BUTTON = "button#additional-filters"
 
 # ==============================
 # Sidebar / Chat list (NUEVO DOM)

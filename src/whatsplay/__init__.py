@@ -12,7 +12,7 @@ from whatsplay.state_manager import StateManager
 from whatsplay.object.message import Message, FileMessage, VoiceMessage
 from whatsplay.codec_detector import detect_codec, get_codec_name
 
-__version__ = "2.0.8"
+__version__ = "2.0.9"
 
 __all__ = [
     "Client",

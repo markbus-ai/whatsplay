@@ -610,21 +610,45 @@ class WhatsAppElements:
 
     async def click_chat_filter(self, filter_type: str) -> bool:
         """Hace click en los filtros de chat (Todos, Grupos, No leídos)"""
-        filter_map = {
-            "all": loc.ALL_CHATS_BUTTON,
-            "groups": loc.GROUPS_CHATS_BUTTON,
-            "unread": loc.UNREAD_CHATS_BUTTON,
-        }
-        xpath = filter_map.get(filter_type)
-        if not xpath:
+        labels = {"all": "Todos", "groups": "Grupos", "unread": "No leídos"}
+        label = labels.get(filter_type)
+        if not label:
             return False
-        try:
-            el = await self.wait_for_selector(xpath, timeout=5000)
+
+        async def _click_tab() -> bool:
+            tab = self.page.locator(f'button[role="tab"]:has-text("{label}")')
+            if await tab.count() > 0 and await tab.first.is_visible():
+                await tab.first.click()
+                await asyncio.sleep(0.3)
+                return True
+            return False
+
+        async def _click_dropdown() -> bool:
+            more = self.page.locator("button#additional-filters")
+            if await more.count() == 0:
+                return False
+            await more.first.click()
+            await asyncio.sleep(0.3)
+            item = self.page.locator(f'button[role="menuitem"]:has-text("{label}")')
+            if await item.count() > 0:
+                await item.first.click()
+                await asyncio.sleep(0.3)
+                return True
+            return False
+
+        async def _click_xpath_fallback() -> bool:
+            xpath = {
+                "all": loc.ALL_CHATS_BUTTON,
+                "groups": loc.GROUPS_CHATS_BUTTON,
+                "unread": loc.UNREAD_CHATS_BUTTON,
+            }.get(filter_type)
+            if not xpath:
+                return False
+            el = await self.wait_for_selector(xpath, timeout=3000)
             if el:
                 await el.click()
                 await asyncio.sleep(0.3)
                 return True
             return False
-        except Exception:
-            print(f"⚠️ No se encontró el filtro '{filter_type}'")
-            return False
+
+        return await _click_tab() or await _click_dropdown() or await _click_xpath_fallback()
