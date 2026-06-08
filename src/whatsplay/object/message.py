@@ -57,10 +57,9 @@ class Message:
             A new Message instance or None if parsing fails.
         """
         try:
-            # 0) Direction (in/out) and ID if exists
-            testid = (await elem.get_attribute("data-testid")) or ""
-            is_outgoing = testid == "conv-msg-right"  # left=incoming, right=outgoing
+            # 0) ID if exists
             msg_id = (await elem.get_attribute("data-id")) or ""
+            testid = (await elem.get_attribute("data-testid")) or ""
 
             # 1) Sender
             sender = ""
@@ -71,6 +70,10 @@ class Message:
                 raw_label = await remitente_span.get_attribute("aria-label")
                 if raw_label:
                     sender = raw_label.rstrip(":").strip()
+
+            # Direction (in/out): WhatsApp Web ya no usa conv-msg-right/left.
+            # "Tú" es el sender de mensajes salientes en español.
+            is_outgoing = (sender == "Tú") or (not sender and testid.startswith("conv-msg-AC"))
 
             # 2) Timestamp
             timestamp = datetime.now()

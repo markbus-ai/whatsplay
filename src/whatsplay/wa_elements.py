@@ -63,106 +63,52 @@ class WhatsAppElements:
             return None
 
     async def click_search_button(self) -> bool:
-        """Intenta hacer click en el botón de búsqueda usando múltiples estrategias"""
+        """Activa el campo de búsqueda (click o foco en el input siempre visible)"""
         try:
-            # Asegurar que el foco está en el área principal
-            try:
-                main_area = await self.page.wait_for_selector('div#app div#main', timeout=3000)
-                if main_area:
-                    await main_area.click()
-            except Exception:
-                print("⚠️ No se pudo establecer el foco en el área principal")
-
-            # Intentar primero con selectores CSS directos del nuevo botón de búsqueda (2024)
-            new_selectors = [
-                # Nuevos selectores 2025 (basados en el DOM actual)
-                'span[data-icon="search-refreshed-thin"]',
-                'button:has(span[data-icon="search-refreshed-thin"])',
-                'div._ai04 button',  # selector por clase contenedora
-                'button._ai08',      # selector por clase del botón
-                # Selectores anteriores por si hay variantes
-                'button[aria-label="Search"]',
-                'button[aria-label="Buscar"]',
-                '[role="button"][title="Search"]',
-                '[role="button"][title="Buscar"]',
-                'span[data-icon="search"]',
-                'span[data-testid="search"]'
+            # En la nueva WhatsApp Web (2026), el search es un <input> siempre visible.
+            # Intentamos hacerle click directamente.
+            search_input_selectors = [
+                "input[aria-label='Buscar un chat o iniciar uno nuevo']",
+                "input[aria-label='Search for a chat or start a new one']",
+                "input[aria-label*='Buscar' i]",
+                "input[aria-label*='Search' i]",
             ]
-            for css in new_selectors:
+            for sel in search_input_selectors:
                 try:
-                    print(f"🔍 Intentando selector directo: {css}")
-                    element = await self.page.wait_for_selector(
-                        css, timeout=2000, state="visible"
-                    )
-                    if element:
-                        await element.click()
-                        if await self.verify_search_active():
-                            print(f"✅ Búsqueda activada con selector directo: {css}")
-                            return True
-                except Exception as e:
-                    print(f"❌ Selector directo falló: {css} - Error: {e}")
+                    inp = await self.page.wait_for_selector(sel, timeout=3000, state="visible")
+                    if inp:
+                        await inp.click()
+                        await asyncio.sleep(0.3)
+                        return True
+                except Exception:
+                    continue
 
-            # Intentar con cada selector del botón de búsqueda de locator.py
+            # Fallback: intentar con los selectores de locator.py
             for selector in loc.SEARCH_BUTTON:
                 try:
-                    print(f"🔍 Intentando selector de locator.py: {selector}")
                     element = await self.page.wait_for_selector(
                         selector, timeout=2000, state="visible"
                     )
                     if element:
                         await element.click()
-                        if await self.verify_search_active():
-                            print(f"✅ Búsqueda activada con selector de locator: {selector}")
-                            return True
-                except Exception as e:
-                    print(f"❌ Selector de locator falló: {selector} - Error: {e}")
+                        return True
+                except Exception:
                     continue
 
-            # Si no funcionó el clic directo, intentar con atajos de teclado
-            # Añadimos variantes para soportar layouts donde '/' requiere AltGr/Alt
-            # Intentar la secuencia especial para Ctrl+Alt+Shift+7
-            try:
-                print("🔑 Intentando secuencia especial Ctrl+Alt+Shift+7...")
-                # Click en el área de chats primero
-                chats_area = await self.page.wait_for_selector('#pane-side', timeout=3000)
-                if chats_area:
-                    await chats_area.click()
-                    # Pequeña pausa para que el foco se establezca
-                    await asyncio.sleep(0.5)
-                    # Presionar la combinación
-                    await self.page.keyboard.press("Control+Alt+/")
-                    if await self.verify_search_active():
-                        print("✅ Búsqueda activada con Ctrl+Alt+/")
-                        return True
-                    print("⚠️ Ctrl+Alt+Shift+7 presionado pero no activó la búsqueda")
-            except Exception as e:
-                print(f"❌ Error en secuencia Ctrl+Alt+Shift+7: {e}")
-
-            # Otros atajos como fallback
+            # Último recurso: atajos de teclado
             shortcuts = [
-                # Atajos alternativos
-                "Control+Alt+Shift+Digit7",  # Alternativa por si el layout requiere Digit7
-                # Atajos tradicionales
                 "Control+/",
-                "Control+Alt+/",  # Por si el layout usa AltGr
-                "Alt+/",
+                "Control+Alt+/",
                 "Control+f",
                 "/",
-                "Slash",
             ]
             for shortcut in shortcuts:
                 try:
-                    print(f"🔑 Probando atajo: {shortcut}")
-                    await self.page.keyboard.press("Escape")  # Limpiar estado actual
+                    await self.page.keyboard.press("Escape")
                     await self.page.keyboard.press(shortcut)
-                    if await self.verify_search_active():
-                        print(f"✅ Búsqueda activada con atajo: {shortcut}")
-                        return True
-                    else:
-                        print(f"⚠️ Atajo {shortcut} presionado pero no activó la búsqueda")
-                except Exception as e:
-                    # Registrar el error para depuración pero continuar con el siguiente atajo
-                    print(f"❌ Error al usar atajo {shortcut}: {e}")
+                    await asyncio.sleep(0.5)
+                    return True
+                except Exception:
                     continue
 
             return False
@@ -172,39 +118,17 @@ class WhatsAppElements:
             return False
 
     async def verify_search_active(self) -> bool:
-        """Verifica si la búsqueda está activa usando múltiples indicadores"""
+        """Verifica si el input de búsqueda está visible (siempre visible en WA Web 2026)"""
         try:
-            # Verificar estructura específica del input de búsqueda (2025)
-            active_search_selectors = [
-                # La clase específica del contenedor de búsqueda activo
-                'div._ak9t',
-                # El div con el input de búsqueda lexical
-                'div.lexical-rich-text-input div[aria-label="Cuadro de texto para ingresar la búsqueda"]',
-                # El placeholder específico cuando está activo
-                'div[aria-placeholder="Buscar un chat o iniciar uno nuevo"]',
-                # La estructura específica del editor
-                'div[data-lexical-editor="true"]'
-            ]
-
-            for selector in active_search_selectors:
+            for selector in loc.SEARCH_TEXT_BOX:
                 try:
-                    print(f"🔍 Verificando búsqueda con selector: {selector}")
-                    element = await self.page.wait_for_selector(
-                        selector, timeout=2000, state="visible"
-                    )
-                    if element:
-                        # Si encontramos cualquiera de estos elementos, la búsqueda está activa
-                        print(f"✅ Búsqueda confirmada activa con selector: {selector}")
+                    el = await self.page.wait_for_selector(selector, timeout=2000, state="visible")
+                    if el:
                         return True
-                except Exception as e:
-                    print(f"⚠️ Selector de verificación falló: {selector} - {str(e)}")
+                except Exception:
                     continue
-
-            print("❌ No se encontraron indicadores de búsqueda activa")
             return False
-
-        except Exception as e:
-            print(f"❌ Error verificando búsqueda activa: {str(e)}")
+        except Exception:
             return False
 
     async def get_qr_code(self) -> Optional[bytes]:

@@ -51,22 +51,24 @@ ROW_TIME = ".//div[@role='gridcell' and @aria-colindex='2']/following-sibling::d
 # Search related locators
 # ==============================
 SEARCH_BUTTON = [
-    # Nuevo botón de búsqueda (2024)
-    "css=button[aria-label='Search'], button[aria-label='Buscar']",
+    # Nuevo input de búsqueda siempre visible (2026)
+    "input[aria-label='Buscar un chat o iniciar uno nuevo'], input[aria-label='Search for a chat or start a new one']",
+    "css=input[aria-label*='Search' i], input[aria-label*='Buscar' i]",
+    # Contenedor con data-testid
+    "div[data-testid='chat-list-search-container']",
     # Legacy selectores
+    "css=button[aria-label='Search'], button[aria-label='Buscar']",
     "//div[@aria-label='Search input textbox']",
-    "//button[@aria-label='Search' or @aria-label='Buscar']",
-    "//button[@title='Search' or @title='Buscar']",
     "//button[@aria-label='Search or start new chat' or @aria-label='Buscar o crear chat']",
-    "//div[@role='button' and (@title='Search input textbox' or @aria-label='Search input textbox')]",
-    "//span[@data-icon='search' or @data-testid='search']/parent::button",
 ]
 
 SEARCH_TEXT_BOX = [
+    # Nuevo input nativo siempre visible (2026)
+    "input[aria-label='Buscar un chat o iniciar uno nuevo'], input[aria-label='Search for a chat or start a new one']",
+    "css=input[aria-label*='Search' i], input[aria-label*='Buscar' i]",
+    # Legacy contenteditable
     "//div[@contenteditable='true' and @role='textbox']",
     "//div[contains(@class, 'lexical-rich-text-input')]//div[@contenteditable='true']",
-    "//div[@role='textbox'][@contenteditable='true']",
-    "//div[contains(@class, '_13NKt')]"
 ]
 
 # Contenedor de resultados de búsqueda (en builds nuevos es un grid también)
@@ -102,7 +104,7 @@ ANY_DOWNLOAD_ICON = "//span[@data-icon='audio-download' or @data-icon='download'
 # Composer / acciones
 # ==============================
 ATTACH_BUTTON = "css=span[data-icon='plus-rounded']"
-SEND_BUTTON = "css=span[data-icon='wds-ic-send-filled'], css=span[data-icon='send']"
+SEND_BUTTON = "css=span[data-icon='wds-ic-send-filled'], span[data-icon='send']"
 FILE_INPUT = "css=input[type='file']"
 
 # ==============================

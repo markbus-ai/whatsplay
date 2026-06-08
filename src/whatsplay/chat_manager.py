@@ -621,7 +621,7 @@ class ChatManager:
                 )
                 return False
 
-            await input_box.click()
+            await input_box.click(force=True)
             await input_box.fill(message)
             await self._page.keyboard.press("Enter")
 
