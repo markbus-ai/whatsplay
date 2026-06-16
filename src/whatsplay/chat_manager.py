@@ -186,9 +186,7 @@ class ChatManager:
 
             # Step 1: Debug initial state
             try:
-                total_rows_now = await self._page.locator(
-                    f"xpath={loc.CHAT_LIST_ROWS}"
-                ).count()
+                total_rows_now = await self._page.locator(f"xpath={loc.CHAT_LIST_ROWS}").count()
                 log(f"DEBUG: Initially visible rows: {total_rows_now}")
 
                 if total_rows_now <= MIN_VISIBLE_CHATS_THRESHOLD:
@@ -261,9 +259,7 @@ class ChatManager:
 
         return unread_chats
 
-    async def _parse_search_result(
-        self, element, result_type: str = "CHATS"
-    ) -> Optional[Dict[str, Any]]:
+    async def _parse_search_result(self, element, result_type: str = "CHATS") -> Optional[Dict[str, Any]]:
         """
         Parse a search result element into structured data.
 
@@ -286,38 +282,22 @@ class ChatManager:
             count = len(components)
 
             # Extract unread count
-            unread_el = await element.query_selector(
-                f"xpath={loc.SEARCH_ITEM_UNREAD_MESSAGES}"
-            )
+            unread_el = await element.query_selector(f"xpath={loc.SEARCH_ITEM_UNREAD_MESSAGES}")
             unread_count = await unread_el.inner_text() if unread_el else "0"
 
             # Check for audio message
-            mic_span = await components[1].query_selector(
-                'xpath=.//span[@data-icon="mic"]'
-            )
+            mic_span = await components[1].query_selector('xpath=.//span[@data-icon="mic"]')
 
             if count == 3:
                 # Group chat layout
-                span_title_0 = await components[0].query_selector(
-                    f"xpath={loc.SPAN_TITLE}"
-                )
-                group_title = (
-                    await span_title_0.get_attribute("title") if span_title_0 else ""
-                )
+                span_title_0 = await components[0].query_selector(f"xpath={loc.SPAN_TITLE}")
+                group_title = await span_title_0.get_attribute("title") if span_title_0 else ""
 
                 datetime_children = await components[0].query_selector_all("xpath=./*")
-                datetime_text = (
-                    await datetime_children[1].text_content()
-                    if len(datetime_children) > 1
-                    else ""
-                )
+                datetime_text = await datetime_children[1].text_content() if len(datetime_children) > 1 else ""
 
-                span_title_1 = await components[1].query_selector(
-                    f"xpath={loc.SPAN_TITLE}"
-                )
-                title = (
-                    await span_title_1.get_attribute("title") if span_title_1 else ""
-                )
+                span_title_1 = await components[1].query_selector(f"xpath={loc.SPAN_TITLE}")
+                title = await span_title_1.get_attribute("title") if span_title_1 else ""
 
                 info_text = (await components[2].text_content()) or ""
                 info_text = info_text.replace("\n", "")
@@ -339,26 +319,14 @@ class ChatManager:
 
             elif count == 2:
                 # Direct chat layout
-                span_title_0 = await components[0].query_selector(
-                    f"xpath={loc.SPAN_TITLE}"
-                )
-                title = (
-                    await span_title_0.get_attribute("title") if span_title_0 else ""
-                )
+                span_title_0 = await components[0].query_selector(f"xpath={loc.SPAN_TITLE}")
+                title = await span_title_0.get_attribute("title") if span_title_0 else ""
 
                 datetime_children = await components[0].query_selector_all("xpath=./*")
-                datetime_text = (
-                    await datetime_children[1].text_content()
-                    if len(datetime_children) > 1
-                    else ""
-                )
+                datetime_text = await datetime_children[1].text_content() if len(datetime_children) > 1 else ""
 
                 info_children = await components[1].query_selector_all("xpath=./*")
-                info_text = (
-                    await info_children[0].text_content()
-                    if len(info_children) > 0
-                    else ""
-                ) or ""
+                info_text = (await info_children[0].text_content() if len(info_children) > 0 else "") or ""
                 info_text = info_text.replace("\n", "")
 
                 # Skip invalid states
@@ -394,9 +362,7 @@ class ChatManager:
                 await self._page.keyboard.press("Escape")
                 await asyncio.sleep(0.5)  # Allow UI to react
             except Exception as e:
-                await self.client.emit(
-                    "on_warning", f"Error trying to close chat with Escape: {e}"
-                )
+                await self.client.emit("on_warning", f"Error trying to close chat with Escape: {e}")
 
     async def open(
         self,
@@ -415,13 +381,9 @@ class ChatManager:
         Returns:
             True if chat was opened successfully, False otherwise
         """
-        return await self.wa_elements.open(
-            chat_name, timeout, open_via_url=open_via_url
-        )
+        return await self.wa_elements.open(chat_name, timeout, open_via_url=open_via_url)
 
-    async def search_conversations(
-        self, query: str, close: bool = True
-    ) -> List[Dict[str, Any]]:
+    async def search_conversations(self, query: str, close: bool = True) -> List[Dict[str, Any]]:
         """
         Search for conversations by term.
 
@@ -463,9 +425,7 @@ class ChatManager:
         else:
             print("[WARN] collect_messages: no message containers found after 5s")
 
-        msg_elements = await self._page.query_selector_all(
-            'div[data-testid^="conv-msg-"]'
-        )
+        msg_elements = await self._page.query_selector_all('div[data-testid^="conv-msg-"]')
 
         for elem in msg_elements:
             voice_msg = await VoiceMessage.from_element(elem, self._page)
@@ -563,9 +523,7 @@ class ChatManager:
         downloads_dir = Path(carpeta) if carpeta else DEFAULT_DOWNLOADS_DIR
 
         messages = await self.collect_messages()
-        downloadable = [
-            m for m in messages if isinstance(m, (FileMessage, VoiceMessage))
-        ]
+        downloadable = [m for m in messages if isinstance(m, (FileMessage, VoiceMessage))]
 
         if index < 0 or index >= len(downloadable):
             return None
@@ -582,9 +540,16 @@ class ChatManager:
 
         return result
 
-    async def send_message(
-        self, chat_query: str, message: str, open_via_url: bool = False
-    ) -> bool:
+    async def _check_msg_sending(self, page):
+        try:
+            pendingState = page.locator(loc.MSG_STATUS_PENDING)
+            await pendingState.wait_for(state="hidden", timeout=10000)
+            return True
+        except Exception as e:
+            print(f"Error checking message sending: {e}")
+            return False
+
+    async def send_message(self, chat_query: str, message: str, open_via_url: bool = False) -> bool:
         """
         Send a text message to a chat.
 
@@ -607,12 +572,8 @@ class ChatManager:
                 return False
             print(f"✓ Chat '{chat_query}' opened, sending message")
 
-            await self._page.wait_for_selector(
-                loc.CHAT_INPUT_BOX, timeout=DEFAULT_WAIT_TIMEOUT
-            )
-            input_box = await self._page.wait_for_selector(
-                loc.CHAT_INPUT_BOX, timeout=DEFAULT_WAIT_TIMEOUT
-            )
+            await self._page.wait_for_selector(loc.CHAT_INPUT_BOX, timeout=DEFAULT_WAIT_TIMEOUT)
+            input_box = await self._page.wait_for_selector(loc.CHAT_INPUT_BOX, timeout=DEFAULT_WAIT_TIMEOUT)
 
             if not input_box:
                 await self.client.emit(
@@ -625,8 +586,7 @@ class ChatManager:
             await input_box.fill(message)
             await self._page.keyboard.press("Enter")
 
-            # Add a short delay to allow the message to be processed by WhatsApp Web UI
-            await asyncio.sleep(2)
+            await self._check_msg_sending(self._page)
 
             return True
 
@@ -648,15 +608,11 @@ class ChatManager:
 
         try:
             # Wait for the tick to be visible in the DOM
-            await self._page.locator(selector_exito).last.wait_for(
-                state="visible", timeout=timeout
-            )
+            await self._page.locator(selector_exito).last.wait_for(state="visible", timeout=timeout)
             print("✅ Message confirmed by the server (Tick seen)")
             return True
         except Exception as e:
-            print(
-                f"❌ Error: The message did not show confirmation in {timeout}ms. Is the internet slow?"
-            )
+            print(f"❌ Error: The message did not show confirmation in {timeout}ms. Is the internet slow?")
             # You could add retry logic if you want
             return False
 
@@ -688,13 +644,9 @@ class ChatManager:
                 await self.client.emit("on_error", msg)
                 return False
 
-            await self._page.wait_for_selector(
-                loc.CHAT_INPUT_BOX, timeout=DEFAULT_WAIT_TIMEOUT
-            )
+            await self._page.wait_for_selector(loc.CHAT_INPUT_BOX, timeout=DEFAULT_WAIT_TIMEOUT)
 
-            attach_btn = await self._page.wait_for_selector(
-                loc.ATTACH_BUTTON, timeout=5000
-            )
+            attach_btn = await self._page.wait_for_selector(loc.ATTACH_BUTTON, timeout=5000)
             await attach_btn.click()
 
             input_files = await self._page.query_selector_all(loc.FILE_INPUT)
@@ -742,16 +694,12 @@ class ChatManager:
         """
         try:
             if not await self.open(group_name):
-                await self.client.emit(
-                    "on_error", f"Could not open group '{group_name}'"
-                )
+                await self.client.emit("on_error", f"Could not open group '{group_name}'")
                 return False
 
             success = await self.wa_elements.add_members_to_group(group_name, members)
             return success
 
         except Exception as e:
-            await self.client.emit(
-                "on_error", f"Error adding members to group '{group_name}': {e}"
-            )
+            await self.client.emit("on_error", f"Error adding members to group '{group_name}': {e}")
             return False

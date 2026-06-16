@@ -3,7 +3,9 @@
 # ==============================
 AUTH = "//div[contains(., 'Steps to log in') or contains(., 'Pasos para iniciar sesión')]"
 QR_CODE = "//canvas[@aria-label='Scan this QR code to link a device!' or @aria-label='Escaneá este código QR para vincular un dispositivo']"
-INVALID_NUMBER_WARNING = "//div[contains(text(), 'invalid') or contains(text(), 'no es válido') or contains(text(), 'no está en WhatsApp')]"
+INVALID_NUMBER_WARNING = (
+    "//div[contains(text(), 'invalid') or contains(text(), 'no es válido') or contains(text(), 'no está en WhatsApp')]"
+)
 
 # Banner inferior de cifrado (cambió el data-icon a 'lock-outline' en algunos builds)
 LOADING = "//span[@data-icon='lock-outline' or @data-icon='lock-refreshed']/ancestor::div[contains(., 'End-to-end encrypted') or contains(., 'Cifrado de extremo a extremo')]"
@@ -84,7 +86,9 @@ SEARCH_ITEM_UNREAD_MESSAGES = ".//span[contains(@aria-label, 'unread') or contai
 # Chat interface elements
 # ==============================
 # (Consolidado; antes duplicado)
-CHAT_INPUT_BOX = "//div[@aria-placeholder='Type a message' or @aria-placeholder='Escribe un mensaje' or @title='Type a message']"
+CHAT_INPUT_BOX = (
+    "//div[@aria-placeholder='Type a message' or @aria-placeholder='Escribe un mensaje' or @title='Type a message']"
+)
 CHAT_DIV = "//div[@role='application']"
 UNREAD_CHAT_DIV = "//div[@aria-label='Chat list' or @aria-label='Lista de chats' or @id='pane-side']"
 
@@ -118,3 +122,12 @@ GROUP_INFO_BUTTON = 'xpath=//div[@title="Profile details" or @title="Detalles de
 ADD_MEMBERS_BUTTON = 'xpath=//span[@data-icon="person-add-filled-refreshed" or @data-icon="person-add"]'
 CONFIRM_ADD_MEMBERS_BUTTON = 'xpath=//span[(@aria-label="Confirm" or @aria-label="Confirmar") and (@data-icon="checkmark-medium" or @data-icon="checkmark")]'
 REMOVE_MEMBER_BUTTON = 'xpath=//span[@data-icon="clear-refreshed" or @data-icon="x-rounded"]'
+
+# ==============================
+# Message status (para control de flujo y race conditions)
+# ==============================
+# el pending tiene los espacios que vimos antes
+MSG_STATUS_PENDING = "css=span[aria-label=' Pendiente '], span[aria-label=' Pending ']"
+MSG_STATUS_SENT = "css=span[aria-label=' Enviado '], span[aria-label=' Sent ']"
+MSG_STATUS_DELIVERED = "css=span[aria-label=' Entregado '], span[aria-label=' Delivered ']"
+MSG_STATUS_READ = "css=span[aria-label=' Leído '], span[aria-label=' Read ']"

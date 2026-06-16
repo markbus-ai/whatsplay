@@ -4,32 +4,26 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "whatsplay"
-version = "2.0.15"
+version = "2.0.16"
 description = "A modern Python library for automating WhatsApp Web using Playwright"
 readme = "README.md"
 requires-python = ">=3.8"
-license = {text = "MIT"}
-authors = [
-    {name = "Marcos Bustos", email = "markbustos1912@gmail.com"}
-]
+license = { text = "MIT" }
+authors = [{ name = "Marcos Bustos", email = "markbustos1912@gmail.com" }]
 keywords = ["whatsapp", "automation", "playwright", "bot"]
 classifiers = [
-    "Development Status :: 4 - Beta",
-    "Intended Audience :: Developers",
-    "License :: OSI Approved :: MIT License",
-    "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.8",
-    "Programming Language :: Python :: 3.9",
-    "Programming Language :: Python :: 3.10",
-    "Programming Language :: Python :: 3.11",
-    "Topic :: Software Development :: Libraries :: Python Modules",
-    "Topic :: Communications :: Chat",
+  "Development Status :: 4 - Beta",
+  "Intended Audience :: Developers",
+  "License :: OSI Approved :: MIT License",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.8",
+  "Programming Language :: Python :: 3.9",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Topic :: Software Development :: Libraries :: Python Modules",
+  "Topic :: Communications :: Chat",
 ]
-dependencies = [
-    "playwright>=1.35.0",
-    "mutagen>=1.47.0",
-    "httpx>=0.24.0"
-]
+dependencies = ["playwright>=1.35.0", "mutagen>=1.47.0", "httpx>=0.24.0"]
 
 [tool.setuptools.packages.find]
 where = ["src"]
