@@ -6,7 +6,10 @@ including authentication, QR code display, loading, and logged-in states.
 """
 
 import asyncio
+import logging
 from typing import Optional
+
+logger = logging.getLogger(__name__)
 
 from playwright.async_api import (
     ElementHandle,
@@ -145,7 +148,9 @@ class StateManager:
             close_qr_window()
             self.qr_server_started = False
 
+        logger.debug("_handle_logged_in_state_change: emitting on_logged_in")
         await self.client.emit("on_logged_in")
+        logger.debug("_handle_logged_in_state_change: on_logged_in done, calling _handle_logged_in_state")
         await self._handle_logged_in_state()
 
     async def _handle_same_state(self, state: State) -> None:
@@ -188,6 +193,14 @@ class StateManager:
 
         Checks for continue buttons and unread chats when in logged-in state.
         """
+        # ── guard: si el page ya fue cerrado por user handler, salir ──
+        if not self._page:
+            logger.debug("_handle_logged_in_state: skipped, page is None (client stopped)")
+            return
+        if not getattr(self.client, "_is_running", False):
+            logger.debug("_handle_logged_in_state: skipped, client not running")
+            return
+
         try:
             # Check for continue button (privacy policy updates, etc.)
             continue_button = await self._page.query_selector(
@@ -196,6 +209,11 @@ class StateManager:
             if continue_button:
                 await continue_button.click()
                 await asyncio.sleep(DEFAULT_SLEEP_AFTER_CONTINUE)
+                return
+
+            # Skip unread check if another page operation is in progress
+            if self.client._page_lock.locked():
+                logger.debug("Skipping _check_unread_chats: page locked by another operation")
                 return
 
             # Check for unread chats

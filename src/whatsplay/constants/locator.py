@@ -15,10 +15,10 @@ LOGGED_IN = "//span[@data-icon='wa-wordmark-refreshed' or @data-icon='whatsapp-l
 # ==============================
 # Navigation buttons
 # ==============================
-CHATS_BUTTON = "//div[@aria-label='Chats' or @aria-label='Chat' or @aria-label='Chats de WhatsApp' or @aria-label='Conversaciones']"
-STATUS_BUTTON = "//div[@aria-label='Status' or @aria-label='Estados']"
-CHANNELS_BUTTON = "//div[@aria-label='Channels' or @aria-label='Canales']"
-COMMUNITIES_BUTTON = "//div[@aria-label='Communities' or @aria-label='Comunidades']"
+CHATS_BUTTON = "//button[@aria-label='Chats' or @aria-label='Chat' or @aria-label='Chats de WhatsApp' or @aria-label='Conversaciones']"
+STATUS_BUTTON = "//button[@aria-label='Status' or @aria-label='Estados']"
+CHANNELS_BUTTON = "//button[@aria-label='Channels' or @aria-label='Canales']"
+COMMUNITIES_BUTTON = "//button[@aria-label='Communities' or @aria-label='Comunidades']"
 
 # ==============================
 # Chat filter buttons (tabs)
@@ -100,6 +100,7 @@ CHAT_MESSAGE = ".//div[@data-pre-plain-text]"  # estable para burbujas
 CHAT_MESSAGE_QUOTE = ".//div[@aria-label='Quoted message' or @aria-label='Mensaje citado']"
 CHAT_MESSAGE_IMAGE = ".//div[@aria-label='Open picture' or @aria-label='Abrir imagen']"
 CHAT_MESSAGE_IMAGE_ELEMENT = ".//img[starts-with(@src, 'blob:https://web.whatsapp.com')]"
+MESSAGE_CONTAINER = 'div[data-testid^="conv-msg-"]'
 
 # Descarga de archivos (audio como ejemplo + fallback genérico por data-icon)
 ANY_DOWNLOAD_ICON = "//span[@data-icon='audio-download' or @data-icon='download' or @data-icon='download-outline']"
@@ -126,8 +127,10 @@ REMOVE_MEMBER_BUTTON = 'xpath=//span[@data-icon="clear-refreshed" or @data-icon=
 # ==============================
 # Message status (para control de flujo y race conditions)
 # ==============================
-# el pending tiene los espacios que vimos antes
-MSG_STATUS_PENDING = "css=span[aria-label=' Pendiente '], span[aria-label=' Pending ']"
-MSG_STATUS_SENT = "css=span[aria-label=' Enviado '], span[aria-label=' Sent ']"
-MSG_STATUS_DELIVERED = "css=span[aria-label=' Entregado '], span[aria-label=' Delivered ']"
-MSG_STATUS_READ = "css=span[aria-label=' Leído '], span[aria-label=' Read ']"
+# Usamos aria-label*= (contains) porque WA Web a veces incluye espacios
+# leading/trailing en el aria-label que Meta puede cambiar en cualquier build
+MSG_STATUS_PENDING = "css=span[aria-label*='Pendiente'], span[aria-label*='Pending']"
+MSG_STATUS_SENT = "css=span[aria-label*='Enviado'], span[aria-label*='Sent']"
+MSG_STATUS_DELIVERED = "css=span[aria-label*='Entregado'], span[aria-label*='Delivered']"
+MSG_STATUS_READ = "css=span[aria-label*='Leído'], span[aria-label*='Read']"
+MSG_STATUS_CONFIRMED = "css=span[aria-label*='Enviado'], span[aria-label*='Sent'], span[aria-label*='Entregado'], span[aria-label*='Delivered'], span[aria-label*='Leído'], span[aria-label*='Read']"

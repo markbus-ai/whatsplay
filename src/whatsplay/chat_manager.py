@@ -7,10 +7,13 @@ detecting unread chats.
 """
 
 import asyncio
+import logging
 import os
 import re
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Union
+
+logger = logging.getLogger(__name__)
 
 from playwright.async_api import (
     Error as PlaywrightError,
@@ -25,7 +28,7 @@ from .codec_detector import detect_codec
 DEFAULT_DOWNLOADS_DIR = Path.home() / "Downloads" / "WhatsAppFiles"
 UNREAD_ARIA_PATTERN = r"(?:mensaje(?:s)?\s+no\s+le[ií]do|unread)"
 MIN_VISIBLE_CHATS_THRESHOLD = 2
-DEFAULT_WAIT_TIMEOUT = 10000
+DEFAULT_WAIT_TIMEOUT = 30000
 
 
 class ChatManager:
@@ -77,179 +80,180 @@ class ChatManager:
             3. Bold font weight detection on chat titles
         """
         unread_chats: List[Dict[str, Any]] = []
-        await self.close()  # Ensure no chat is currently open
+        async with self.client._page_lock:
+            await self.close()  # Ensure no chat is currently open
 
-        def log(msg: str) -> None:
-            """Log debug messages if debug mode is enabled."""
-            if debug:
-                print(msg)
+            def log(msg: str) -> None:
+                """Log debug messages if debug mode is enabled."""
+                if debug:
+                    print(msg)
 
-        async def _wait_for_grid() -> None:
-            """Wait for the chat grid to be present and hydrated."""
-            try:
-                await self._page.locator(loc.CHAT_LIST_GRID).wait_for(timeout=15000)
-            except Exception:
-                await self._page.wait_for_timeout(1000)
-
-        async def _get_scroller_handle():
-            """
-            Get the ElementHandle of the actual scrolling container.
-
-            Returns:
-                ElementHandle for the virtualizable scrolling container
-            """
-            grid = self._page.locator(loc.CHAT_LIST_GRID)
-            grid_h = await grid.element_handle()
-
-            if not grid_h:
-                return await self._page.locator("#pane-side").element_handle()
-
-            return await grid_h.evaluate_handle(
-                """(el) => {
-                    let cur = el;
-                    while (cur && cur !== document.body) {
-                        const s = getComputedStyle(cur);
-                        if ((s.overflowY === 'auto' || s.overflowY === 'scroll') &&
-                            cur.clientHeight < cur.scrollHeight) return cur;
-                        cur = cur.parentElement;
-                    }
-                    return document.querySelector('#pane-side');
-                }"""
-            )
-
-        async def _is_row_unread(row_loc) -> bool:
-            """
-            Determine if a chat row represents an unread conversation.
-
-            Uses multiple detection strategies:
-            1. aria-label with 'unread' or 'mensaje(s) no leído'
-            2. Explicit unread badge
-            3. Bold font weight on title (>= 600)
-
-            Args:
-                row_loc: Locator for the chat row
-
-            Returns:
-                True if the chat is unread, False otherwise
-            """
-            try:
-                # Strategy 1: Check aria-label for unread indicators
-                has_aria = await row_loc.locator("[aria-label]").evaluate_all(
-                    "(els, rx) => els.some(el => (el.getAttribute('aria-label')||'').match(new RegExp(rx,'i')))",
-                    UNREAD_ARIA_PATTERN,
-                )
-                if has_aria:
-                    return True
-
-                # Strategy 2: Check for explicit unread badge
+            async def _wait_for_grid() -> None:
+                """Wait for the chat grid to be present and hydrated."""
                 try:
-                    if await row_loc.locator(f"xpath={loc.UNREAD_BADGE}").count() > 0:
-                        return True
+                    await self._page.locator(loc.CHAT_LIST_GRID).wait_for(timeout=15000)
                 except Exception:
-                    pass
+                    await self._page.wait_for_timeout(1000)
 
-                # Strategy 3: Check for bold font weight on title
-                title = row_loc.locator(f"xpath={loc.SPAN_TITLE}")
-                if await title.count() == 0:
-                    return False
+            async def _get_scroller_handle():
+                """
+                Get the ElementHandle of the actual scrolling container.
 
-                is_bold = await title.evaluate(
+                Returns:
+                    ElementHandle for the virtualizable scrolling container
+                """
+                grid = self._page.locator(loc.CHAT_LIST_GRID)
+                grid_h = await grid.element_handle()
+
+                if not grid_h:
+                    return await self._page.locator("#pane-side").element_handle()
+
+                return await grid_h.evaluate_handle(
                     """(el) => {
-                        const w = getComputedStyle(el).fontWeight;
-                        const n = parseInt(w, 10);
-                        return isNaN(n) ? /bold/i.test(w) : n >= 600;
+                        let cur = el;
+                        while (cur && cur !== document.body) {
+                            const s = getComputedStyle(cur);
+                            if ((s.overflowY === 'auto' || s.overflowY === 'scroll') &&
+                                cur.clientHeight < cur.scrollHeight) return cur;
+                            cur = cur.parentElement;
+                        }
+                        return document.querySelector('#pane-side');
                     }"""
                 )
-                return bool(is_bold)
 
-            except Exception:
-                return False
-
-        async def _parse_row(row_loc):
-            """
-            Parse a chat row into structured data.
-
-            Args:
-                row_loc: Locator for the chat row
-
-            Returns:
-                Dictionary with chat information or None if parsing fails
-            """
-            handle = await row_loc.element_handle()
-            if not handle:
-                return None
-            return await self._parse_search_result(handle, "CHATS")
-
-        try:
-            # Step 0: Wait for UI to be ready
-            await _wait_for_grid()
-
-            # Step 1: Debug initial state
-            try:
-                total_rows_now = await self._page.locator(f"xpath={loc.CHAT_LIST_ROWS}").count()
-                log(f"DEBUG: Initially visible rows: {total_rows_now}")
-
-                if total_rows_now <= MIN_VISIBLE_CHATS_THRESHOLD:
-                    await self._page.locator(loc.ALL_CHATS_BUTTON).click()
-                    log("DEBUG: Few chats visible, clicking 'All' button")
-                    log("DEBUG: Taking screenshot of low chat count state")
-                    await self._page.screenshot(path="pocos_chats_visibles.png")
-
-            except Exception:
-                log("DEBUG: Could not count initial rows")
-
-            # Step 2: Get correct scroller for virtualized list
-            scroller_h = await _get_scroller_handle()
-
-            # Step 3: Sweep visible rows
-            async def sweep(tag: str) -> None:
+            async def _is_row_unread(row_loc) -> bool:
                 """
-                Scan visible chat rows for unread messages.
+                Determine if a chat row represents an unread conversation.
+
+                Uses multiple detection strategies:
+                1. aria-label with 'unread' or 'mensaje(s) no leído'
+                2. Explicit unread badge
+                3. Bold font weight on title (>= 600)
 
                 Args:
-                    tag: Label for this sweep operation (for debugging)
+                    row_loc: Locator for the chat row
+
+                Returns:
+                    True if the chat is unread, False otherwise
                 """
-                nonlocal unread_chats
-                rows = self._page.locator(f"xpath={loc.CHAT_LIST_ROWS}")
-                count = await rows.count()
-                log(f"DEBUG: {tag}: Currently visible rows: {count}")
+                try:
+                    # Strategy 1: Check aria-label for unread indicators
+                    has_aria = await row_loc.locator("[aria-label]").evaluate_all(
+                        "(els, rx) => els.some(el => (el.getAttribute('aria-label')||'').match(new RegExp(rx,'i')))",
+                        UNREAD_ARIA_PATTERN,
+                    )
+                    if has_aria:
+                        return True
 
-                for i in range(count):
-                    row = rows.nth(i)
+                    # Strategy 2: Check for explicit unread badge
                     try:
-                        if await _is_row_unread(row):
-                            chat = await _parse_row(row)
-                            if chat:
-                                unread_chats.append(chat)
-                                log(f"✓ Unread ({tag}): {chat.get('name', 'No name')}")
-                    except Exception as e:
-                        log(f"DEBUG: Error evaluating row {i} ({tag}): {e}")
+                        if await row_loc.locator(f"xpath={loc.UNREAD_BADGE}").count() > 0:
+                            return True
+                    except Exception:
+                        pass
 
-            # Step 4: Initial sweep
-            await sweep("initial")
+                    # Strategy 3: Check for bold font weight on title
+                    title = row_loc.locator(f"xpath={loc.SPAN_TITLE}")
+                    if await title.count() == 0:
+                        return False
 
-            # Step 5: Deduplication
-            def _get_chat_key(ch: Dict[str, Any]) -> tuple:
-                """Generate a unique key for a chat to enable deduplication."""
-                return ch.get("id") or (
-                    ch.get("name"),
-                    ch.get("last_message"),
-                    ch.get("last_activity"),
-                )
+                    is_bold = await title.evaluate(
+                        """(el) => {
+                            const w = getComputedStyle(el).fontWeight;
+                            const n = parseInt(w, 10);
+                            return isNaN(n) ? /bold/i.test(w) : n >= 600;
+                        }"""
+                    )
+                    return bool(is_bold)
 
-            seen = set()
-            dedup = []
-            for ch in unread_chats:
-                k = _get_chat_key(ch)
-                if k in seen:
-                    continue
-                seen.add(k)
-                dedup.append(ch)
-            unread_chats = dedup
+                except Exception:
+                    return False
 
-        except Exception as e:
-            await self.client.emit("on_warning", f"Error detecting unread chats: {e}")
-            log(f"DEBUG: General error: {e}")
+            async def _parse_row(row_loc):
+                """
+                Parse a chat row into structured data.
+
+                Args:
+                    row_loc: Locator for the chat row
+
+                Returns:
+                    Dictionary with chat information or None if parsing fails
+                """
+                handle = await row_loc.element_handle()
+                if not handle:
+                    return None
+                return await self._parse_search_result(handle, "CHATS")
+
+            try:
+                # Step 0: Wait for UI to be ready
+                await _wait_for_grid()
+
+                # Step 1: Debug initial state
+                try:
+                    total_rows_now = await self._page.locator(f"xpath={loc.CHAT_LIST_ROWS}").count()
+                    log(f"DEBUG: Initially visible rows: {total_rows_now}")
+
+                    if total_rows_now <= MIN_VISIBLE_CHATS_THRESHOLD:
+                        await self._page.locator(loc.ALL_CHATS_BUTTON).click()
+                        log("DEBUG: Few chats visible, clicking 'All' button")
+                        log("DEBUG: Taking screenshot of low chat count state")
+                        await self._page.screenshot(path="pocos_chats_visibles.png")
+
+                except Exception:
+                    log("DEBUG: Could not count initial rows")
+
+                # Step 2: Get correct scroller for virtualized list
+                scroller_h = await _get_scroller_handle()
+
+                # Step 3: Sweep visible rows
+                async def sweep(tag: str) -> None:
+                    """
+                    Scan visible chat rows for unread messages.
+
+                    Args:
+                        tag: Label for this sweep operation (for debugging)
+                    """
+                    nonlocal unread_chats
+                    rows = self._page.locator(f"xpath={loc.CHAT_LIST_ROWS}")
+                    count = await rows.count()
+                    log(f"DEBUG: {tag}: Currently visible rows: {count}")
+
+                    for i in range(count):
+                        row = rows.nth(i)
+                        try:
+                            if await _is_row_unread(row):
+                                chat = await _parse_row(row)
+                                if chat:
+                                    unread_chats.append(chat)
+                                    log(f"✓ Unread ({tag}): {chat.get('name', 'No name')}")
+                        except Exception as e:
+                            log(f"DEBUG: Error evaluating row {i} ({tag}): {e}")
+
+                # Step 4: Initial sweep
+                await sweep("initial")
+
+                # Step 5: Deduplication
+                def _get_chat_key(ch: Dict[str, Any]) -> tuple:
+                    """Generate a unique key for a chat to enable deduplication."""
+                    return ch.get("id") or (
+                        ch.get("name"),
+                        ch.get("last_message"),
+                        ch.get("last_activity"),
+                    )
+
+                seen = set()
+                dedup = []
+                for ch in unread_chats:
+                    k = _get_chat_key(ch)
+                    if k in seen:
+                        continue
+                    seen.add(k)
+                    dedup.append(ch)
+                unread_chats = dedup
+
+            except Exception as e:
+                await self.client.emit("on_warning", f"Error detecting unread chats: {e}")
+                log(f"DEBUG: General error: {e}")
 
         # Step 6: Final summary
         log("\nDEBUG: ===== SUMMARY =====")
@@ -414,6 +418,22 @@ class ChatManager:
         """
         results: List[Union[Message, FileMessage, VoiceMessage]] = []
 
+        # ── Scroll up to trigger WhatsApp's virtual list to load older messages ──
+        try:
+            await self._page.evaluate("""
+                () => {
+                    const scroller = document.querySelector('div[role="application"]')?.parentElement
+                        || document.querySelector('[data-virtualized="false"]')?.closest('[style*="overflow"]')
+                        || document.querySelector('div[tabindex="-1"]');
+                    if (scroller && scroller.scrollTop !== undefined) {
+                        scroller.scrollTop = 0;
+                    }
+                }
+            """)
+            await asyncio.sleep(1.5)
+        except Exception:
+            pass
+
         # Wait for message containers to appear in the DOM
         for _ in range(10):
             count = await self._page.evaluate(
@@ -423,23 +443,37 @@ class ChatManager:
                 break
             await asyncio.sleep(0.5)
         else:
-            print("[WARN] collect_messages: no message containers found after 5s")
+            logger.warning("collect_messages: no message containers found after 5s")
 
         msg_elements = await self._page.query_selector_all('div[data-testid^="conv-msg-"]')
+        logger.debug("collect_messages: %d containers found", len(msg_elements))
 
-        for elem in msg_elements:
+        last_sender = ""
+        for i, elem in enumerate(msg_elements):
             voice_msg = await VoiceMessage.from_element(elem, self._page)
             if voice_msg:
+                if not voice_msg.sender:
+                    voice_msg.sender = last_sender
+                if voice_msg.sender:
+                    last_sender = voice_msg.sender
                 results.append(voice_msg)
                 continue
 
             file_msg = await FileMessage.from_element(elem, self._page)
             if file_msg:
+                if not file_msg.sender:
+                    file_msg.sender = last_sender
+                if file_msg.sender:
+                    last_sender = file_msg.sender
                 results.append(file_msg)
                 continue
 
             simple_msg = await Message.from_element(elem, self._page)
             if simple_msg:
+                if not simple_msg.sender:
+                    simple_msg.sender = last_sender
+                if simple_msg.sender:
+                    last_sender = simple_msg.sender
                 results.append(simple_msg)
 
         return results
@@ -540,15 +574,6 @@ class ChatManager:
 
         return result
 
-    async def _check_msg_sending(self, page):
-        try:
-            pendingState = page.locator(loc.MSG_STATUS_PENDING)
-            await pendingState.wait_for(state="hidden", timeout=10000)
-            return True
-        except Exception as e:
-            print(f"Error checking message sending: {e}")
-            return False
-
     async def send_message(self, chat_query: str, message: str, open_via_url: bool = False) -> bool:
         """
         Send a text message to a chat.
@@ -561,59 +586,55 @@ class ChatManager:
         Returns:
             True if message was sent successfully, False otherwise
         """
-        print("Sending message...")
-        if not await self.client.wait_until_logged_in():
-            return False
-
-        try:
-            opened = await self.open(chat_query, open_via_url=open_via_url)
-            if not opened:
-                await self.client.emit("on_error", f"Could not open chat: {chat_query}")
-                return False
-            print(f"✓ Chat '{chat_query}' opened, sending message")
-
-            await self._page.wait_for_selector(loc.CHAT_INPUT_BOX, timeout=DEFAULT_WAIT_TIMEOUT)
-            input_box = await self._page.wait_for_selector(loc.CHAT_INPUT_BOX, timeout=DEFAULT_WAIT_TIMEOUT)
-
-            if not input_box:
-                await self.client.emit(
-                    "on_error",
-                    "Could not find text input box for sending message",
-                )
+        async with self.client._page_lock:
+            print("Sending message...")
+            if not await self.client.wait_until_logged_in():
                 return False
 
-            await input_box.click(force=True)
-            await input_box.fill(message)
-            await self._page.keyboard.press("Enter")
+            try:
+                opened = await self.open(chat_query, open_via_url=open_via_url)
+                if not opened:
+                    await self.client.emit("on_error", f"Could not open chat: {chat_query}")
+                    return False
+                print(f"✓ Chat '{chat_query}' opened, sending message")
 
-            await self._check_msg_sending(self._page)
+                await self._page.wait_for_selector(loc.CHAT_INPUT_BOX, timeout=DEFAULT_WAIT_TIMEOUT)
+                input_box = await self._page.wait_for_selector(loc.CHAT_INPUT_BOX, timeout=DEFAULT_WAIT_TIMEOUT)
 
-            return True
+                if not input_box:
+                    await self.client.emit(
+                        "on_error",
+                        "Could not find text input box for sending message",
+                    )
+                    return False
 
-        except Exception as e:
-            await self._page.screenshot(path="send_message_error.png")
-            await self.client.emit("on_error", f"Error sending message: {e}")
-            return False
-        finally:
-            await self.close()
+                await input_box.click(force=True)
+                await input_box.fill(message)
+                await self._page.keyboard.press("Enter")
+                await asyncio.sleep(2)
 
-    async def wait_for_whatsapp_ready(self, timeout=10000) -> bool:
-        """
-        Espera a que aparezca el tick (uno solo) o el doble tick en el último mensaje.
-        Sirve para texto y archivos.
-        """
-        # Buscamos cualquiera de los dos estados: Enviado (check) o Recibido (dblcheck)
-        # Usamos .last para asegurarnos de que estamos mirando EL NUEVO mensaje, no uno viejo.
-        selector_exito = 'span[data-icon="msg-check"], span[data-icon="msg-dblcheck"]'
+                confirmed = await self.wait_for_whatsapp_ready(timeout=DEFAULT_WAIT_TIMEOUT)
+                if not confirmed:
+                    print("⚠ Message sent but not confirmed by server")
+                    return False
 
+                return True
+
+            except Exception as e:
+                await self._page.screenshot(path="send_message_error.png")
+                await self.client.emit("on_error", f"Error sending message: {e}")
+                return False
+            finally:
+                await self.close()
+
+    async def wait_for_whatsapp_ready(self, timeout=30000) -> bool:
         try:
-            # Wait for the tick to be visible in the DOM
-            await self._page.locator(selector_exito).last.wait_for(state="visible", timeout=timeout)
+            last_msg = self._page.locator(loc.MESSAGE_CONTAINER).last
+            await last_msg.locator(loc.MSG_STATUS_CONFIRMED).wait_for(state="visible", timeout=timeout)
             print("✅ Message confirmed by the server (Tick seen)")
             return True
         except Exception as e:
-            print(f"❌ Error: The message did not show confirmation in {timeout}ms. Is the internet slow?")
-            # You could add retry logic if you want
+            print(f"❌ Message not confirmed within {timeout}ms (internet slow?)")
             return False
 
     # You continue with the message sending...
@@ -628,45 +649,46 @@ class ChatManager:
         Returns:
             True if file was sent successfully, False otherwise
         """
-        try:
-            if not os.path.isfile(path):
-                msg = f"File does not exist: {path}"
-                await self.client.emit("on_error", msg)
+        async with self.client._page_lock:
+            try:
+                if not os.path.isfile(path):
+                    msg = f"File does not exist: {path}"
+                    await self.client.emit("on_error", msg)
+                    return False
+
+                if not await self.client.wait_until_logged_in():
+                    msg = "Could not log in"
+                    await self.client.emit("on_error", msg)
+                    return False
+
+                if not await self.open(chat_name):
+                    msg = f"Could not open chat: {chat_name}"
+                    await self.client.emit("on_error", msg)
+                    return False
+
+                await self._page.wait_for_selector(loc.CHAT_INPUT_BOX, timeout=DEFAULT_WAIT_TIMEOUT)
+
+                attach_btn = await self._page.wait_for_selector(loc.ATTACH_BUTTON, timeout=5000)
+                await attach_btn.click()
+
+                input_files = await self._page.query_selector_all(loc.FILE_INPUT)
+                if not input_files:
+                    msg = "Could not find input[type='file']"
+                    await self.client.emit("on_error", msg)
+                    return False
+
+                await input_files[0].set_input_files(path)
+                await asyncio.sleep(5)
+                send_btn = await self._page.locator(loc.SEND_BUTTON).last.wait_for(
+                    state="visible", timeout=DEFAULT_WAIT_TIMEOUT
+                )
+                await send_btn.click()
+                await asyncio.sleep(2)
+                await self.wait_for_whatsapp_ready(timeout=DEFAULT_WAIT_TIMEOUT)
+                return True
+            except Exception as e:
+                await self.client.emit("on_error", f"Error sending file: {e}")
                 return False
-
-            if not await self.client.wait_until_logged_in():
-                msg = "Could not log in"
-                await self.client.emit("on_error", msg)
-                return False
-
-            if not await self.open(chat_name):
-                msg = f"Could not open chat: {chat_name}"
-                await self.client.emit("on_error", msg)
-                return False
-
-            await self._page.wait_for_selector(loc.CHAT_INPUT_BOX, timeout=DEFAULT_WAIT_TIMEOUT)
-
-            attach_btn = await self._page.wait_for_selector(loc.ATTACH_BUTTON, timeout=5000)
-            await attach_btn.click()
-
-            input_files = await self._page.query_selector_all(loc.FILE_INPUT)
-            if not input_files:
-                msg = "Could not find input[type='file']"
-                await self.client.emit("on_error", msg)
-                return False
-
-            await input_files[0].set_input_files(path)
-            await asyncio.sleep(5)
-            send_btn = await self._page.locator(loc.SEND_BUTTON).last.wait_for(
-                state="visible", timeout=DEFAULT_WAIT_TIMEOUT
-            )
-            await send_btn.click()
-            await asyncio.sleep(1)
-            await self.wait_for_whatsapp_ready(timeout=DEFAULT_WAIT_TIMEOUT)
-            return True
-        except Exception as e:
-            await self.client.emit("on_error", f"Error sending file: {e}")
-            return False
 
     async def new_group(self, group_name: str, members: List[str]) -> bool:
         """

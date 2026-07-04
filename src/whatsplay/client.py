@@ -75,6 +75,7 @@ class Client(BaseWhatsAppClient):
         self.current_state: Optional[State] = None
         self.unread_messages_sleep = DEFAULT_UNREAD_MESSAGES_SLEEP
         self._shutdown_event = asyncio.Event()
+        self._page_lock = asyncio.Lock()
         self._consecutive_errors = 0
         self.last_qr_shown: Optional[bytes] = None
         self.chat_manager: Optional[ChatManager] = None

@@ -1,4 +1,5 @@
 # models.py
+import logging
 import re
 from datetime import datetime
 from pathlib import Path
@@ -6,7 +7,39 @@ from typing import Optional, Dict, Any
 from playwright.async_api import Page, ElementHandle, Download
 import asyncio
 
+logger = logging.getLogger(__name__)
+
 from ..codec_detector import detect_codec
+
+
+def parse_timestamp(raw: str) -> Optional[datetime]:
+    """Extract ``[HH:MM(:SS)?]`` from a ``data-pre-plain-text`` attribute value.
+
+    Returns a ``datetime`` with today's date and the parsed time,
+    or ``None`` if the format does not match.
+    """
+    m = re.match(r"\[(\d{1,2}:\d{2}(?::\d{2})?)\]", raw)
+    if not m:
+        return None
+    hh, mm = m.group(1).split(":")[:2]
+    now = datetime.now()
+    return now.replace(hour=int(hh), minute=int(mm), second=0, microsecond=0)
+
+
+def _format_duration(seconds: object) -> str:
+    """Format a float duration in seconds to ``MM:SS``.
+
+    Returns ``""`` for ``None``, negative, or non-numeric input.
+    """
+    try:
+        seconds = float(seconds)  # type: ignore[arg-type]
+    except (TypeError, ValueError):
+        return ""
+    if seconds < 0:
+        return ""
+    minutes = int(seconds // 60)
+    secs = int(seconds % 60)
+    return f"{minutes:02d}:{secs:02d}"
 
 
 class Message:
@@ -61,45 +94,34 @@ class Message:
             msg_id = (await elem.get_attribute("data-id")) or ""
             testid = (await elem.get_attribute("data-testid")) or ""
 
-            # 1) Sender
+            # 1) Sender + Timestamp: ambos desde data-pre-plain-text
+            #    Formato: "[HH:MM(:SS)?] Sender Name: message text"
             sender = ""
-            remitente_span = await elem.query_selector(
-                'xpath=.//span[@aria-label and substring(@aria-label, string-length(@aria-label))=":"]'
-            )
-            if remitente_span:
-                raw_label = await remitente_span.get_attribute("aria-label")
-                if raw_label:
-                    sender = raw_label.rstrip(":").strip()
+            timestamp = datetime.now()
+            pre_plain = await elem.query_selector('[data-pre-plain-text]')
+            if pre_plain:
+                raw = await pre_plain.get_attribute("data-pre-plain-text")
+                if raw:
+                    # Sender (después del "] ")
+                    if "] " in raw:
+                        sender = raw.split("] ", 1)[1].rstrip(": ").strip()
+                    # Timestamp (desde el bracket)
+                    parsed_ts = parse_timestamp(raw)
+                    if parsed_ts:
+                        timestamp = parsed_ts
+            if not sender:
+                # Fallback: aria-label del span remitente (solo primer msg de cada uno)
+                remitente_span = await elem.query_selector(
+                    'xpath=.//span[@aria-label and substring(@aria-label, string-length(@aria-label))=":"]'
+                )
+                if remitente_span:
+                    raw_label = await remitente_span.get_attribute("aria-label")
+                    if raw_label:
+                        sender = raw_label.rstrip(":").strip()
 
             # Direction (in/out): WhatsApp Web ya no usa conv-msg-right/left.
             # "Tú" es el sender de mensajes salientes en español.
             is_outgoing = (sender == "Tú") or (not sender and testid.startswith("conv-msg-AC"))
-
-            # 2) Timestamp
-            timestamp = datetime.now()
-            time_span = await elem.query_selector(
-                'xpath=.//span[contains(@class,"x16dsc37")]'
-            )
-            if time_span:
-                hora_text = (await time_span.inner_text()).strip().lower()
-                # Expected formats: "10:30", "10:30 am", "10:30 p.m."
-                match = re.match(
-                    r"(\d{1,2}):(\d{2})\s*(a\.?.m\.?|p\.?.m\.?|)?", hora_text
-                )
-                if match:
-                    hh = int(match.group(1))
-                    mm = int(match.group(2))
-                    ampm = (match.group(3) or "").replace(".", "")
-
-                    if ampm == "pm" and hh != 12:
-                        hh += 12
-                    elif ampm == "am" and hh == 12:  # Midnight
-                        hh = 0
-
-                    ahora = datetime.now()
-                    timestamp = ahora.replace(
-                        hour=hh, minute=mm, second=0, microsecond=0
-                    )
 
             # 3) Text
             texto = ""
@@ -116,21 +138,6 @@ class Message:
                         texto = "\n".join(lineas[1:]).strip()
                     else:
                         texto = raw_inner.strip()
-            else:
-                # Fallback: intentar con el selector viejo
-                cuerpo_div = await elem.query_selector(
-                    'xpath=.//div[contains(@class,"copyable-text")]/div'
-                )
-                if cuerpo_div:
-                    raw_inner = await cuerpo_div.inner_text()
-                    if raw_inner:
-                        lineas = raw_inner.split("\n")
-                        if len(lineas) > 1 and (
-                            lineas[0].strip().startswith(sender) or ":" in lineas[0]
-                        ):
-                            texto = "\n".join(lineas[1:]).strip()
-                        else:
-                            texto = raw_inner.strip()
 
             return cls(
                 page=page,
@@ -141,7 +148,8 @@ class Message:
                 is_outgoing=is_outgoing,
                 msg_id=msg_id,
             )
-        except Exception:
+        except Exception as ex:
+            logger.debug("Message.from_element EXCEPTION for %s: %s: %s", testid, type(ex).__name__, ex)
             return None
 
     async def react(self, emoji: str):
@@ -378,10 +386,10 @@ class VoiceMessage(Message):
                 return None
 
             has_play_button = await elem.query_selector(
-                'button[aria-label="Reproducir mensaje de voz"]'
+                'button[aria-label*="voz"], button[aria-label*="voice" i]'
             )
             has_voice_container = await elem.query_selector(
-                'span[aria-label="Mensaje de voz"]'
+                'span[aria-label*="voz"], span[aria-label*="voice" i]'
             )
 
             # Check for voice icon using evaluate (more reliable than :has selector)
@@ -402,11 +410,39 @@ class VoiceMessage(Message):
                 return None
 
             duration = ""
-            duration_elem = await elem.query_selector(
-                'xpath=.//div[contains(@class,"x10l6tqk") and not(contains(@class,"x13vifvy"))]'
-            )
-            if duration_elem:
-                duration = (await duration_elem.inner_text()).strip()
+            try:
+                # Method 1: native audio.duration (works when audio element exists)
+                seconds = await elem.evaluate(
+                    """(el) => {
+                        const audio = el.querySelector('audio');
+                        if (!audio) return null;
+                        const d = audio.duration;
+                        return (typeof d === 'number' && !isNaN(d) && d >= 0) ? d : null;
+                    }"""
+                )
+                if seconds is not None:
+                    duration = _format_duration(seconds)
+                else:
+                    # Method 2: fallback — parse from slider aria-valuetext "0:00/MM:SS"
+                    slider_dur = await elem.evaluate(
+                        """(el) => {
+                            const slider = el.querySelector('[role="slider"][aria-valuetext]');
+                            if (!slider) return null;
+                            const vt = slider.getAttribute('aria-valuetext');
+                            if (!vt) return null;
+                            // format: "0:00/MM:SS" or "M:SS/MM:SS"
+                            const parts = vt.split('/');
+                            if (parts.length < 2) return null;
+                            const total = parts[parts.length - 1].trim();
+                            const m = total.match(/^(\\d{1,2}):(\\d{2})$/);
+                            if (!m) return null;
+                            return parseInt(m[1], 10) * 60 + parseInt(m[2], 10);
+                        }"""
+                    )
+                    if slider_dur is not None:
+                        duration = _format_duration(slider_dur)
+            except Exception:
+                logger.warning("VoiceMessage: failed to extract voice duration")
 
             base_msg = await Message.from_element(elem, page)
             if not base_msg:
@@ -495,23 +531,32 @@ class VoiceMessage(Message):
             await asyncio.sleep(0.3)
 
             async with page.expect_download() as download_info:
-                await page.evaluate(
+                target_found = await page.evaluate(
                     """(el) => {
-                        const voiceContainer = el.querySelector('[class*="_ak4"]');
-                        if (voiceContainer) {
-                            const rect = voiceContainer.getBoundingClientRect();
-                            const event = new MouseEvent('contextmenu', {
-                                bubbles: true,
-                                cancelable: true,
-                                view: window,
-                                clientX: rect.left + rect.width / 2,
-                                clientY: rect.top + rect.height / 2
-                            });
-                            voiceContainer.dispatchEvent(event);
-                        }
+                        // Priority: play button is the most stable voice target
+                        // Support both Spanish (voz) and English (voice) locale
+                        const target = el.querySelector('button[aria-label*="voz"], button[aria-label*="voice" i]')
+                            || el.querySelector('[class*="_ak4"]');
+                        if (!target) return false;
+                        const rect = target.getBoundingClientRect();
+                        const event = new MouseEvent('contextmenu', {
+                            bubbles: true,
+                            cancelable: true,
+                            view: window,
+                            clientX: rect.left + rect.width / 2,
+                            clientY: rect.top + rect.height / 2
+                        });
+                        target.dispatchEvent(event);
+                        return true;
                     }""",
                     self.container,
                 )
+                if not target_found:
+                    logger.warning(
+                        "VoiceMessage.download_via_context_menu: "
+                        "no target element found for msg %s",
+                        self.msg_id,
+                    )
 
                 await asyncio.sleep(0.5)
 

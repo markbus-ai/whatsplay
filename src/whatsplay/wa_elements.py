@@ -209,123 +209,112 @@ class WhatsAppElements:
         """
         Abre un chat por su nombre visible o número. Si no está visible, lo busca.
         """
+        import time as _time
+        _t0 = _time.time()
+        def _log(msg: str) -> None:
+            elapsed = _time.time() - _t0
+            print(f"[open:{elapsed:.2f}s] {msg}")
+
+        _log(f"inicio: chat_name='{chat_name}' timeout={timeout}")
+
         if open_via_url:
             numero_limpio = re.sub(r"\D", "", chat_name)
-            # Asumimos que si no tiene +, es un número local que puede necesitar el prefijo de país.
-            # Esta lógica puede necesitar ser ajustada dependiendo del caso de uso.
-            # Por ahora, simplemente limpiamos y usamos el número.
             url = f"https://web.whatsapp.com/send?phone={numero_limpio}"
-            print(f"🌐 Abriendo chat por URL: {url}")
+            _log(f"abriendo por URL: {url}")
             try:
-                await self.page.goto(url, timeout=60000) # Timeout más largo para la navegación
-                
-                # Esperar a que la interfaz principal de WhatsApp cargue
+                await self.page.goto(url, timeout=60000)
                 await self.page.wait_for_selector(loc.LOGGED_IN, timeout=30000)
-                print("✅ Interfaz principal de WhatsApp cargada.")
-
-                # Esperar a que el input de chat aparezca o a un mensaje de "número inválido".
+                _log("LOGGED_IN detectado tras navegacion")
                 await self.page.wait_for_selector(
-                    f"{loc.CHAT_INPUT_BOX}|{loc.INVALID_NUMBER_WARNING}", 
+                    f"{loc.CHAT_INPUT_BOX}|{loc.INVALID_NUMBER_WARNING}",
                     timeout=timeout
                 )
-                
-                # Verificar si el número es inválido
                 invalid_warning = await self.page.query_selector(loc.INVALID_NUMBER_WARNING)
                 if invalid_warning and await invalid_warning.is_visible():
-                    print(f"❌ El número de teléfono '{chat_name}' parece ser inválido.")
+                    _log("numero invalido detectado")
                     return False
-
-                print(f"✅ Chat con '{chat_name}' abierto vía URL.")
+                _log("chat abierto via URL OK")
                 return True
             except PlaywrightTimeoutError:
-                print(f"⏱️❌ Timeout abriendo el chat con '{chat_name}' vía URL.")
+                _log(f"TIMEOUT via URL")
                 return False
             except Exception as e:
-                print(f"💥❌ Error abriendo el chat con '{chat_name}' vía URL: {e}")
+                _log(f"EXCEPTION via URL: {e}")
                 return False
-
-        es_numero = False
-        chat_name_normalizado = None
 
         span_xpath = f"//span[contains(@title, {repr(chat_name)})]"
 
         try:
             chat_element = await self.page.query_selector(f"xpath={span_xpath}")
+            _log(f"query_selector directo: {'encontrado' if chat_element else 'no encontrado'}")
+
             if chat_element:
                 await chat_element.click()
-                print(f"✅ Chat '{chat_name}' abierto directamente.")
+                _log("click directo OK")
             else:
-                print(f"🔍 Chat '{chat_name}' no visible, usando buscador...")
-                # Esperar a que la UI esté completamente cargada
+                _log("chat no visible, entrando a ruta de busqueda")
                 await asyncio.sleep(2)
-                # Capturar estado antes de intentar búsqueda
                 await self.page.screenshot(path="before_search.png")
-                # Intentar el método centralizado y más robusto para activar la búsqueda
                 activated = await self.click_search_button()
+                _log(f"click_search_button: {activated}")
                 if not activated:
                     await self.page.screenshot(path="no_search_button.png")
-                    raise Exception("❌ Botón de búsqueda no encontrado")
+                    raise Exception("Boton de busqueda no encontrado")
 
-                # Buscar y llenar el input con más tiempo de espera
                 for j, input_xpath in enumerate(loc.SEARCH_TEXT_BOX):
-                    inputs = await self.page.query_selector_all(f"xpath={input_xpath}")
+                    inputs = await self.page.query_selector_all(input_xpath)
+                    _log(f"search_input[{j}] count={len(inputs)} selector={input_xpath}")
                     if inputs:
-                        print(f"⌨️ Esperando que el input esté listo...")
-                        await asyncio.sleep(1)  # Esperar que el input esté realmente listo
-                        
-                        print(f"⌨️ Llenando input de búsqueda [{input_xpath}] con: {chat_name}")
+                        await asyncio.sleep(1)
                         await self.page.screenshot(path=f"search_input_{j}.png")
-                        
-                        # Limpiar el input primero
                         await inputs[0].fill("")
-                        await asyncio.sleep(0.5)  # Esperar que se limpie
-                        
-                        # Escribir caracteres con delay
-                        await inputs[0].type(chat_name, delay=100)  # 100ms entre cada caracter
-                        print("📝 Texto ingresado, esperando resultados...")
-                        await asyncio.sleep(1)  # Esperar que aparezcan resultados
+                        await asyncio.sleep(0.5)
+                        await inputs[0].type(chat_name, delay=100)
+                        _log("texto tipeado en input de busqueda")
+                        await asyncio.sleep(1)
                         break
                 else:
-                    raise Exception("❌ Input de búsqueda no encontrado")
+                    raise Exception("Input de busqueda no encontrado")
 
-                # Esperar y verificar resultados de búsqueda
-                print("🔍 Esperando resultados de búsqueda...")
+                _log("esperando SEARCH_ITEM...")
                 results = await self.page.wait_for_selector(loc.SEARCH_ITEM, timeout=5000)
+                _log(f"SEARCH_ITEM: {results is not None}")
                 if not results:
-                    raise Exception("❌ No se encontraron resultados de búsqueda")
-                
-                # Esperar un momento para que los resultados se carguen completamente
-                await asyncio.sleep(1)
-                
-                # Buscar el chat específico en los resultados
-                chat_results = await self.page.query_selector_all(loc.SEARCH_ITEM)
-                for chat in chat_results:
-                    title = await chat.get_attribute("title")
-                    if title and chat_name.lower() in title.lower():
-                        print(f"✅ Chat encontrado: {title}")
-                        await chat.click()
-                        print(f"✅ Chat '{chat_name}' abierto desde buscador.")
-                        break
-                else:
-                    # Si no encontramos el chat específico, usar el comportamiento anterior
-                    print("⚠️ Chat específico no encontrado, usando primer resultado...")
-                    await self.page.keyboard.press("ArrowDown")
-                    await asyncio.sleep(0.5)  # Esperar antes de Enter
-                    await self.page.keyboard.press("Enter")
-                    print(f"✅ Chat '{chat_name}' abierto desde buscador.")
+                    raise Exception("No se encontraron resultados de busqueda")
 
+                await asyncio.sleep(1)
+                chat_results = await self.page.query_selector_all(loc.SEARCH_ITEM)
+                _log(f"chat_results count={len(chat_results)}")
+
+                found = False
+                for chat in chat_results:
+                    title_el = await chat.query_selector(f"xpath={loc.SPAN_TITLE}")
+                    if title_el:
+                        title = await title_el.get_attribute("title")
+                        if title and chat_name.lower() in title.lower():
+                            _log(f"clickeando chat: {title}")
+                            await chat.click()
+                            found = True
+                            break
+                if not found:
+                    _log("chat no encontrado en results, usando ArrowDown+Enter")
+                    await self.page.keyboard.press("ArrowDown")
+                    await asyncio.sleep(0.5)
+                    await self.page.keyboard.press("Enter")
+
+            _log(f"esperando CHAT_INPUT_BOX (timeout={timeout}ms)...")
             await self.page.wait_for_selector(loc.CHAT_INPUT_BOX, timeout=timeout)
-            print("esperando input box...")
+            _log("CHAT_INPUT_BOX encontrado, SUCCESS")
             return True
 
         except PlaywrightTimeoutError:
-            print(f"⏱️❌ Timeout esperando el input del chat '{chat_name}'")
+            _log("TIMEOUT esperando CHAT_INPUT_BOX")
             timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
             await self.page.screenshot(path=f"search_timeout_error_{timestamp}.png")
             return False
 
         except Exception as e:
-            print(f"💥❌ Error al abrir el chat '{chat_name}': {e}")
+            _log(f"EXCEPTION: {type(e).__name__}: {e}")
             timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
             await self.page.screenshot(path=f"search_exception_error_{timestamp}.png")
             return False

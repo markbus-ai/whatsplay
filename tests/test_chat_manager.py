@@ -1,6 +1,6 @@
 import pytest
 from unittest.mock import AsyncMock, MagicMock
-from src.whatsplay.chat_manager import ChatManager
+from whatsplay.chat_manager import ChatManager
 
 # Mock de loc (locator) para evitar dependencias reales
 class MockLocator:
@@ -11,6 +11,8 @@ class MockLocator:
 class MockClient:
     def __init__(self):
         self._page = AsyncMock()
+        self._page_lock = MagicMock()
+        self._page_lock.locked.return_value = False
         self.wa_elements = MagicMock()
         self.unread_messages_sleep = 1
 

@@ -1,11 +1,14 @@
 import pytest
 from unittest.mock import AsyncMock, MagicMock
-from src.whatsplay.state_manager import StateManager
+from whatsplay.state_manager import StateManager
 
 # Mock de un cliente mínimo para StateManager
 class MockClient:
     def __init__(self):
         self._page = AsyncMock()
+        self._is_running = True
+        self._page_lock = MagicMock()
+        self._page_lock.locked.return_value = False
         self.wa_elements = MagicMock()
         self.chat_manager = AsyncMock()
         self.emit = AsyncMock() # Make emit an AsyncMock
@@ -99,5 +102,5 @@ async def test_handle_logged_in_state_exception(mock_state_manager):
 
     # Verificar que se emitió 'on_error'
     mock_state_manager.client.emit.assert_called_with(
-        "on_error", "Error en estado de sesión iniciada: Test error"
+        "on_error", "Error in logged-in state: Test error"
     )
