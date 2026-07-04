@@ -34,7 +34,7 @@ jobs:
       # Step 3: Install documentation dependencies
       - name: Install dependencies
         run: |
-          pip install mkdocs mkdocs-material pymdown-extensions mkdocstrings-python
+          pip install "mkdocs<2" mkdocs-material pymdown-extensions mkdocstrings-python mkdocs-static-i18n
 
       # Step 4: Deploy the documentation
       - name: Deploy to GitHub Pages
