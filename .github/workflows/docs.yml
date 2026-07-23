@@ -1,42 +1,46 @@
-# GitHub Actions workflow to build and deploy MkDocs documentation to GitHub Pages
-
 name: Deploy Docs
 
-# Controls when the action will run. Triggers the workflow on push events
-# but only for the main branch.
 on:
   push:
-    branches:
-      - main
+    branches: [main]
+  workflow_dispatch:
 
-# A workflow run is made up of one or more jobs that can run sequentially or in parallel
+permissions:
+  contents: write
+
+concurrency:
+  group: docs-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   deploy:
-    # The type of runner that the job will run on
     runs-on: ubuntu-latest
-
-    # Grant GITHUB_TOKEN the permissions it needs to deploy to GitHub Pages
-    permissions:
-      contents: write
-
-    # Steps represent a sequence of tasks that will be executed as part of the job
     steps:
-      # Step 1: Check out the repository so the workflow can access it
-      - name: Checkout repository
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      # Step 2: Set up Python
-      - name: Set up Python
-        uses: actions/setup-python@v5
+      - uses: actions/setup-python@v5
         with:
-          python-version: '3.x'
+          python-version: "3.12"
+          cache: "pip"
 
-      # Step 3: Install documentation dependencies
       - name: Install dependencies
         run: |
+<<<<<<< Updated upstream
           pip install "mkdocs<2" mkdocs-material pymdown-extensions mkdocstrings-python mkdocs-static-i18n
+=======
+          pip install \
+            mkdocs \
+            mkdocs-material \
+            mkdocstrings-python \
+            mkdocs-i18n \
+            pymdown-extensions
+>>>>>>> Stashed changes
 
-      # Step 4: Deploy the documentation
-      - name: Deploy to GitHub Pages
+      - name: Build & deploy to GitHub Pages
         run: |
+<<<<<<< Updated upstream
           mkdocs gh-deploy --force --clean --message "Deploy documentation from {sha}"
+=======
+          mkdocs gh-deploy --force --clean \
+            --message "docs: deploy from ${GITHUB_SHA}"
+>>>>>>> Stashed changes

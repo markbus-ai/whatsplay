@@ -42,3 +42,9 @@ htmlcov/
 .vscode/
 whatsapp_session
 site/
+
+# SDD / Agent tooling
+.atl/
+
+# Debug screenshots
+*.png

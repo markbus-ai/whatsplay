@@ -1,6 +1,6 @@
 Metadata-Version: 2.4
 Name: whatsplay
-Version: 2.0.15
+Version: 2.2.0
 Summary: A modern Python library for automating WhatsApp Web using Playwright
 Author-email: Marcos Bustos <markbustos1912@gmail.com>
 License: MIT
@@ -24,6 +24,7 @@ License-File: LICENSE
 Requires-Dist: playwright>=1.35.0
 Requires-Dist: mutagen>=1.47.0
 Requires-Dist: httpx>=0.24.0
+Requires-Dist: build>=1.2.2.post1
 Dynamic: license-file
 
 # WhatsPlay 🚀
