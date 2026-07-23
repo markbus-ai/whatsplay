@@ -26,7 +26,7 @@ from .codec_detector import detect_codec
 
 # Constants
 DEFAULT_DOWNLOADS_DIR = Path.home() / "Downloads" / "WhatsAppFiles"
-UNREAD_ARIA_PATTERN = r"(?:mensaje(?:s)?\s+no\s+le[ií]do|unread)"
+UNREAD_ARIA_PATTERN = r"(?:mensaje(?:s)?\s+no\s+le[ií]do[s]?|unread)"
 MIN_VISIBLE_CHATS_THRESHOLD = 2
 DEFAULT_WAIT_TIMEOUT = 30000
 
@@ -164,6 +164,13 @@ class ChatManager:
                             return isNaN(n) ? /bold/i.test(w) : n >= 600;
                         }"""
                     )
+                    # Strategy 4: Check for inline "X mensaje(s) no leido(s)" text in title
+                    try:
+                        if await row_loc.locator(f"xpath={loc.UNREAD_BADGE_TEXT}").count() > 0:
+                            return True
+                    except Exception:
+                        pass
+
                     return bool(is_bold)
 
                 except Exception:

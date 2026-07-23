@@ -8,9 +8,9 @@ INVALID_NUMBER_WARNING = (
 )
 
 # Banner inferior de cifrado (cambió el data-icon a 'lock-outline' en algunos builds)
-LOADING = "//span[@data-icon='lock-outline' or @data-icon='lock-refreshed']/ancestor::div[contains(., 'End-to-end encrypted') or contains(., 'Cifrado de extremo a extremo')]"
-LOADING_CHATS = "//div[normalize-space(text())='Loading your chats' or normalize-space(text())='Cargando tus chats']"
-LOGGED_IN = "//span[@data-icon='wa-wordmark-refreshed' or @data-icon='whatsapp-logo']"
+LOADING = "//div[@data-testid='wa-web-loading-screen'] | //span[@data-icon='lock-outline' or @data-icon='lock-refreshed']/ancestor::div[contains(., 'End-to-end encrypted') or contains(., 'Cifrado de extremo a extremo')]"
+LOADING_CHATS = "//div[contains(normalize-space(text()), 'Loading your chats') or contains(normalize-space(text()), 'Cargando tus chats')]"
+LOGGED_IN = "//span[@data-testid='wa-wordmark' or @data-icon='wa-wordmark' or @data-icon='wa-wordmark-refreshed' or @data-icon='whatsapp-logo']"
 
 # ==============================
 # Navigation buttons
@@ -23,10 +23,10 @@ COMMUNITIES_BUTTON = "//button[@aria-label='Communities' or @aria-label='Comunid
 # ==============================
 # Chat filter buttons (tabs)
 # ==============================
-ALL_CHATS_BUTTON = "//span[normalize-space(text())='All' or normalize-space(text())='Todos']"
-UNREAD_CHATS_BUTTON = "//span[normalize-space(text())='Unread' or normalize-space(text())='No leídos']"
-FAVOURITES_CHATS_BUTTON = "//span[normalize-space(text())='Favourites' or normalize-space(text())='Favoritos']"
-GROUPS_CHATS_BUTTON = "//span[normalize-space(text())='Groups' or normalize-space(text())='Grupos']"
+ALL_CHATS_BUTTON = "//button[@role='tab'][contains(., 'All') or contains(., 'Todos')]"
+UNREAD_CHATS_BUTTON = "//button[@role='tab'][contains(., 'Unread') or contains(., 'No leídos')]"
+FAVOURITES_CHATS_BUTTON = "//button[@role='tab'][contains(., 'Favourites') or contains(., 'Favoritos')]"
+GROUPS_CHATS_BUTTON = "//button[@role='tab'][contains(., 'Groups') or contains(., 'Grupos')]"
 # Selectores semánticos por role (más estables)
 ALL_CHATS_ROLE = "button[role='tab']:has-text('All'), button[role='tab']:has-text('Todos')"
 UNREAD_CHATS_ROLE = "button[role='tab']:has-text('Unread'), button[role='tab']:has-text('No leídos')"
@@ -43,7 +43,9 @@ CHAT_LIST_GRID = f"{CHAT_LIST_PANE}//div[@role='grid']"
 # Filas (cada chat)
 CHAT_LIST_ROWS = f"{CHAT_LIST_GRID}//div[@role='row']"
 # Badge/indicador de "no leído" (ES/EN)
-UNREAD_BADGE = ".//span[contains(@aria-label, 'unread') or contains(@aria-label, 'mensaje no leído') or contains(@aria-label, 'mensajes no leídos')]"
+UNREAD_BADGE = ".//span[@data-testid='icon-unread-count'] | .//span[contains(@aria-label, 'unread') or contains(@aria-label, 'mensaje no leído') or contains(@aria-label, 'mensajes no leídos')]"
+# Texto visible de no leidos (nuevo DOM 2026: span inline dentro de cell-frame-title)
+UNREAD_BADGE_TEXT = ".//div[@data-testid='cell-frame-title']/span[contains(., 'mensaje') or contains(., 'unread') or contains(., 'message')]"
 # Título del chat (estable)
 SPAN_TITLE = ".//span[@title]"
 # Celda con la hora (en tu build es esta clase semántica, pero la referenciamos por rol de gridcell si cambia)
