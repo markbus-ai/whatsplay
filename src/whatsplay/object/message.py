@@ -119,9 +119,18 @@ class Message:
                     if raw_label:
                         sender = raw_label.rstrip(":").strip()
 
-            # Direction (in/out): WhatsApp Web ya no usa conv-msg-right/left.
-            # "Tú" es el sender de mensajes salientes en español.
-            is_outgoing = (sender == "Tú") or (not sender and testid.startswith("conv-msg-AC"))
+            # Direction (in/out): WhatsApp Web usa tail-out (propio) / tail-in (ajeno).
+            # El testid "conv-msg-AC..." era el método viejo; el robusto es el tail.
+            is_outgoing = False
+            tail_out = await elem.query_selector('[data-testid="tail-out"]')
+            tail_in = await elem.query_selector('[data-testid="tail-in"]')
+            if tail_out is not None:
+                is_outgoing = True
+            elif tail_in is None:
+                # Fallback: "Tú" como sender, o el prefijo viejo
+                is_outgoing = (sender == "Tú") or (
+                    not sender and testid.startswith("conv-msg-AC")
+                )
 
             # 3) Text
             texto = ""

@@ -390,18 +390,19 @@ class Client(BaseWhatsAppClient):
             chat_query, message, open_via_url=open_via_url
         )
 
-    async def send_file(self, chat_name: str, path: str) -> bool:
+    async def send_file(self, chat_name: str, path: str, open_via_url: bool = False) -> bool:
         """
         Send a file attachment.
 
         Args:
             chat_name: Name of the chat
             path: Absolute path to the file
+            open_via_url: Open chat via URL before sending (required for phone numbers)
 
         Returns:
             True if file was sent successfully
         """
-        return await self.chat_manager.send_file(chat_name, path)
+        return await self.chat_manager.send_file(chat_name, path, open_via_url=open_via_url)
 
     async def react_to_last_message(self, emoji: str) -> bool:
         """

@@ -28,8 +28,14 @@ class LocalProfileAuth(AuthBase):
         }
 
     async def setup_context(self, context: BrowserContext) -> None:
-        """Configure browser context with profile settings"""
-        await context.storage_state(path=os.path.join(self.profile_path, "state.json"))
+        """Configure browser context with profile settings.
+
+        NOTA: NO guardar storage_state aquí — context.storage_state(path=...)
+        cierra/cancela el contexto en versiones recientes de Playwright, causando
+        "Target page, context or browser has been closed". El perfil ya persiste
+        en el user_data_dir, así que no hace falta este paso.
+        """
+        pass
 
     async def save_session(self) -> bool:
         """Save browser session state"""

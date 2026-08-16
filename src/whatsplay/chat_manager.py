@@ -645,13 +645,14 @@ class ChatManager:
             return False
 
     # You continue with the message sending...
-    async def send_file(self, chat_name: str, path: str) -> bool:
+    async def send_file(self, chat_name: str, path: str, open_via_url: bool = False) -> bool:
         """
         Send a file attachment to a chat.
 
         Args:
             chat_name: Name of the chat to send the file to
             path: Absolute path to the file to send
+            open_via_url: If True, opens the chat via URL (required for phone numbers)
 
         Returns:
             True if file was sent successfully, False otherwise
@@ -668,7 +669,7 @@ class ChatManager:
                     await self.client.emit("on_error", msg)
                     return False
 
-                if not await self.open(chat_name):
+                if not await self.open(chat_name, open_via_url=open_via_url):
                     msg = f"Could not open chat: {chat_name}"
                     await self.client.emit("on_error", msg)
                     return False
@@ -677,19 +678,30 @@ class ChatManager:
 
                 attach_btn = await self._page.wait_for_selector(loc.ATTACH_BUTTON, timeout=5000)
                 await attach_btn.click()
+                await asyncio.sleep(1.5)
 
-                input_files = await self._page.query_selector_all(loc.FILE_INPUT)
-                if not input_files:
-                    msg = "Could not find input[type='file']"
-                    await self.client.emit("on_error", msg)
-                    return False
+                # Usar el file chooser de Playwright: intercepta el diálogo nativo de
+                # selección de archivos y funciona TAMBIÉN en headless (el input accept="*"
+                # solo se crea cuando se abre ese diálogo, que en headless no aparece).
+                # 1) Registrar el file chooser ANTES de clickear "Documento"
+                async with self._page.expect_file_chooser(timeout=15000) as fc_info:
+                    doc_btn = self._page.locator(
+                        "button[aria-label='Documento'], button[aria-label='Document']"
+                    ).first
+                    if await doc_btn.count():
+                        await doc_btn.click()
+                    else:
+                        # fallback: usar el primer input de archivos
+                        fallback = self._page.locator(loc.FILE_INPUT).first
+                        await fallback.click()
+                    file_chooser = await fc_info.value
 
-                await input_files[0].set_input_files(path)
+                await file_chooser.set_files(path)
                 await asyncio.sleep(5)
-                send_btn = await self._page.locator(loc.SEND_BUTTON).last.wait_for(
-                    state="visible", timeout=DEFAULT_WAIT_TIMEOUT
-                )
-                await send_btn.click()
+                # El botón de enviar real es el DIV role=button (el SPAN interno no dispara)
+                send_btn_loc = self._page.locator(loc.SEND_BUTTON).first
+                await send_btn_loc.wait_for(state="visible", timeout=DEFAULT_WAIT_TIMEOUT)
+                await send_btn_loc.click()
                 await asyncio.sleep(2)
                 await self.wait_for_whatsapp_ready(timeout=DEFAULT_WAIT_TIMEOUT)
                 return True

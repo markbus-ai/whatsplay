@@ -161,6 +161,14 @@ class BaseWhatsAppClient(EventHandler):
             user_data_dir: Directory for browser profile data
             launch_args: Browser launch arguments
         """
+        # Usar el Chromium del sistema cuando el bundle de Playwright falla
+        # al abrir ventana visible en entornos Wayland/X11 (Target closed).
+        import os as _os
+        _executable = None
+        for _exe in ("/usr/bin/chromium", "/usr/bin/google-chrome"):
+            if _os.path.exists(_exe):
+                _executable = _exe
+                break
         self._context = await browser_type.launch_persistent_context(
             user_data_dir=user_data_dir,
             headless=self.headless,
@@ -169,6 +177,7 @@ class BaseWhatsAppClient(EventHandler):
             timezone_id=DEFAULT_TIMEZONE,
             viewport=DEFAULT_VIEWPORT,
             user_agent=USER_AGENT_CHROME_114_WIN10,
+            executable_path=_executable,
         )
         self._browser = self._context.browser
 

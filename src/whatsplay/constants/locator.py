@@ -110,8 +110,8 @@ ANY_DOWNLOAD_ICON = "//span[@data-icon='audio-download' or @data-icon='download'
 # ==============================
 # Composer / acciones
 # ==============================
-ATTACH_BUTTON = "css=span[data-icon='plus-rounded']"
-SEND_BUTTON = "css=span[data-icon='wds-ic-send-filled'], span[data-icon='send']"
+ATTACH_BUTTON = "css=button[aria-label='Adjuntar'], button[aria-label='Attach'], span[data-icon='plus-rounded']"
+SEND_BUTTON = "css=div[role='button'][aria-label*='Enviar']"
 FILE_INPUT = "css=input[type='file']"
 
 # ==============================
