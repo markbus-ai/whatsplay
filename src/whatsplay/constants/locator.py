@@ -107,6 +107,11 @@ MESSAGE_CONTAINER = 'div[data-testid^="conv-msg-"]'
 # Descarga de archivos (audio como ejemplo + fallback genérico por data-icon)
 ANY_DOWNLOAD_ICON = "//span[@data-icon='audio-download' or @data-icon='download' or @data-icon='download-outline']"
 
+# Document file icons (WhatsApp Web 2026)
+DOCUMENT_ICON = "span[data-icon='document-PDF-icon']"
+DOCUMENT_ICON_GENERIC = "span[data-icon*='document']"
+FILE_ICONS = f"span[data-icon='audio-download'], {DOCUMENT_ICON}, span[data-icon*='document']"
+
 # ==============================
 # Composer / acciones
 # ==============================

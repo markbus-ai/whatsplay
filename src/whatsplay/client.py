@@ -213,11 +213,6 @@ class Client(BaseWhatsAppClient):
 
         await self.emit("on_start")
 
-        try:
-            await self._page.screenshot(path="init_main.png", full_page=True)
-        except Exception as e:
-            await self.emit("on_warning", f"Could not take initial screenshot: {e}")
-
         await self._run_main_loop()
 
     async def _run_main_loop(self) -> None:

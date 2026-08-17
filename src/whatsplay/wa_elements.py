@@ -254,11 +254,9 @@ class WhatsAppElements:
             else:
                 _log("chat no visible, entrando a ruta de busqueda")
                 await asyncio.sleep(2)
-                await self.page.screenshot(path="before_search.png")
                 activated = await self.click_search_button()
                 _log(f"click_search_button: {activated}")
                 if not activated:
-                    await self.page.screenshot(path="no_search_button.png")
                     raise Exception("Boton de busqueda no encontrado")
 
                 for j, input_xpath in enumerate(loc.SEARCH_TEXT_BOX):
@@ -266,7 +264,6 @@ class WhatsAppElements:
                     _log(f"search_input[{j}] count={len(inputs)} selector={input_xpath}")
                     if inputs:
                         await asyncio.sleep(1)
-                        await self.page.screenshot(path=f"search_input_{j}.png")
                         await inputs[0].fill("")
                         await asyncio.sleep(0.5)
                         await inputs[0].type(chat_name, delay=100)
@@ -317,14 +314,10 @@ class WhatsAppElements:
 
         except PlaywrightTimeoutError:
             _log("TIMEOUT esperando CHAT_INPUT_BOX")
-            timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-            await self.page.screenshot(path=f"search_timeout_error_{timestamp}.png")
             return False
 
         except Exception as e:
             _log(f"EXCEPTION: {type(e).__name__}: {e}")
-            timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-            await self.page.screenshot(path=f"search_exception_error_{timestamp}.png")
             return False
 
 

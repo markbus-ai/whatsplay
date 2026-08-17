@@ -203,8 +203,6 @@ class ChatManager:
                     if total_rows_now <= MIN_VISIBLE_CHATS_THRESHOLD:
                         await self._page.locator(loc.ALL_CHATS_BUTTON).click()
                         log("DEBUG: Few chats visible, clicking 'All' button")
-                        log("DEBUG: Taking screenshot of low chat count state")
-                        await self._page.screenshot(path="pocos_chats_visibles.png")
 
                 except Exception:
                     log("DEBUG: Could not count initial rows")
@@ -628,7 +626,6 @@ class ChatManager:
                 return True
 
             except Exception as e:
-                await self._page.screenshot(path="send_message_error.png")
                 await self.client.emit("on_error", f"Error sending message: {e}")
                 return False
             finally:

@@ -212,6 +212,67 @@ class Message:
             print(f"An error occurred while reacting to message {self.msg_id}: {e}")
 
 
+# ==============================
+# File message helpers
+# ==============================
+
+# File extension pattern for filename extraction
+_FILE_EXT_RE = r"[\w\s\-_.]+\.pdf|docx?|xlsx?|pptx?|zip|rar|jpg|jpeg|png|gif|mp[34]|wav"
+
+
+async def _find_file_icon(elem: ElementHandle) -> Optional[ElementHandle]:
+    """
+    Find a file/document icon in a message element.
+
+    Tries multiple selectors for compatibility across WhatsApp Web versions:
+    - audio-download (legacy)
+    - document-PDF-icon (2026)
+    - any data-icon containing 'document' (fallback)
+
+    Returns:
+        The icon element, or None if not a file message.
+    """
+    selectors = [
+        'span[data-icon="audio-download"]',
+        'span[data-icon="document-PDF-icon"]',
+        'span[data-icon*="document"]',
+    ]
+    for selector in selectors:
+        icon = await elem.query_selector(selector)
+        if icon:
+            return icon
+    return None
+
+
+async def _extract_filename(icon: ElementHandle) -> str:
+    """
+    Extract filename from a file message icon.
+
+    WhatsApp Web stores filenames in the `title` attribute of
+    `div[data-testid="document-thumb"]`, formatted as: Ver "filename.ext"
+
+    Returns:
+        The filename, or empty string if not found.
+    """
+    # Walk up from icon to find the document-thumb container
+    result = await icon.evaluate("""
+        (node) => {
+            let curr = node;
+            for (let i = 0; i < 10 && curr; i++) {
+                if (curr.getAttribute && curr.getAttribute('data-testid') === 'document-thumb') {
+                    let title = curr.getAttribute('title') || '';
+                    // Title format: Ver "filename.ext"
+                    let match = title.match(/"(.+?)"/);
+                    return match ? match[1] : '';
+                }
+                curr = curr.parentElement;
+            }
+            return '';
+        }
+    """)
+    return result
+
+
 class FileMessage(Message):
     """
     Represents a message containing a downloadable file.
@@ -245,7 +306,7 @@ class FileMessage(Message):
         """
         Create a FileMessage from a DOM element.
 
-        Checks for the presence of a download icon and attempts to parse the filename.
+        Checks for the presence of a download/document icon and extracts the filename.
 
         Args:
             elem: The message container element.
@@ -255,62 +316,13 @@ class FileMessage(Message):
             A new FileMessage instance or None if not a valid file message.
         """
         try:
-            # 1) Check for download/document icon
-            icon = await elem.query_selector('span[data-icon="audio-download"]')
-            if not icon:
-                # Check for document icons (WhatsApp Web 2026)
-                icon = await elem.query_selector('span[data-icon="document-PDF-icon"]')
-            if not icon:
-                icon = await elem.query_selector('span[data-icon*="document"]')
+            # 1) Find file icon (try multiple selectors for compatibility)
+            icon = await _find_file_icon(elem)
             if not icon:
                 return None
 
-            # 2) Find filename
-            filename = ""
-            
-            # First try: title attribute with "Download" (old WhatsApp Web)
-            title_handle = await icon.evaluate_handle(
-                """
-                (node) => {
-                    let curr = node;
-                    while (curr) {
-                        if (curr.title && curr.title.startsWith("Download")) {
-                            return curr;
-                        }
-                        curr = curr.parentElement;
-                    }
-                    return null;
-                }
-            """
-            )
-
-            if title_handle:
-                title_elem: ElementHandle = title_handle.as_element()
-                if title_elem:
-                    raw_title = await title_elem.get_attribute("title")
-                    if raw_title and '"' in raw_title:
-                        parts = raw_title.split('"')
-                        if len(parts) >= 2:
-                            filename = parts[1].strip()
-            
-            # Second try: innerText of parent elements (WhatsApp Web 2026)
-            if not filename:
-                filename = await icon.evaluate("""
-                    (node) => {
-                        let curr = node;
-                        for (let i = 0; i < 8 && curr; i++) {
-                            let text = curr.innerText || '';
-                            // Look for filename pattern (something.pdf, something.docx, etc.)
-                            let match = text.match(/([\\w\\s\\-_.]+\\.(pdf|docx?|xlsx?|pptx?|zip|rar|jpg|jpeg|png|gif|mp[34]|wav))/i);
-                            if (match) {
-                                return match[1].trim();
-                            }
-                            curr = curr.parentElement;
-                        }
-                        return '';
-                    }
-                """)
-
+            # 2) Extract filename from DOM
+            filename = await _extract_filename(icon)
             if not filename:
                 return None
 
