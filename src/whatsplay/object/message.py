@@ -267,6 +267,8 @@ class FileMessage(Message):
 
             # 2) Find filename
             filename = ""
+            
+            # First try: title attribute with "Download" (old WhatsApp Web)
             title_handle = await icon.evaluate_handle(
                 """
                 (node) => {
@@ -290,6 +292,24 @@ class FileMessage(Message):
                         parts = raw_title.split('"')
                         if len(parts) >= 2:
                             filename = parts[1].strip()
+            
+            # Second try: innerText of parent elements (WhatsApp Web 2026)
+            if not filename:
+                filename = await icon.evaluate("""
+                    (node) => {
+                        let curr = node;
+                        for (let i = 0; i < 8 && curr; i++) {
+                            let text = curr.innerText || '';
+                            // Look for filename pattern (something.pdf, something.docx, etc.)
+                            let match = text.match(/([\\w\\s\\-_.]+\\.(pdf|docx?|xlsx?|pptx?|zip|rar|jpg|jpeg|png|gif|mp[34]|wav))/i);
+                            if (match) {
+                                return match[1].trim();
+                            }
+                            curr = curr.parentElement;
+                        }
+                        return '';
+                    }
+                """)
 
             if not filename:
                 return None
