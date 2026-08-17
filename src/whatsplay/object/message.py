@@ -255,8 +255,13 @@ class FileMessage(Message):
             A new FileMessage instance or None if not a valid file message.
         """
         try:
-            # 1) Check for download icon
+            # 1) Check for download/document icon
             icon = await elem.query_selector('span[data-icon="audio-download"]')
+            if not icon:
+                # Check for document icons (WhatsApp Web 2026)
+                icon = await elem.query_selector('span[data-icon="document-PDF-icon"]')
+            if not icon:
+                icon = await elem.query_selector('span[data-icon*="document"]')
             if not icon:
                 return None
 
