@@ -271,6 +271,14 @@ class WhatsAppElements:
                         await asyncio.sleep(0.5)
                         await inputs[0].type(chat_name, delay=100)
                         _log("texto tipeado en input de busqueda")
+                        
+                        # Wait for search spinner to detach from DOM
+                        try:
+                            await self.page.wait_for_selector("svg[role='status']", state="detached", timeout=10000)
+                            _log("spinner detached from DOM")
+                        except PlaywrightTimeoutError:
+                            _log("timeout waiting for spinner, continuing")
+                        
                         await asyncio.sleep(1)
                         break
                 else:
