@@ -175,17 +175,11 @@ class Message:
         try:
             # 1. Hover over the message to make the action bar appear.
             await self.container.hover()
-
-            # Take screenshot after hover
-            # await self.container.screenshot(path="after_hover.png")
-            # print("self.container: ", self.container)
             await asyncio.sleep(0.5)
-            # input("presiona enter para continuar")
 
             # 2. Find reaction button
             reaction_bar = self.page.locator('[aria-label="Reaccionar"]')
             if not reaction_bar:
-                # print("Error: No se encontró el botón '[aria-label="Reaccionar"]'.")
                 return None
             await reaction_bar.click()
 
@@ -194,7 +188,6 @@ class Message:
                 '[aria-label="Más reacciones"]'
             )
             if not more_reactions_button_handle:
-                # print("Error: No se encontró el botón '[aria-label="Más reacciones"]'.")
                 return None
 
             await more_reactions_button_handle.click()
@@ -206,8 +199,6 @@ class Message:
             await emoji_in_picker.wait_for(state="visible", timeout=5000)
             await emoji_in_picker.click()
 
-            # print(f"Successfully reacted with '{emoji}'")
-
         except Exception as e:
             print(f"An error occurred while reacting to message {self.msg_id}: {e}")
 
@@ -215,9 +206,6 @@ class Message:
 # ==============================
 # File message helpers
 # ==============================
-
-# File extension pattern for filename extraction
-_FILE_EXT_RE = r"[\w\s\-_.]+\.pdf|docx?|xlsx?|pptx?|zip|rar|jpg|jpeg|png|gif|mp[34]|wav"
 
 
 async def _find_file_icon(elem: ElementHandle) -> Optional[ElementHandle]:
