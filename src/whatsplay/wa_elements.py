@@ -25,25 +25,30 @@ class WhatsAppElements:
 
     async def get_state(self) -> Optional[State]:
         """
-        Determina el estado actual de WhatsApp Web basado en los elementos visibles
+        Determina el estado actual de WhatsApp Web basado en los elementos visibles.
+
+        El orden es critico: LOADING y QR se checkean ANTES que LOGGED_IN porque
+        comparten elementos visibles (wa-wordmark aparece en QR y loading screen).
         """
         try:
-            # Checkear en orden de prioridad
-            if await self.page.locator(loc.LOGGED_IN).is_visible():
-                print("LOGGED_IN")
-                return State.LOGGED_IN
-            elif await self.page.locator(loc.LOADING).is_visible():
+            # Orden: LOADING > QR_AUTH > LOADING_CHATS > AUTH > LOGGED_IN
+            if await self.page.locator(loc.LOADING).is_visible():
                 print("LOADING")
                 return State.LOADING
             elif await self.page.locator(loc.QR_CODE).is_visible():
                 print("QR_AUTH")
                 return State.QR_AUTH
-            elif await self.page.locator(loc.AUTH).is_visible():
-                print("AUTH")
-                return State.AUTH
             elif await self.page.locator(loc.LOADING_CHATS).is_visible():
                 print("LOADING_CHATS")
                 return State.LOADING
+            elif await self.page.locator(loc.AUTH).is_visible():
+                print("AUTH")
+                return State.AUTH
+            elif await self.page.locator(loc.LOGGED_IN).is_visible():
+                # Confirmar que tambien esta el chat list (distinguir de QR screen)
+                if await self.page.locator("[data-testid='chat-list']").is_visible():
+                    print("LOGGED_IN")
+                    return State.LOGGED_IN
             return None
         except Exception:
             return None

@@ -150,7 +150,10 @@ class StateManager:
 
         logger.debug("_handle_logged_in_state_change: emitting on_logged_in")
         await self.client.emit("on_logged_in")
-        logger.debug("_handle_logged_in_state_change: on_logged_in done, calling _handle_logged_in_state")
+        logger.debug("_handle_logged_in_state_change: on_logged_in done, waiting for chat list to load...")
+        # Esperar a que el chat list se hidrate (WhatsApp Web tarda en cargar los chats)
+        await asyncio.sleep(10)
+        logger.debug("_handle_logged_in_state_change: calling _handle_logged_in_state")
         await self._handle_logged_in_state()
 
     async def _handle_same_state(self, state: State) -> None:
@@ -173,8 +176,19 @@ class StateManager:
         Handle QR authentication state (periodic check).
 
         Checks if the QR code has changed and updates the display if necessary.
+        Handles expired QR codes by clicking the refresh button.
         """
         try:
+            # Detectar QR expirado (boton de refresh visible)
+            refresh_btn = await self._page.query_selector("[data-testid='refresh-large']")
+            if refresh_btn and await refresh_btn.is_visible():
+                print("DEBUG: QR expired, clicking refresh...")
+                try:
+                    await refresh_btn.click()
+                    await asyncio.sleep(2)
+                except Exception as e:
+                    print(f"DEBUG: Error clicking refresh: {e}")
+
             qr_code_canvas = await self._page.query_selector(loc.QR_CODE)
             if not qr_code_canvas:
                 return

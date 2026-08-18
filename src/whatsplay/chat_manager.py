@@ -91,9 +91,15 @@ class ChatManager:
             async def _wait_for_grid() -> None:
                 """Wait for the chat grid to be present and hydrated."""
                 try:
-                    await self._page.locator(loc.CHAT_LIST_GRID).wait_for(timeout=15000)
+                    await self._page.locator(loc.CHAT_LIST_GRID).wait_for(timeout=30000)
                 except Exception:
-                    await self._page.wait_for_timeout(1000)
+                    # Retry once more after a longer pause (WhatsApp Web may still be loading)
+                    log("DEBUG: Grid not found on first wait, retrying...")
+                    await self._page.wait_for_timeout(3000)
+                    try:
+                        await self._page.locator(loc.CHAT_LIST_GRID).wait_for(timeout=30000)
+                    except Exception:
+                        log("DEBUG: Grid still not found after retry")
 
             async def _get_scroller_handle():
                 """
