@@ -328,14 +328,22 @@ class Client(BaseWhatsAppClient):
         """
         return await self.chat_manager.search_conversations(query, close)
 
-    async def collect_messages(self) -> List[Union[Message, FileMessage]]:
+    async def collect_messages(
+        self, own_push_names: Optional[Union[str, list]] = None
+    ) -> List[Union[Message, FileMessage]]:
         """
         Collect all visible messages in the current chat.
+
+        Args:
+            own_push_names: Account push names identifying own bubbles
+                (e.g. ["Marcos Bustos"]). Forwarded to ChatManager so own
+                continuation bubbles without tail markers are still
+                flagged outgoing. Compared accent/case-insensitively.
 
         Returns:
             List of Message and FileMessage objects
         """
-        return await self.chat_manager.collect_messages()
+        return await self.chat_manager.collect_messages(own_push_names=own_push_names)
 
     async def download_all_files(
         self, carpeta: Optional[str] = None, detect_codecs: bool = True

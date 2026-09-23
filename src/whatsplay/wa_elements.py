@@ -22,6 +22,7 @@ class WhatsAppElements:
 
     def __init__(self, page: Page):
         self.page = page
+        self._search_active = False
 
     async def get_state(self) -> Optional[State]:
         """
@@ -67,6 +68,17 @@ class WhatsAppElements:
         except PlaywrightTimeoutError:
             return None
 
+    async def _get_search_box(self, timeout: int = 2000) -> Optional[ElementHandle]:
+        """Return a search editor without falling back to the chat composer."""
+        for selector in loc.SEARCH_TEXT_BOX:
+            try:
+                element = await self.wait_for_selector(selector, timeout=timeout)
+                if element:
+                    return element
+            except Exception:
+                continue
+        return None
+
     async def click_search_button(self) -> bool:
         """Activa el campo de búsqueda (click o foco en el input siempre visible)"""
         try:
@@ -84,6 +96,7 @@ class WhatsAppElements:
                     if inp:
                         await inp.click()
                         await asyncio.sleep(0.3)
+                        self._search_active = True
                         return True
                 except Exception:
                     continue
@@ -96,6 +109,7 @@ class WhatsAppElements:
                     )
                     if element:
                         await element.click()
+                        self._search_active = True
                         return True
                 except Exception:
                     continue
@@ -109,9 +123,9 @@ class WhatsAppElements:
             ]
             for shortcut in shortcuts:
                 try:
-                    await self.page.keyboard.press("Escape")
                     await self.page.keyboard.press(shortcut)
                     await asyncio.sleep(0.5)
+                    self._search_active = True
                     return True
                 except Exception:
                     continue
@@ -123,18 +137,80 @@ class WhatsAppElements:
             return False
 
     async def verify_search_active(self) -> bool:
-        """Verifica si el input de búsqueda está visible (siempre visible en WA Web 2026)"""
+        """Return whether search is active, not merely visible in the DOM."""
+        if self._search_active:
+            return True
         try:
-            for selector in loc.SEARCH_TEXT_BOX:
-                try:
-                    el = await self.page.wait_for_selector(selector, timeout=2000, state="visible")
-                    if el:
-                        return True
-                except Exception:
-                    continue
+            focused_search = await self.page.evaluate(
+                """() => {
+                    const active = document.activeElement;
+                    if (!active) return false;
+                    const text = [
+                        active.getAttribute('aria-label'),
+                        active.getAttribute('placeholder'),
+                        active.getAttribute('title'),
+                    ].filter(Boolean).join(' ').toLowerCase();
+                    if (active.tagName === 'INPUT') {
+                        return text.includes('search') || text.includes('buscar');
+                    }
+                    if (active.getAttribute('contenteditable') === 'true') {
+                        return text.includes('search') || text.includes('buscar');
+                    }
+                    return false;
+                }"""
+            )
+            if focused_search is True:
+                self._search_active = True
+                return True
             return False
         except Exception:
             return False
+
+    async def prepare_search(self) -> Optional[ElementHandle]:
+        """Select All/Todos, activate search, and return its input."""
+        if await self.verify_search_active() and not await self.close_search():
+            return None
+
+        if not await self.click_chat_filter("all"):
+            return None
+
+        if not await self.click_search_button():
+            return None
+
+        search_box = await self._get_search_box()
+        if not search_box:
+            await self.close_search()
+            self._search_active = False
+            return None
+
+        self._search_active = True
+        return search_box
+
+    async def close_search(self) -> bool:
+        """Close only an active search, without bubbling Escape to the chat."""
+        if not await self.verify_search_active():
+            return False
+
+        search_box = await self._get_search_box(timeout=1000)
+        if search_box:
+            try:
+                await search_box.press("Escape")
+                self._search_active = False
+                return True
+            except Exception:
+                pass
+
+        for selector in loc.SEARCH_CLOSE_BUTTON:
+            try:
+                close_button = await self.wait_for_selector(selector, timeout=1000)
+                if close_button:
+                    await close_button.click()
+                    self._search_active = False
+                    return True
+            except Exception:
+                continue
+
+        return False
 
     async def get_qr_code(self) -> Optional[bytes]:
         """
@@ -153,20 +229,7 @@ class WhatsAppElements:
         results = []
         
         try:
-            # Activar búsqueda
-            if not await self.click_search_button():
-                return results
-
-            # Buscar campo de texto y escribir consulta
-            search_box = None
-            for selector in loc.SEARCH_TEXT_BOX:
-                try:
-                    search_box = await self.wait_for_selector(selector, timeout=2000)
-                    if search_box:
-                        break
-                except Exception:
-                    continue
-
+            search_box = await self.prepare_search()
             if not search_box:
                 return results
 
@@ -204,7 +267,7 @@ class WhatsAppElements:
             # Cerrar búsqueda
             try:
                 if close:
-                    await self.page.keyboard.press("Escape")
+                    await self.close_search()
             except:
                 pass
 
@@ -228,6 +291,7 @@ class WhatsAppElements:
             _log(f"abriendo por URL: {url}")
             try:
                 await self.page.goto(url, timeout=60000)
+                self._search_active = False
                 await self.page.wait_for_selector(loc.LOGGED_IN, timeout=30000)
                 _log("LOGGED_IN detectado tras navegacion")
                 await self.page.wait_for_selector(
@@ -255,36 +319,30 @@ class WhatsAppElements:
 
             if chat_element:
                 await chat_element.click()
+                self._search_active = False
                 _log("click directo OK")
             else:
                 _log("chat no visible, entrando a ruta de busqueda")
                 await asyncio.sleep(2)
-                activated = await self.click_search_button()
-                _log(f"click_search_button: {activated}")
-                if not activated:
-                    raise Exception("Boton de busqueda no encontrado")
-
-                for j, input_xpath in enumerate(loc.SEARCH_TEXT_BOX):
-                    inputs = await self.page.query_selector_all(input_xpath)
-                    _log(f"search_input[{j}] count={len(inputs)} selector={input_xpath}")
-                    if inputs:
-                        await asyncio.sleep(1)
-                        await inputs[0].fill("")
-                        await asyncio.sleep(0.5)
-                        await inputs[0].type(chat_name, delay=100)
-                        _log("texto tipeado en input de busqueda")
-                        
-                        # Wait for search spinner to detach from DOM
-                        try:
-                            await self.page.wait_for_selector("svg[role='status']", state="detached", timeout=10000)
-                            _log("spinner detached from DOM")
-                        except PlaywrightTimeoutError:
-                            _log("timeout waiting for spinner, continuing")
-                        
-                        await asyncio.sleep(1)
-                        break
-                else:
+                search_box = await self.prepare_search()
+                _log(f"search preparation: {search_box is not None}")
+                if not search_box:
                     raise Exception("Input de busqueda no encontrado")
+
+                await asyncio.sleep(1)
+                await search_box.fill("")
+                await asyncio.sleep(0.5)
+                await search_box.type(chat_name, delay=100)
+                _log("texto tipeado en input de busqueda")
+
+                # Wait for search spinner to detach from DOM.
+                try:
+                    await self.page.wait_for_selector("svg[role='status']", state="detached", timeout=10000)
+                    _log("spinner detached from DOM")
+                except PlaywrightTimeoutError:
+                    _log("timeout waiting for spinner, continuing")
+
+                await asyncio.sleep(1)
 
                 _log("esperando SEARCH_ITEM...")
                 results = await self.page.wait_for_selector(loc.SEARCH_ITEM, timeout=5000)
@@ -304,6 +362,7 @@ class WhatsAppElements:
                         if title and chat_name.lower() in title.lower():
                             _log(f"clickeando chat: {title}")
                             await chat.click()
+                            self._search_active = False
                             found = True
                             break
                 if not found:
@@ -311,6 +370,7 @@ class WhatsAppElements:
                     await self.page.keyboard.press("ArrowDown")
                     await asyncio.sleep(0.5)
                     await self.page.keyboard.press("Enter")
+                    self._search_active = False
 
             _log(f"esperando CHAT_INPUT_BOX (timeout={timeout}ms)...")
             await self.page.wait_for_selector(loc.CHAT_INPUT_BOX, timeout=timeout)
@@ -322,6 +382,8 @@ class WhatsAppElements:
             return False
 
         except Exception as e:
+            if self._search_active:
+                await self.close_search()
             _log(f"EXCEPTION: {type(e).__name__}: {e}")
             return False
 
@@ -529,13 +591,23 @@ class WhatsAppElements:
 
     async def click_chat_filter(self, filter_type: str) -> bool:
         """Hace click en los filtros de chat (Todos, Grupos, No leídos)"""
-        labels = {"all": "Todos", "groups": "Grupos", "unread": "No leídos"}
-        label = labels.get(filter_type)
-        if not label:
+        labels = {
+            "all": ("All", "Todos"),
+            "groups": ("Grupos",),
+            "unread": ("No leídos",),
+        }
+        label_options = labels.get(filter_type)
+        if not label_options:
             return False
 
+        def _has_text_selector(role: str) -> str:
+            return ", ".join(
+                f"button[role='{role}']:has-text('{label}')"
+                for label in label_options
+            )
+
         async def _click_tab() -> bool:
-            tab = self.page.locator(f'button[role="tab"]:has-text("{label}")')
+            tab = self.page.locator(_has_text_selector("tab"))
             if await tab.count() > 0 and await tab.first.is_visible():
                 await tab.first.click()
                 await asyncio.sleep(0.3)
@@ -548,7 +620,7 @@ class WhatsAppElements:
                 return False
             await more.first.click()
             await asyncio.sleep(0.3)
-            item = self.page.locator(f'button[role="menuitem"]:has-text("{label}")')
+            item = self.page.locator(_has_text_selector("menuitem"))
             if await item.count() > 0:
                 await item.first.click()
                 await asyncio.sleep(0.3)

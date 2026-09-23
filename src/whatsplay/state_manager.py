@@ -185,10 +185,11 @@ class StateManager:
                 print("DEBUG: QR expired, clicking refresh...")
                 try:
                     await refresh_btn.click()
-                    await asyncio.sleep(2)
+                    await asyncio.sleep(3)
                 except Exception as e:
                     print(f"DEBUG: Error clicking refresh: {e}")
 
+            # Re-query canvas despues de posible refresh (canvas viejo se desadjunta)
             qr_code_canvas = await self._page.query_selector(loc.QR_CODE)
             if not qr_code_canvas:
                 return

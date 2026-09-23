@@ -67,12 +67,17 @@ SEARCH_BUTTON = [
 ]
 
 SEARCH_TEXT_BOX = [
-    # Nuevo input nativo siempre visible (2026)
+    # Native search input is always present in current WhatsApp Web builds.
     "input[aria-label='Buscar un chat o iniciar uno nuevo'], input[aria-label='Search for a chat or start a new one']",
     "css=input[aria-label*='Search' i], input[aria-label*='Buscar' i]",
-    # Legacy contenteditable
-    "//div[@contenteditable='true' and @role='textbox']",
-    "//div[contains(@class, 'lexical-rich-text-input')]//div[@contenteditable='true']",
+    # Legacy search editors with search-specific labels.
+    "//div[@contenteditable='true' and @role='textbox' and (@aria-label='Search input textbox' or @aria-label='Cuadro de texto de búsqueda' or @aria-label='Search' or @aria-label='Buscar')]",
+    "//div[@id='pane-side']//div[contains(@class, 'lexical-rich-text-input')]//div[@contenteditable='true']",
+]
+
+SEARCH_CLOSE_BUTTON = [
+    "button[aria-label='Close search'], button[aria-label='Cerrar búsqueda']",
+    "div[role='button'][aria-label='Close search'], div[role='button'][aria-label='Cerrar búsqueda']",
 ]
 
 # Contenedor de resultados de búsqueda (en builds nuevos es un grid también)
@@ -88,8 +93,15 @@ SEARCH_ITEM_UNREAD_MESSAGES = ".//span[contains(@aria-label, 'unread') or contai
 # Chat interface elements
 # ==============================
 # (Consolidado; antes duplicado)
+# Current WA Web composer is a Lexical contenteditable (role=textbox,
+# data-lexical-editor). The aria-placeholder attribute stopped matching on
+# newer builds, so the stable contenteditable markers come first and the
+# legacy aria-placeholder/title variants stay as back-compat fallbacks.
 CHAT_INPUT_BOX = (
-    "//div[@aria-placeholder='Type a message' or @aria-placeholder='Escribe un mensaje' or @title='Type a message']"
+    "//div[@contenteditable='true' and @role='textbox']"
+    " | //div[@data-lexical-editor='true']"
+    " | //div[@aria-label='Type a message' or @aria-label='Escribe un mensaje']"
+    " | //div[@aria-placeholder='Type a message' or @aria-placeholder='Escribe un mensaje' or @title='Type a message']"
 )
 CHAT_DIV = "//div[@role='application']"
 UNREAD_CHAT_DIV = "//div[@aria-label='Chat list' or @aria-label='Lista de chats' or @id='pane-side']"

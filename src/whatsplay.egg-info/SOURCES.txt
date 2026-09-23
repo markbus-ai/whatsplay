@@ -1,6 +1,7 @@
 LICENSE
 README.md
 pyproject.toml
+setup.cfg
 src/whatsplay/__init__.py
 src/whatsplay/base_client.py
 src/whatsplay/chat_manager.py
@@ -31,4 +32,5 @@ src/whatsplay/object/__init__.py
 src/whatsplay/object/message.py
 tests/test_chat_manager.py
 tests/test_message.py
+tests/test_search_state.py
 tests/test_state_manager.py

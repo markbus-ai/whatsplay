@@ -7,6 +7,7 @@ detecting unread chats.
 """
 
 import asyncio
+import inspect
 import logging
 import os
 import re
@@ -21,7 +22,13 @@ from playwright.async_api import (
 )
 
 from .constants import locator as loc
-from .object.message import FileMessage, Message, VoiceMessage
+from .object.message import (
+    DirectionSignal,
+    FileMessage,
+    Message,
+    VoiceMessage,
+    _flag_direction_fallback,
+)
 from .codec_detector import detect_codec
 
 # Constants
@@ -367,13 +374,24 @@ class ChatManager:
 
     async def close(self) -> None:
         """
-        Close the current chat or view by pressing Escape.
+        Close an active search first, otherwise close the current chat.
 
-        This method safely closes any open chat window by simulating
-        the Escape key press.
+        Search owns its Escape event so it cannot bubble through and close
+        the underlying chat in the same operation.
         """
         if self._page:
             try:
+                close_search = getattr(self.wa_elements, "close_search", None)
+                if close_search:
+                    try:
+                        result = close_search()
+                        if inspect.isawaitable(result):
+                            if await result:
+                                return
+                        elif result is True:
+                            return
+                    except Exception as e:
+                        await self.client.emit("on_warning", f"Error trying to close search: {e}")
                 await self._page.keyboard.press("Escape")
                 await asyncio.sleep(0.5)  # Allow UI to react
             except Exception as e:
@@ -417,12 +435,40 @@ class ChatManager:
             await self.client.emit("on_error", f"Search error: {e}")
             return []
 
-    async def collect_messages(self) -> List[Union[Message, FileMessage, VoiceMessage]]:
+    async def collect_messages(
+        self, own_push_names: Optional[Union[str, list]] = None
+    ) -> List[Union[Message, FileMessage, VoiceMessage]]:
         """
         Collect all currently visible messages in the active chat.
 
         Scans all visible message containers and returns a list of Message,
         FileMessage, or VoiceMessage instances.
+
+        Args:
+            own_push_names: Optional account push names identifying own
+                bubbles (e.g. ["Bikes Amigorena"]). Last-resort fallback
+                only: forwarded to Message.from_element and consulted when
+                tail + class + data-id + positional + group are all
+                inconclusive. Compared accent/case-insensitively. The
+                default path (None) classifies direction config-free via
+                positional alignment and group inheritance.
+
+        Direction contract (precedence is DIRECTION_ORDER in
+        whatsplay.object.message; config-free first):
+        tail (ground truth) > class / data-id (opportunistic, outrank
+        group) > group inheritance (tail-delimited groups, direction never
+        leaks across an outgoing/incoming boundary) > positional
+        inner-bubble alignment (right = outgoing, left = incoming;
+        inconclusive geometry abstains) > sender identity (last resort).
+
+        Sender inheritance contract:
+            Sender-less continuation bubbles inherit the previous bubble's
+            sender for DISPLAY only (sender_inherited=True). Consumers must
+            use is_outgoing / is_from_self() for skip logic, never the
+            inherited sender. Direction is preserved through inheritance: a
+            sender-less bubble with no direction signal of its own inherits
+            the group direction; a bubble with its own positive signal
+            (including position-out/position-in) keeps it.
 
         Returns:
             List of Message, FileMessage, or VoiceMessage instances
@@ -460,34 +506,121 @@ class ChatManager:
         logger.debug("collect_messages: %d containers found", len(msg_elements))
 
         last_sender = ""
+        last_is_outgoing = False
         for i, elem in enumerate(msg_elements):
-            voice_msg = await VoiceMessage.from_element(elem, self._page)
+            voice_msg = await VoiceMessage.from_element(elem, self._page, own_push_names)
             if voice_msg:
-                if not voice_msg.sender:
-                    voice_msg.sender = last_sender
+                self._inherit_sender(voice_msg, last_sender, last_is_outgoing)
                 if voice_msg.sender:
                     last_sender = voice_msg.sender
+                    last_is_outgoing = voice_msg.is_outgoing
                 results.append(voice_msg)
                 continue
 
-            file_msg = await FileMessage.from_element(elem, self._page)
+            file_msg = await FileMessage.from_element(elem, self._page, own_push_names)
             if file_msg:
-                if not file_msg.sender:
-                    file_msg.sender = last_sender
+                self._inherit_sender(file_msg, last_sender, last_is_outgoing)
                 if file_msg.sender:
                     last_sender = file_msg.sender
+                    last_is_outgoing = file_msg.is_outgoing
                 results.append(file_msg)
                 continue
 
-            simple_msg = await Message.from_element(elem, self._page)
+            simple_msg = await Message.from_element(elem, self._page, own_push_names)
             if simple_msg:
-                if not simple_msg.sender:
-                    simple_msg.sender = last_sender
+                self._inherit_sender(simple_msg, last_sender, last_is_outgoing)
                 if simple_msg.sender:
                     last_sender = simple_msg.sender
+                    last_is_outgoing = simple_msg.is_outgoing
                 results.append(simple_msg)
 
+        self._apply_group_tail_inheritance(results)
         return results
+
+    @staticmethod
+    def _inherit_sender(
+        msg: Union[Message, FileMessage, VoiceMessage],
+        last_sender: str,
+        last_is_outgoing: bool,
+    ) -> None:
+        """Stamp a sender-less continuation bubble with display attribution.
+
+        Inherits the previous sender for display only (sender_inherited=True)
+        so skip logic keyed on sender can never see a propagated own push
+        name. Direction is preserved at this stage: bubbles without their
+        own positive signal (direction_signal == "none") inherit the
+        previous direction; bubbles carrying their own signal keep the
+        is_outgoing computed from the DOM. The group-tail step running
+        after collection may still override a positional signal with the
+        group leader direction (group outranks positional).
+        """
+        if msg.sender or not last_sender:
+            return
+        msg.sender = last_sender
+        msg.sender_inherited = True
+        if msg.direction_signal == DirectionSignal.NONE:
+            msg.is_outgoing = last_is_outgoing
+
+    @staticmethod
+    def _apply_group_tail_inheritance(
+        msgs: List[Union[Message, FileMessage, VoiceMessage]],
+    ) -> None:
+        """Propagate tail ground truth within tail-delimited groups.
+
+        Applies the group layers of DIRECTION_ORDER (group-out/group-in):
+        continuations with no signal of their own (none: no tail, class,
+        data-id, or positional side) inherit direction from the nearest
+        sibling carrying an explicit tail signal in the same group — and so
+        do continuations carrying a positional signal, because live
+        evidence proved positional can lie (v3 row geometry; Sept 2026
+        quoted-voice bubble). Groups start at tail-out/tail-in leaders, so
+        direction never leaks across an outgoing/incoming boundary, and
+        leaderless groups are left untouched. Bubbles carrying a class,
+        data-id, or sender-own signal keep it. Bubbles still signalless
+        after this step keep "none" (incoming default) and are flagged via
+        the fallback counter + log (fail-safe, never silent).
+        """
+        if not msgs:
+            return
+        groups: List[List[Union[Message, FileMessage, VoiceMessage]]] = []
+        current: List[Union[Message, FileMessage, VoiceMessage]] = []
+        for msg in msgs:
+            if msg.direction_signal in (
+                DirectionSignal.TAIL_OUT,
+                DirectionSignal.TAIL_IN,
+            ) and current:
+                groups.append(current)
+                current = [msg]
+            else:
+                current.append(msg)
+        if current:
+            groups.append(current)
+        for group in groups:
+            leader_outgoing: Optional[bool] = None
+            for msg in group:
+                if msg.direction_signal == DirectionSignal.TAIL_OUT:
+                    leader_outgoing = True
+                    break
+                if msg.direction_signal == DirectionSignal.TAIL_IN:
+                    leader_outgoing = False
+                    break
+            if leader_outgoing is None:
+                continue
+            for msg in group:
+                if msg.direction_signal in (
+                    DirectionSignal.NONE,
+                    DirectionSignal.POSITION_OUT,
+                    DirectionSignal.POSITION_IN,
+                ):
+                    msg.is_outgoing = leader_outgoing
+                    msg.direction_signal = (
+                        DirectionSignal.GROUP_OUT
+                        if leader_outgoing
+                        else DirectionSignal.GROUP_IN
+                    )
+        for msg in msgs:
+            if msg.direction_signal == DirectionSignal.NONE:
+                _flag_direction_fallback(msg.msg_id)
 
     async def react_to_last_message(self, emoji: str) -> bool:
         """
