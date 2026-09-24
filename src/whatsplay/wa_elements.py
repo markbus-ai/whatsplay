@@ -311,7 +311,10 @@ class WhatsAppElements:
                 _log(f"EXCEPTION via URL: {e}")
                 return False
 
-        span_xpath = f"//span[contains(@title, {repr(chat_name)})]"
+        span_xpath = (
+            f"//div[@role='row']//div[@data-testid='cell-frame-title']"
+            f"//span[contains(@title, {repr(chat_name)})]"
+        )
 
         try:
             chat_element = await self.page.query_selector(f"xpath={span_xpath}")

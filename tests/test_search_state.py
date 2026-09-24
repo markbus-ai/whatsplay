@@ -199,6 +199,24 @@ async def test_open_search_route_uses_shared_preparation(monkeypatch):
 
 
 @pytest.mark.asyncio
+async def test_open_direct_lookup_targets_chat_title_cell():
+    page = AsyncMock()
+    elements = WhatsAppElements(page)
+    chat = AsyncMock()
+    page.query_selector.return_value = chat
+
+    assert await elements.open("2235988856") is True
+
+    selector = page.query_selector.await_args.args[0]
+    assert selector == (
+        "xpath=//div[@role='row']//div[@data-testid='cell-frame-title']"
+        "//span[contains(@title, '2235988856')]"
+    )
+    assert selector != "xpath=//span[contains(@title, '2235988856')]"
+    chat.click.assert_awaited_once_with()
+
+
+@pytest.mark.asyncio
 async def test_keyboard_search_fallback_does_not_escape():
     page = AsyncMock()
     page.wait_for_selector.side_effect = Exception("not found")
