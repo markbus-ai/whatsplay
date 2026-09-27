@@ -13,6 +13,9 @@ from playwright.async_api import (
 import re
 
 from .constants import locator as loc
+from .logging_setup import get_logger
+
+logger = get_logger(__name__)
 from .constants.states import State
 from .filters import MessageFilter
 
@@ -33,22 +36,26 @@ class WhatsAppElements:
         """
         try:
             # Orden: LOADING > QR_AUTH > LOADING_CHATS > AUTH > LOGGED_IN
+            # Todos los estados van a DEBUG: get_state() corre en cada tick del
+            # poller (cada ~2s), así que loguearlos a nivel INFO generaba
+            # ~217k líneas/día de ruido. Activá whatsplay.wa_elements=DEBUG
+            # para verlos.
             if await self.page.locator(loc.LOADING).is_visible():
-                print("LOADING")
+                logger.debug("state=LOADING")
                 return State.LOADING
             elif await self.page.locator(loc.QR_CODE).is_visible():
-                print("QR_AUTH")
+                logger.debug("state=QR_AUTH")
                 return State.QR_AUTH
             elif await self.page.locator(loc.LOADING_CHATS).is_visible():
-                print("LOADING_CHATS")
+                logger.debug("state=LOADING_CHATS")
                 return State.LOADING
             elif await self.page.locator(loc.AUTH).is_visible():
-                print("AUTH")
+                logger.debug("state=AUTH")
                 return State.AUTH
             elif await self.page.locator(loc.LOGGED_IN).is_visible():
                 # Confirmar que tambien esta el chat list (distinguir de QR screen)
                 if await self.page.locator("[data-testid='chat-list']").is_visible():
-                    print("LOGGED_IN")
+                    logger.debug("state=LOGGED_IN")
                     return State.LOGGED_IN
             return None
         except Exception:
@@ -133,7 +140,7 @@ class WhatsAppElements:
             return False
 
         except Exception as e:
-            print(f"Error clicking search button: {e}")
+            logger.warning(f"Error clicking search button: {e}")
             return False
 
     async def verify_search_active(self) -> bool:
@@ -250,7 +257,7 @@ class WhatsAppElements:
                 loc.SEARCH_RESULT, timeout=5000
             )
             if not results_container:
-                print("No search results found")
+                logger.info("No search results found")
                 return results
 
             # Obtener y procesar resultados
@@ -262,7 +269,7 @@ class WhatsAppElements:
                     results.append(formatted)
 
         except Exception as e:
-            print(f"Error searching chats: {e}")
+            logger.warning(f"Error searching chats: {e}")
         finally:
             # Cerrar búsqueda
             try:
@@ -281,7 +288,7 @@ class WhatsAppElements:
         _t0 = _time.time()
         def _log(msg: str) -> None:
             elapsed = _time.time() - _t0
-            print(f"[open:{elapsed:.2f}s] {msg}")
+            logger.info(f"[open:{elapsed:.2f}s] {msg}")
 
         _log(f"inicio: chat_name='{chat_name}' timeout={timeout}")
 
@@ -392,7 +399,7 @@ class WhatsAppElements:
 
 
     async def new_group(self, group_name: str, members: List[str]) -> Optional[ElementHandle]:
-        print(f"Creating new group: {group_name} with members: {members}")
+        logger.info(f"Creating new group: {group_name} with members: {members}")
         """
         Crea un nuevo grupo con el nombre especificado
         """
@@ -434,10 +441,10 @@ class WhatsAppElements:
 
 
         except PlaywrightTimeoutError:
-            print("Timeout while trying to create a new group")
+            logger.warning("Timeout while trying to create a new group")
             return None
         except Exception as e:
-            print(f"Error creating new group: {e}")
+            logger.warning(f"Error creating new group: {e}")
             return None
             
     async def add_members_to_group(
@@ -448,7 +455,7 @@ class WhatsAppElements:
         """
         try:
             if not self.open(group_name, timeout=5000):
-                print(f"❌ No se pudo abrir el grupo '{group_name}'")
+                logger.warning(f"❌ No se pudo abrir el grupo '{group_name}'")
                 return False
             
             # 2. Hacer clic en la cabecera para abrir la info del grupo
@@ -487,11 +494,11 @@ class WhatsAppElements:
             return True
 
         except PlaywrightTimeoutError:
-            print(f"Timeout al intentar agregar miembros a '{group_name}'")
+            logger.warning(f"Timeout al intentar agregar miembros a '{group_name}'")
             await self.page.keyboard.press("Escape") # Intentar limpiar
             return False
         except Exception as e:
-            print(f"Error agregando miembros a '{group_name}': {e}")
+            logger.warning(f"Error agregando miembros a '{group_name}': {e}")
             await self.page.keyboard.press("Escape") # Intentar limpiar
             return False
     async def del_member_group(self, group_name: str, member_name: str) -> bool:
@@ -500,23 +507,23 @@ class WhatsAppElements:
         """
         try:
             if not await self.open(group_name, timeout=5000):
-                print(f"❌ No se pudo abrir el grupo '{group_name}'")
+                logger.warning(f"❌ No se pudo abrir el grupo '{group_name}'")
                 return False
 
             # 1. Abrir info de grupo
-            print(" 1. Esperando GROUP_INFO_BUTTON...")
+            logger.debug(" 1. Esperando GROUP_INFO_BUTTON...")
             header = await self.page.wait_for_selector(loc.GROUP_INFO_BUTTON, timeout=5000)
             await header.click()
 
             # 2. Contenedor de info del grupo
-            print(" 2. Esperando contenedor 'Group info'...")
+            logger.debug(" 2. Esperando contenedor 'Group info'...")
             group_info = await self.page.wait_for_selector('div[aria-label="Group info"]', timeout=5000)
             if not group_info:
-                print("❌ No se encontró el contenedor 'Group info'")
+                logger.warning("❌ No se encontró el contenedor 'Group info'")
                 return False
 
             # 3. Buscar el <span> del miembro por coincidencia parcial
-            print(" 3. Buscando miembro por coincidencia parcial...")
+            logger.debug(" 3. Buscando miembro por coincidencia parcial...")
             span_member = await group_info.evaluate_handle(
                 f"""
                 (container) => {{
@@ -528,13 +535,13 @@ class WhatsAppElements:
 
             # ⚠️ Verificar si se encontró o no
             if not await span_member.evaluate("el => !!el"):
-                print(f"❌ No se encontró el miembro '{member_name}'")
+                logger.warning(f"❌ No se encontró el miembro '{member_name}'")
                 return False
 
             # 4. Subir al contenedor general del miembro (div[role="button"])
             member_row = await span_member.evaluate_handle("el => el.closest('div[role=\"button\"]')")
             if not await member_row.evaluate("el => !!el"):
-                print("⚠️ No se encontró el contenedor del miembro")
+                logger.warning("⚠️ No se encontró el contenedor del miembro")
                 return False
 
             # 5. Buscar el contenedor del status
@@ -548,26 +555,26 @@ class WhatsAppElements:
                 }"""
             )
             if not await status_container.evaluate("el => !!el"):
-                print("⚠️ No se encontró el contenedor del estado del miembro")
+                logger.warning("⚠️ No se encontró el contenedor del estado del miembro")
                 return False
 
             # 6. Hover sobre el estado
-            print(" 4. Hover sobre el estado...")
+            logger.debug(" 4. Hover sobre el estado...")
             await status_container.scroll_into_view_if_needed()
             await status_container.hover()
-            print(f"✅ Hover sobre el estado de '{member_name}'")
+            logger.info(f"✅ Hover sobre el estado de '{member_name}'")
 
             # 7. Esperar botón de menú
-            print(" 5. Esperando botón ⋮ ...")
+            logger.debug(" 5. Esperando botón ⋮ ...")
             try:
                 menu_btn = await self.page.wait_for_selector(
                     'button[aria-label="Open the chat context menu"]',
                     timeout=3000
                 )
                 await menu_btn.click()
-                print("✅ Menú contextual clickeado correctamente.")
+                logger.info("✅ Menú contextual clickeado correctamente.")
             except Exception as e:
-                print(f"❌ No se pudo hacer clic en el botón del menú: {e}")
+                logger.warning(f"❌ No se pudo hacer clic en el botón del menú: {e}")
                 return False
 
             # 8. Clic en "Remove"
@@ -580,15 +587,15 @@ class WhatsAppElements:
             await confirm_button.click()
             await asyncio.sleep(0.5)
 
-            print(f"✅ Miembro '{member_name}' eliminado de '{group_name}'.")
+            logger.info(f"✅ Miembro '{member_name}' eliminado de '{group_name}'.")
             return True
 
         except PlaywrightTimeoutError:
-            print(f"⏱️ Timeout al intentar eliminar miembro de '{group_name}'")
+            logger.warning(f"⏱️ Timeout al intentar eliminar miembro de '{group_name}'")
             await self.page.keyboard.press("Escape")
             return False
         except Exception as e:
-            print(f"❌ Error eliminando miembro '{member_name}' de '{group_name}': {e}")
+            logger.warning(f"❌ Error eliminando miembro '{member_name}' de '{group_name}': {e}")
             await self.page.keyboard.press("Escape")
             return False
 

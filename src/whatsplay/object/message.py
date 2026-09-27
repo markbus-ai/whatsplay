@@ -8,7 +8,9 @@ from typing import Iterable, Optional, Dict, Any
 from playwright.async_api import Page, ElementHandle, Download
 import asyncio
 
-logger = logging.getLogger(__name__)
+from ..logging_setup import get_logger
+
+logger = get_logger(__name__)
 
 from ..codec_detector import detect_codec
 
@@ -265,20 +267,34 @@ async def _resolve_positional_side(elem: ElementHandle) -> Optional[str]:
 
 
 def parse_timestamp(raw: str) -> Optional[datetime]:
-    """Extract ``[HH:MM(:SS)?]`` from a ``data-pre-plain-text`` attribute value.
+    """Extract the message time from a ``data-pre-plain-text`` attribute value.
 
-    Accepts the legacy bare form (``[10:00] Sender:``) and the current form
-    carrying the date (``[18:51, 3/9/2026] Sender:``, observed Sept 2026).
+    Acepta las formas que fue usando WhatsApp Web:
+      - legacy sin fecha: ``[10:00] Sender:``
+      - con fecha (Sept 2026): ``[18:51, 3/9/2026] Sender:``
+      - 12h con am/pm (observado Sept 2026): ``6:55 p.m. Sender:``
 
     Returns a ``datetime`` with today's date and the parsed time,
     or ``None`` if the format does not match.
     """
+    # Forma con corchetes: [HH:MM(:SS)?] o [HH:MM, d/m/yyyy]
     m = re.match(r"\[(\d{1,2}:\d{2}(?::\d{2})?)(?:,\s*\d{1,2}/\d{1,2}/\d{2,4})?\]", raw)
-    if not m:
-        return None
-    hh, mm = m.group(1).split(":")[:2]
-    now = datetime.now()
-    return now.replace(hour=int(hh), minute=int(mm), second=0, microsecond=0)
+    if m:
+        hh, mm = m.group(1).split(":")[:2]
+        now = datetime.now()
+        return now.replace(hour=int(hh), minute=int(mm), second=0, microsecond=0)
+
+    # Forma 12h suelta: "6:55 p.m." / "7:07 p. m." / "12:30 am"
+    m12 = re.match(r"(\d{1,2}):(\d{2})\s*([ap])\.?\s*m", raw.strip().lower())
+    if m12:
+        hh = int(m12.group(1)) % 12
+        mm = int(m12.group(2))
+        if m12.group(3) == "p":
+            hh += 12
+        now = datetime.now()
+        return now.replace(hour=hh, minute=mm, second=0, microsecond=0)
+
+    return None
 
 
 def _format_duration(seconds: object) -> str:
@@ -549,7 +565,7 @@ class Message:
             await emoji_in_picker.click()
 
         except Exception as e:
-            print(f"An error occurred while reacting to message {self.msg_id}: {e}")
+            logger.warning(f"An error occurred while reacting to message {self.msg_id}: {e}")
 
 
 # ==============================

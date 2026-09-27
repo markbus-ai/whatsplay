@@ -9,7 +9,9 @@ import asyncio
 import logging
 from typing import Optional
 
-logger = logging.getLogger(__name__)
+from .logging_setup import get_logger
+
+logger = get_logger(__name__)
 
 from playwright.async_api import (
     ElementHandle,
@@ -182,12 +184,12 @@ class StateManager:
             # Detectar QR expirado (boton de refresh visible)
             refresh_btn = await self._page.query_selector("[data-testid='refresh-large']")
             if refresh_btn and await refresh_btn.is_visible():
-                print("DEBUG: QR expired, clicking refresh...")
+                logger.info("DEBUG: QR expired, clicking refresh...")
                 try:
                     await refresh_btn.click()
                     await asyncio.sleep(3)
                 except Exception as e:
-                    print(f"DEBUG: Error clicking refresh: {e}")
+                    logger.warning(f"DEBUG: Error clicking refresh: {e}")
 
             # Re-query canvas despues de posible refresh (canvas viejo se desadjunta)
             qr_code_canvas = await self._page.query_selector(loc.QR_CODE)

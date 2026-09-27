@@ -43,7 +43,7 @@ class LocalProfileAuth(AuthBase):
             os.makedirs(self.profile_path, exist_ok=True)
             return True
         except Exception as e:
-            print(f"Error saving session: {e}")
+            logger.warning(f"Error saving session: {e}")
             return False
 
     async def load_session(self) -> bool:

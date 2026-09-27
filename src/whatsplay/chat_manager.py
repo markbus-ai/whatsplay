@@ -11,10 +11,13 @@ import inspect
 import logging
 import os
 import re
+import time
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Union
 
-logger = logging.getLogger(__name__)
+from .logging_setup import get_logger
+
+logger = get_logger(__name__)
 
 from playwright.async_api import (
     Error as PlaywrightError,
@@ -87,13 +90,20 @@ class ChatManager:
             3. Bold font weight detection on chat titles
         """
         unread_chats: List[Dict[str, Any]] = []
+        _scan_start = time.monotonic()
         async with self.client._page_lock:
             await self.close()  # Ensure no chat is currently open
 
-            def log(msg: str) -> None:
-                """Log debug messages if debug mode is enabled."""
+            def log(msg: str, level: int = logging.DEBUG) -> None:
+                """Loguea el detalle del escaneo vía logging.
+
+                Antes era un print() gateado por `debug=True` (default), lo que
+                generaba ~217k líneas/día de ruido en el consumidor. Ahora el
+                nivel del logger decide: silencioso por defecto, visible con
+                ``logging.getLogger('whatsplay.chat_manager').setLevel(DEBUG)``.
+                """
                 if debug:
-                    print(msg)
+                    logger.log(level, msg)
 
             async def _wait_for_grid() -> None:
                 """Wait for the chat grid to be present and hydrated."""
@@ -274,10 +284,17 @@ class ChatManager:
                 log(f"DEBUG: General error: {e}")
 
         # Step 6: Final summary
-        log("\nDEBUG: ===== SUMMARY =====")
-        log(f"Total unread chats found: {len(unread_chats)}")
-        for i, chat in enumerate(unread_chats, 1):
-            log(f"  {i}. {chat.get('name', 'No name')}")
+        # Una sola línea a INFO con el resultado del escaneo (útil y barata),
+        # y el detalle por chat a DEBUG. Antes eran 5 líneas por ciclo ×43k
+        # ciclos/día; ahora una línea por ciclo, y el detalle on-demand.
+        logger.info(
+            "unread_scan: found=%d duration_ms=%.0f",
+            len(unread_chats),
+            (time.monotonic() - _scan_start) * 1000,
+        )
+        if logger.isEnabledFor(logging.DEBUG):
+            for i, chat in enumerate(unread_chats, 1):
+                logger.debug("  unread %d. %s", i, chat.get("name", "No name"))
 
         return unread_chats
 
@@ -369,7 +386,7 @@ class ChatManager:
             return None
 
         except Exception as e:
-            print(f"Error parsing result: {e}")
+            logger.warning(f"Error parsing result: {e}")
             return None
 
     async def close(self) -> None:
@@ -500,7 +517,21 @@ class ChatManager:
                 break
             await asyncio.sleep(0.5)
         else:
-            logger.warning("collect_messages: no message containers found after 5s")
+            # Logear QUE chat y en que URL fallo: sin esto no se puede
+            # distinguir un chat vacio de un selector roto o una pestana
+            # en la pantalla equivocada.
+            try:
+                _url = self._page.url
+                _title = await self._page.title()
+                _pane = await self._page.evaluate(
+                    """() => document.querySelector('#main') ? 'main-present' : 'no-main'"""
+                )
+            except Exception:
+                _url, _title, _pane = "?", "?", "?"
+            logger.warning(
+                "collect_messages: no message containers found after 5s "
+                "(url=%s pane=%s title=%r)", _url, _pane, _title[:60]
+            )
 
         msg_elements = await self._page.query_selector_all('div[data-testid^="conv-msg-"]')
         logger.debug("collect_messages: %d containers found", len(msg_elements))
@@ -731,7 +762,7 @@ class ChatManager:
             True if message was sent successfully, False otherwise
         """
         async with self.client._page_lock:
-            print("Sending message...")
+            logger.info("Sending message to %r", chat_query)
             if not await self.client.wait_until_logged_in():
                 return False
 
@@ -740,7 +771,7 @@ class ChatManager:
                 if not opened:
                     await self.client.emit("on_error", f"Could not open chat: {chat_query}")
                     return False
-                print(f"✓ Chat '{chat_query}' opened, sending message")
+                logger.info("Chat %r opened, sending message", chat_query)
 
                 await self._page.wait_for_selector(loc.CHAT_INPUT_BOX, timeout=DEFAULT_WAIT_TIMEOUT)
                 input_box = await self._page.wait_for_selector(loc.CHAT_INPUT_BOX, timeout=DEFAULT_WAIT_TIMEOUT)
@@ -759,7 +790,9 @@ class ChatManager:
 
                 confirmed = await self.wait_for_whatsapp_ready(timeout=DEFAULT_WAIT_TIMEOUT)
                 if not confirmed:
-                    print("⚠ Message sent but not confirmed by server")
+                    logger.warning(
+                        "Message to %r sent but not confirmed by server", chat_query
+                    )
                     return False
 
                 return True
@@ -774,10 +807,12 @@ class ChatManager:
         try:
             last_msg = self._page.locator(loc.MESSAGE_CONTAINER).last
             await last_msg.locator(loc.MSG_STATUS_CONFIRMED).wait_for(state="visible", timeout=timeout)
-            print("✅ Message confirmed by the server (Tick seen)")
+            logger.debug("Message confirmed by the server (tick seen)")
             return True
-        except Exception as e:
-            print(f"❌ Message not confirmed within {timeout}ms (internet slow?)")
+        except Exception:
+            logger.warning(
+                "Message not confirmed within %dms (server tick not seen)", timeout
+            )
             return False
 
     # You continue with the message sending...

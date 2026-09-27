@@ -8,6 +8,7 @@ src/whatsplay/chat_manager.py
 src/whatsplay/client.py
 src/whatsplay/codec_detector.py
 src/whatsplay/event.py
+src/whatsplay/logging_setup.py
 src/whatsplay/state_manager.py
 src/whatsplay/utils.py
 src/whatsplay/wa_elements.py
@@ -31,6 +32,7 @@ src/whatsplay/filters/message_filter.py
 src/whatsplay/object/__init__.py
 src/whatsplay/object/message.py
 tests/test_chat_manager.py
+tests/test_logging_setup.py
 tests/test_message.py
 tests/test_search_state.py
 tests/test_state_manager.py

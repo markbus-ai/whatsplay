@@ -79,7 +79,7 @@ def show_qr_window(qr_image_bytes):
         # Bind to 0.0.0.0 to make it accessible from the public IP
         with socketserver.TCPServer(("0.0.0.0", PORT), Handler) as httpd_server:
             httpd = httpd_server
-            print(f"Servidor iniciado en http://0.0.0.0:{PORT}")
+            logger.info(f"Servidor iniciado en http://0.0.0.0:{PORT}")
             httpd.serve_forever()
 
     server_thread = threading.Thread(target=start_server)

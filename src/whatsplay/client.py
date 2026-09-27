@@ -115,7 +115,7 @@ class Client(BaseWhatsAppClient):
         signame = (
             signal.Signals(signum).name if hasattr(signal, "Signals") else str(signum)
         )
-        print(f"\nReceived signal {signame}. Shutting down gracefully...")
+        logger.info(f"\nReceived signal {signame}. Shutting down gracefully...")
         self._shutdown_event.set()
         await self.stop()
         sys.exit(0)
