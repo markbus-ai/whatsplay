@@ -37,15 +37,23 @@ async def test_extract_image_from_canvas_no_element(mock_state_manager):
 
 @pytest.mark.asyncio
 async def test_extract_image_from_canvas_error(mock_state_manager):
+    """Un fallo de extraccion NO debe cortar el flujo del QR.
+
+    Antes se emitia on_error y se devolvia None, y como _handle_qr_logic
+    cortaba con un qr_binary vacio, el servidor del QR (puerto 8000) no
+    arrancaba nunca: el portal daba 502 y no habia forma de escanear.
+    Ahora la extraccion falla en silencio (solo warning) y el flujo sigue.
+    """
     mock_canvas_element = AsyncMock()
+    # tanto el evaluate (toDataURL) como el screenshot fallan
+    mock_canvas_element.evaluate.side_effect = Exception("Screenshot error")
     mock_canvas_element.screenshot.side_effect = Exception("Screenshot error")
 
     result = await mock_state_manager._extract_image_from_canvas(mock_canvas_element)
 
     assert result is None
-    mock_state_manager.client.emit.assert_called_with(
-        "on_error", "Error extracting QR image: Screenshot error"
-    )
+    # No se emite on_error: el flujo del QR debe continuar igual.
+    mock_state_manager.client.emit.assert_not_called()
 
 @pytest.mark.asyncio
 async def test_handle_logged_in_state_with_continue_button(mock_state_manager):

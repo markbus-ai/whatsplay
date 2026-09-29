@@ -1,9 +1,12 @@
+import logging
 """Local profile authentication implementation"""
 
 import os
 from typing import Dict, Any
 from .auth import AuthBase
 from playwright.async_api import BrowserContext
+
+logger = logging.getLogger("whatsplay.auth.local_profile_auth")
 
 
 class LocalProfileAuth(AuthBase):

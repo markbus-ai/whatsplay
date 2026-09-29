@@ -1,8 +1,11 @@
+import logging
 import http.server
 import socketserver
 import threading
 import base64
 import time
+
+logger = logging.getLogger("whatsplay.utils")
 
 # Global variable to hold the QR code and the HTTP server instance
 current_qr_base64 = None

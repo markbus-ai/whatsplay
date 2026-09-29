@@ -6,6 +6,7 @@ including authentication, QR code display, loading, and logged-in states.
 """
 
 import asyncio
+import base64
 import logging
 from typing import Optional
 
@@ -78,14 +79,22 @@ class StateManager:
         Returns:
             True if QR code was updated or shown, False otherwise
         """
-        if not qr_binary or qr_binary == self.last_qr_shown:
+        # El servidor del QR (puerto 8000, proxeado por nginx) TIENE que
+        # arrancar aunque no hayamos podido leer la imagen del canvas todavia.
+        # Antes, un qr_binary vacio hacia return False y el server no arrancaba
+        # nunca: el portal daba 502 y no habia forma de escanear. Ahora
+        # arrancamos con imagen vacia y se actualiza cuando llegue una.
+        if qr_binary and qr_binary == self.last_qr_shown:
             return False
 
         if not self.qr_server_started:
-            show_qr_window(qr_binary)
+            show_qr_window(qr_binary or b"")
             self.qr_server_started = True
-        else:
+        elif qr_binary:
             update_qr_code(qr_binary)
+
+        if not qr_binary:
+            return False
 
         self.last_qr_shown = qr_binary
         return True
@@ -256,8 +265,25 @@ class StateManager:
         if not canvas_element:
             return None
 
+        # El canvas del QR se re-anima en WhatsApp Web, asi que un screenshot
+        # normal (scroll_into_view + esperar estabilidad) falla con
+        # "element is not stable" / "not attached to the DOM". Leemos el canvas
+        # por JS, que no depende de estabilidad, y si falla probamos un
+        # screenshot con las animaciones deshabilitadas. Nunca cortamos el flujo
+        # por esto: el servidor del QR debe arrancar igual.
         try:
-            return await canvas_element.screenshot()
+            data_url = await canvas_element.evaluate(
+                "el => el.toDataURL ? el.toDataURL('image/png') : null"
+            )
+            if data_url and "," in data_url:
+                return base64.b64decode(data_url.split(",", 1)[1])
+        except Exception:
+            pass
+
+        try:
+            return await canvas_element.screenshot(animations="disabled")
         except Exception as e:
-            await self.client.emit("on_error", f"Error extracting QR image: {e}")
+            # No es fatal: show_qr_window arranca el server con imagen vacia y
+            # se actualiza cuando el canvas vuelva a estar disponible.
+            logger.warning(f"QR screenshot fallo (no fatal): {e}")
             return None

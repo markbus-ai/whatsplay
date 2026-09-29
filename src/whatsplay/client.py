@@ -1,3 +1,4 @@
+import logging
 """
 Main WhatsApp Web client implementation.
 
@@ -18,6 +19,8 @@ from .constants.states import State
 from .object.message import FileMessage, Message
 from .state_manager import StateManager
 from .wa_elements import WhatsAppElements
+
+logger = logging.getLogger("whatsplay.client")
 
 # Constants
 DEFAULT_POLL_FREQUENCY = 0.25
