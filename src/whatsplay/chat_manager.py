@@ -453,7 +453,9 @@ class ChatManager:
             return []
 
     async def collect_messages(
-        self, own_push_names: Optional[Union[str, list]] = None
+        self,
+        own_push_names: Optional[Union[str, list]] = None,
+        dispose: bool = False,
     ) -> List[Union[Message, FileMessage, VoiceMessage]]:
         """
         Collect all currently visible messages in the active chat.
@@ -467,6 +469,11 @@ class ChatManager:
                 only: forwarded to Message.from_element and consulted when
                 tail + class + data-id + positional + group are all
                 inconclusive. Compared accent/case-insensitively. The
+                dispose: When True, release each message's container handle
+                before returning. Use for data-only consumers (bots that
+                only read text/sender/timestamp) to avoid accumulating DOM
+                handles in the renderer; keep False (default) so react()
+                and download() still work.
                 default path (None) classifies direction config-free via
                 positional alignment and group inheritance.
 
@@ -566,6 +573,18 @@ class ChatManager:
                 results.append(simple_msg)
 
         self._apply_group_tail_inheritance(results)
+
+        if dispose:
+            # Data-only consumers (bots that read text/sender/timestamp and
+            # never call react/download) should release the container handles
+            # right away: each one pins a DOM node in the renderer, and a poll
+            # loop reading chats every few seconds accumulates thousands of
+            # them until the V8 heap cannot commit and the renderer crashes
+            # with SIGTRAP ("Target crashed"). Interactive consumers keep the
+            # default dispose=False so react()/download() still work.
+            for _msg in results:
+                await _msg.dispose()
+
         return results
 
     @staticmethod

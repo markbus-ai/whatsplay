@@ -332,7 +332,9 @@ class Client(BaseWhatsAppClient):
         return await self.chat_manager.search_conversations(query, close)
 
     async def collect_messages(
-        self, own_push_names: Optional[Union[str, list]] = None
+        self,
+        own_push_names: Optional[Union[str, list]] = None,
+        dispose: bool = False,
     ) -> List[Union[Message, FileMessage]]:
         """
         Collect all visible messages in the current chat.
@@ -342,11 +344,18 @@ class Client(BaseWhatsAppClient):
                 (e.g. ["Marcos Bustos"]). Forwarded to ChatManager so own
                 continuation bubbles without tail markers are still
                 flagged outgoing. Compared accent/case-insensitively.
+            dispose: When True, release each message's container handle
+                before returning. Pass True for data-only consumers that
+                read text/sender/timestamp but never call react()/download();
+                this prevents DOM handles from accumulating in the renderer
+                across poll cycles.
 
         Returns:
             List of Message and FileMessage objects
         """
-        return await self.chat_manager.collect_messages(own_push_names=own_push_names)
+        return await self.chat_manager.collect_messages(
+            own_push_names=own_push_names, dispose=dispose
+        )
 
     async def download_all_files(
         self, carpeta: Optional[str] = None, detect_codecs: bool = True

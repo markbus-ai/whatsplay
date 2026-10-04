@@ -406,3 +406,142 @@ async def test_context_menu_logs_warning_when_no_target(caplog):
     assert result is None
     # Verify warning was actually logged
     assert "no target element found" in caplog.text
+
+
+# ============================================================
+# Handle disposal — renderer memory leak regression (2.6.2)
+# ============================================================
+
+@pytest.mark.asyncio
+async def test_message_dispose_releases_container():
+    """dispose() must release the container handle and clear the attribute."""
+    from whatsplay.object.message import Message
+
+    page = AsyncMock()
+    container = AsyncMock()
+    msg = Message(page=page, sender="A", timestamp=datetime.now(),
+                  text="hi", container=container)
+
+    await msg.dispose()
+
+    container.dispose.assert_awaited_once()
+    assert msg.container is None
+
+
+@pytest.mark.asyncio
+async def test_message_dispose_is_idempotent():
+    """Calling dispose() twice must not raise or re-dispose."""
+    from whatsplay.object.message import Message
+
+    container = AsyncMock()
+    msg = Message(page=AsyncMock(), sender="A", timestamp=datetime.now(),
+                  text="hi", container=container)
+
+    await msg.dispose()
+    await msg.dispose()  # second call: container is None
+
+    container.dispose.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_from_element_disposes_parse_only_handles():
+    """Parse-only handles (pre_plain, selectable, tails) must be disposed
+    after a successful parse — they pin renderer DOM nodes otherwise."""
+    from whatsplay.object.message import Message
+
+    page = AsyncMock()
+    elem = AsyncMock()
+    elem.get_attribute.side_effect = lambda attr: {
+        "data-id": "msg-1",
+        "data-testid": "conv-msg-AC-test",
+    }.get(attr)
+
+    pre_plain = AsyncMock()
+    pre_plain.get_attribute.return_value = "[14:30] Juan: "
+    pre_plain.dispose = AsyncMock()
+    selectable = AsyncMock()
+    selectable.inner_text.return_value = "Hola"
+    selectable.dispose = AsyncMock()
+
+    async def query_selector(selector):
+        if "[data-pre-plain-text]" in selector:
+            return pre_plain
+        if '[data-testid="selectable-text"]' in selector:
+            return selectable
+        return None
+
+    elem.query_selector = query_selector
+
+    msg = await Message.from_element(elem, page)
+
+    assert msg is not None
+    pre_plain.dispose.assert_awaited_once()
+    selectable.dispose.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_file_message_dispose_releases_icon_and_container():
+    """FileMessage.dispose() must free both download_icon and container."""
+    from whatsplay.object.message import FileMessage
+
+    container = AsyncMock()
+    icon = AsyncMock()
+    fm = FileMessage(page=AsyncMock(), sender="A", timestamp=datetime.now(),
+                     text="", container=container, filename="a.pdf",
+                     download_icon=icon)
+
+    await fm.dispose()
+
+    icon.dispose.assert_awaited_once()
+    container.dispose.assert_awaited_once()
+    assert fm.download_icon is None
+    assert fm.container is None
+
+
+@pytest.mark.asyncio
+async def test_safe_dispose_swallows_errors():
+    """A handle whose dispose() raises must not break the caller."""
+    from whatsplay.object.message import _safe_dispose
+
+    broken = AsyncMock()
+    broken.dispose.side_effect = Exception("already gone")
+
+    await _safe_dispose(broken)  # must not raise
+    await _safe_dispose(None)    # None must be a no-op
+
+
+@pytest.mark.asyncio
+async def test_collect_messages_dispose_flag_releases_containers():
+    """collect_messages(dispose=True) must dispose each returned message's
+    container; the default (False) must leave them intact for react()/download()."""
+    from whatsplay.client import Client
+
+    client = Client.__new__(Client)  # bypass __init__
+    client.chat_manager = AsyncMock()
+
+    # Two fake messages with spy containers
+    m1, m2 = MagicMock(), MagicMock()
+    m1.dispose = AsyncMock()
+    m2.dispose = AsyncMock()
+    client.chat_manager.collect_messages.return_value = [m1, m2]
+
+    await client.collect_messages(dispose=True)
+    client.chat_manager.collect_messages.assert_awaited_once_with(
+        own_push_names=None, dispose=True
+    )
+
+
+@pytest.mark.asyncio
+async def test_collect_messages_default_keep_handles():
+    """Calling collect_messages() without dispose must forward False."""
+    from whatsplay.client import Client
+
+    client = Client.__new__(Client)
+    client.chat_manager = AsyncMock()
+    client.chat_manager.collect_messages.return_value = []
+
+    await client.collect_messages()
+
+    client.chat_manager.collect_messages.assert_awaited_once_with(
+        own_push_names=None, dispose=False
+    )

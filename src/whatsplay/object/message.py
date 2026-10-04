@@ -131,6 +131,26 @@ def _flag_direction_fallback(testid: str) -> None:
     )
 
 
+async def _safe_dispose(handle: Optional[ElementHandle]) -> None:
+    """Release one Playwright ElementHandle, never raising.
+
+    Playwright pinneers the referenced DOM node until ``dispose()`` runs
+    (docs: "ElementHandle prevents DOM element from garbage collection
+    unless the handle is disposed"). collect_messages creates dozens of
+    handles per chat read, so un-disposed handles accumulate in both the
+    renderer and the Python side until the V8 heap cannot commit and the
+    renderer dies with SIGTRAP. This helper frees one handle and swallows
+    dispose errors (handle already gone, mock without dispose, frame
+    navigated) so cleanup never masks the real work.
+    """
+    if handle is None:
+        return
+    try:
+        await handle.dispose()
+    except Exception:
+        pass
+
+
 async def _self_or_descendant_has_class(elem: ElementHandle, class_name: str) -> bool:
     """Check a direction CSS class on the bubble container itself or below it.
 
@@ -163,7 +183,10 @@ async def _resolve_data_id(elem: ElementHandle, outer_id: str) -> str:
     try:
         inner = await elem.query_selector("[data-id]")
         if inner is not None:
-            return (await inner.get_attribute("data-id")) or ""
+            try:
+                return (await inner.get_attribute("data-id")) or ""
+            finally:
+                await _safe_dispose(inner)
     except Exception:
         pass
     return ""
@@ -371,6 +394,19 @@ class Message:
         own = normalize_own_push_names(own_push_names) | OWN_SENDER_TOKENS
         return normalize_sender_name(self.sender) in own
 
+    async def dispose(self) -> None:
+        """Release the DOM handle held by this message.
+
+        The container ElementHandle pins its DOM node in the renderer until
+        disposed. A long-running consumer that only reads text/sender/
+        timestamp should call this after each message (or after each batch)
+        so handles do not accumulate until the renderer runs out of
+        committable V8 heap and crashes. Safe to call more than once and on
+        messages whose interactive methods are never used.
+        """
+        await _safe_dispose(self.container)
+        self.container = None
+
     @classmethod
     async def from_element(
         cls,
@@ -401,6 +437,13 @@ class Message:
         Returns:
             A new Message instance or None if parsing fails.
         """
+        # Handles created for parsing only: they stay referenced by Playwright
+        # until disposed, so every one of them is released in the finally
+        # below. The returned Message keeps only elem (the container) alive for
+        # interactive methods (react); collect_messages owns the container.
+        pre_plain = remitente_span = None
+        tail_out = tail_in = message_out = message_in = None
+        selectable = None
         try:
             # 0) ID if exists (outer container first, inner row fallback:
             #    data-id may live on a descendant, not on the conv-msg node).
@@ -527,6 +570,17 @@ class Message:
         except Exception as ex:
             logger.debug("Message.from_element EXCEPTION for %s: %s: %s", testid, type(ex).__name__, ex)
             return None
+        finally:
+            # Release parse-only handles: they pin DOM nodes in the renderer
+            # and, multiplied across every chat read, are the reason memory
+            # climbs without bound until the renderer crashes.
+            await _safe_dispose(pre_plain)
+            await _safe_dispose(remitente_span)
+            await _safe_dispose(tail_out)
+            await _safe_dispose(tail_in)
+            await _safe_dispose(message_out)
+            await _safe_dispose(message_in)
+            await _safe_dispose(selectable)
 
     async def react(self, emoji: str):
         """
@@ -695,11 +749,14 @@ class FileMessage(Message):
             # 2) Extract filename from DOM
             filename = await _extract_filename(icon)
             if not filename:
+                # Icon is not a real file attachment: release it now.
+                await _safe_dispose(icon)
                 return None
 
             # 3) Extract base message data
             base_msg = await Message.from_element(elem, page, own_push_names)
             if not base_msg:
+                await _safe_dispose(icon)
                 return None
 
             return cls(
@@ -751,6 +808,12 @@ class FileMessage(Message):
 
         except Exception:
             return None
+
+    async def dispose(self) -> None:
+        """Release the container and download-icon handles held by this file message."""
+        await _safe_dispose(self.download_icon)
+        self.download_icon = None
+        await super().dispose()
 
     def get_codec_info(self, file_path: Path) -> Optional[Dict[str, Any]]:
         """
@@ -822,10 +885,17 @@ class VoiceMessage(Message):
         try:
             is_quoted = await elem.query_selector('[aria-label="Mensaje citado"]')
             if is_quoted:
+                await _safe_dispose(is_quoted)
                 return None
 
             has_play_button = await elem.query_selector('button[aria-label*="voz"], button[aria-label*="voice" i]')
             has_voice_container = await elem.query_selector('span[aria-label*="voz"], span[aria-label*="voice" i]')
+            # These two are only probed for presence; release them now so they
+            # do not pin DOM nodes for the whole collect_messages pass.
+            await _safe_dispose(has_play_button)
+            await _safe_dispose(has_voice_container)
+            has_play_button = has_play_button is not None
+            has_voice_container = has_voice_container is not None
 
             # Check for voice icon using evaluate (more reliable than :has selector)
             has_voice_icon = await elem.evaluate(
@@ -898,6 +968,10 @@ class VoiceMessage(Message):
 
         except Exception:
             return None
+
+    async def dispose(self) -> None:
+        """Release the container handle held by this voice message."""
+        await super().dispose()
 
     async def download_via_play(self, page: Page, downloads_dir: Path) -> Optional[Path]:
         """

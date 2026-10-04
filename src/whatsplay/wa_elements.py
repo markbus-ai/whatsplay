@@ -14,6 +14,7 @@ import re
 
 from .constants import locator as loc
 from .logging_setup import get_logger
+from .object.message import _safe_dispose
 
 logger = get_logger(__name__)
 from .constants.states import State
@@ -271,7 +272,15 @@ class WhatsAppElements:
         except Exception as e:
             logger.warning(f"Error searching chats: {e}")
         finally:
-            # Cerrar búsqueda
+            # Release the query handle and close the search.
+            try:
+                await _safe_dispose(results_container)
+            except NameError:
+                pass
+            try:
+                await _safe_dispose(search_box)
+            except NameError:
+                pass
             try:
                 if close:
                     await self.close_search()
@@ -306,9 +315,12 @@ class WhatsAppElements:
                     timeout=timeout
                 )
                 invalid_warning = await self.page.query_selector(loc.INVALID_NUMBER_WARNING)
-                if invalid_warning and await invalid_warning.is_visible():
-                    _log("numero invalido detectado")
-                    return False
+                try:
+                    if invalid_warning and await invalid_warning.is_visible():
+                        _log("numero invalido detectado")
+                        return False
+                finally:
+                    await _safe_dispose(invalid_warning)
                 _log("chat abierto via URL OK")
                 return True
             except PlaywrightTimeoutError:
@@ -328,9 +340,12 @@ class WhatsAppElements:
             _log(f"query_selector directo: {'encontrado' if chat_element else 'no encontrado'}")
 
             if chat_element:
-                await chat_element.click()
-                self._search_active = False
-                _log("click directo OK")
+                try:
+                    await chat_element.click()
+                    self._search_active = False
+                    _log("click directo OK")
+                finally:
+                    await _safe_dispose(chat_element)
             else:
                 _log("chat no visible, entrando a ruta de busqueda")
                 await asyncio.sleep(2)
@@ -358,6 +373,7 @@ class WhatsAppElements:
                 results = await self.page.wait_for_selector(loc.SEARCH_ITEM, timeout=5000)
                 _log(f"SEARCH_ITEM: {results is not None}")
                 if not results:
+                    await _safe_dispose(search_box)
                     raise Exception("No se encontraron resultados de busqueda")
 
                 await asyncio.sleep(1)
@@ -365,16 +381,25 @@ class WhatsAppElements:
                 _log(f"chat_results count={len(chat_results)}")
 
                 found = False
-                for chat in chat_results:
-                    title_el = await chat.query_selector(f"xpath={loc.SPAN_TITLE}")
-                    if title_el:
-                        title = await title_el.get_attribute("title")
-                        if title and chat_name.lower() in title.lower():
-                            _log(f"clickeando chat: {title}")
-                            await chat.click()
-                            self._search_active = False
-                            found = True
-                            break
+                try:
+                    for chat in chat_results:
+                        title_el = await chat.query_selector(f"xpath={loc.SPAN_TITLE}")
+                        try:
+                            if title_el:
+                                title = await title_el.get_attribute("title")
+                                if title and chat_name.lower() in title.lower():
+                                    _log(f"clickeando chat: {title}")
+                                    await chat.click()
+                                    self._search_active = False
+                                    found = True
+                                    break
+                        finally:
+                            await _safe_dispose(title_el)
+                finally:
+                    # Release every result handle; the click already happened.
+                    for chat in chat_results:
+                        await _safe_dispose(chat)
+                    await _safe_dispose(search_box)
                 if not found:
                     _log("chat no encontrado en results, usando ArrowDown+Enter")
                     await self.page.keyboard.press("ArrowDown")
