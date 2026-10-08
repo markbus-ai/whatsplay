@@ -31,6 +31,7 @@ from .object.message import (
     Message,
     VoiceMessage,
     _flag_direction_fallback,
+    _safe_dispose,
 )
 from .codec_detector import detect_codec
 
@@ -120,29 +121,36 @@ class ChatManager:
 
             async def _get_scroller_handle():
                 """
-                Get the ElementHandle of the actual scrolling container.
-
-                Returns:
-                    ElementHandle for the virtualizable scrolling container
+                Resolve the scrolling container to confirm the virtualized list
+                is mounted. The handle is not needed by the caller, so every
+                handle created here is released before returning. This runs on
+                every scan tick (~every poll_freq): undisposed handles pin DOM
+                nodes in the renderer until it cannot commit heap and crashes.
                 """
                 grid = self._page.locator(loc.CHAT_LIST_GRID)
                 grid_h = await grid.element_handle()
 
                 if not grid_h:
-                    return await self._page.locator("#pane-side").element_handle()
+                    await _safe_dispose(
+                        await self._page.locator("#pane-side").element_handle()
+                    )
+                    return
 
-                return await grid_h.evaluate_handle(
-                    """(el) => {
-                        let cur = el;
-                        while (cur && cur !== document.body) {
-                            const s = getComputedStyle(cur);
-                            if ((s.overflowY === 'auto' || s.overflowY === 'scroll') &&
-                                cur.clientHeight < cur.scrollHeight) return cur;
-                            cur = cur.parentElement;
-                        }
-                        return document.querySelector('#pane-side');
-                    }"""
-                )
+                try:
+                    await _safe_dispose(await grid_h.evaluate_handle(
+                        """(el) => {
+                            let cur = el;
+                            while (cur && cur !== document.body) {
+                                const s = getComputedStyle(cur);
+                                if ((s.overflowY === 'auto' || s.overflowY === 'scroll') &&
+                                    cur.clientHeight < cur.scrollHeight) return cur;
+                                cur = cur.parentElement;
+                            }
+                            return document.querySelector('#pane-side');
+                        }"""
+                    ))
+                finally:
+                    await _safe_dispose(grid_h)
 
             async def _is_row_unread(row_loc) -> bool:
                 """
@@ -212,7 +220,12 @@ class ChatManager:
                 handle = await row_loc.element_handle()
                 if not handle:
                     return None
-                return await self._parse_search_result(handle, "CHATS")
+                try:
+                    return await self._parse_search_result(handle, "CHATS")
+                finally:
+                    # The parsed dict carries plain data only; release the row
+                    # handle so it does not pin the node across scan ticks.
+                    await _safe_dispose(handle)
 
             try:
                 # Step 0: Wait for UI to be ready
@@ -231,7 +244,7 @@ class ChatManager:
                     log("DEBUG: Could not count initial rows")
 
                 # Step 2: Get correct scroller for virtualized list
-                scroller_h = await _get_scroller_handle()
+                await _get_scroller_handle()
 
                 # Step 3: Sweep visible rows
                 async def sweep(tag: str) -> None:
@@ -313,7 +326,15 @@ class ChatManager:
             Handles two main layouts:
             - 3 components: Group chats (group name, title, last message)
             - 2 components: Direct chats (title, last message)
+
+            Every ElementHandle created here is released in the finally block.
+            This runs on every scan tick, and undisposed handles pin DOM nodes
+            in the renderer until it cannot commit heap and crashes (SIGTRAP).
         """
+        components: list = []
+        unread_el = mic_span = span_title_0 = span_title_1 = None
+        datetime_children: list = []
+        info_children: list = []
         try:
             components = await element.query_selector_all(
                 "xpath=.//div[@role='gridcell' and @aria-colindex='2']/parent::div/div"
@@ -353,7 +374,6 @@ class ChatManager:
                     "last_message": info_text,
                     "last_message_type": "audio" if mic_span else "text",
                     "unread_count": unread_count,
-                    "element": element,
                 }
 
             elif count == 2:
@@ -379,7 +399,6 @@ class ChatManager:
                     "last_message": info_text,
                     "last_message_type": "audio" if mic_span else "text",
                     "unread_count": unread_count,
-                    "element": element,
                     "group": None,
                 }
 
@@ -388,6 +407,17 @@ class ChatManager:
         except Exception as e:
             logger.warning(f"Error parsing result: {e}")
             return None
+        finally:
+            for _h in components:
+                await _safe_dispose(_h)
+            await _safe_dispose(unread_el)
+            await _safe_dispose(mic_span)
+            await _safe_dispose(span_title_0)
+            await _safe_dispose(span_title_1)
+            for _h in datetime_children:
+                await _safe_dispose(_h)
+            for _h in info_children:
+                await _safe_dispose(_h)
 
     async def close(self) -> None:
         """

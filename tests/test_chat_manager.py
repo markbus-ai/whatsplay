@@ -188,3 +188,61 @@ async def test_parse_search_result_individual_chat_with_colon_in_message(mock_ch
     assert result["last_message"] == "Mensaje: con dos puntos"
     assert result["unread_count"] == "1"
     assert result["group"] is None
+
+
+# ============================================================
+# Scan handle disposal — renderer memory leak regression (2.6.3)
+# ============================================================
+
+@pytest.mark.asyncio
+async def test_parse_search_result_disposes_all_handles():
+    """_parse_search_result must release every handle it creates; the scan
+    runs every tick and undisposed handles pin DOM nodes in the renderer."""
+    from whatsplay.chat_manager import ChatManager
+    from unittest.mock import AsyncMock
+
+    client = MockClient()
+    mgr = ChatManager(client)
+
+    def mk():
+        h = AsyncMock()
+        h.dispose = AsyncMock()
+        h.get_attribute = AsyncMock(return_value="Title")
+        h.text_content = AsyncMock(return_value="info")
+        h.query_selector = AsyncMock(return_value=None)
+        h.query_selector_all = AsyncMock(return_value=[])
+        return h
+
+    c0, c1 = mk(), mk()
+    element = AsyncMock()
+    element.query_selector_all = AsyncMock(return_value=[c0, c1])
+    element.query_selector = AsyncMock(return_value=None)
+
+    result = await mgr._parse_search_result(element, "CHATS")
+
+    # 2-component layout -> a dict, and no handle stored inside it
+    assert result is not None
+    assert "element" not in result
+    c0.dispose.assert_awaited()
+    c1.dispose.assert_awaited()
+
+
+@pytest.mark.asyncio
+async def test_refresh_reloads_and_waits_for_login():
+    """Client.refresh must reload the page and wait for login again."""
+    from whatsplay.client import Client
+    from unittest.mock import AsyncMock, MagicMock
+
+    client = Client.__new__(Client)
+    client._page = AsyncMock()
+    client._page.reload = AsyncMock()
+    client.emit = AsyncMock()
+    client.current_state = "stale"
+    client.wait_until_logged_in = AsyncMock(return_value=True)
+
+    ok = await client.refresh(timeout=5)
+
+    assert ok is True
+    client._page.reload.assert_awaited_once()
+    client.wait_until_logged_in.assert_awaited_once()
+    assert client.current_state is None  # forced a fresh state read

@@ -290,6 +290,38 @@ class Client(BaseWhatsAppClient):
         await self.emit("on_error", "Login timeout expired")
         return False
 
+    async def refresh(self, timeout: int = 180) -> bool:
+        """
+        Reload WhatsApp Web to release accumulated renderer memory.
+
+        WhatsApp Web accumulates detached DOM nodes and JS heap over hours of
+        use. Left running, the renderer reaches V8's heap ceiling and crashes
+        with SIGTRAP ("Target crashed"). A page reload destroys the JS context
+        and frees all of it; cookies persist, so the session survives and no QR
+        is needed.
+
+        Intended to be called periodically by the consumer (the schedule is an
+        operational policy, not a library concern).
+
+        Args:
+            timeout: Maximum seconds to wait for the client to log back in.
+
+        Returns:
+            True when the client is logged in again after the reload.
+        """
+        if not self._page:
+            return False
+        # Force a fresh state read: current_state is stale right after a
+        # reload, and wait_until_logged_in would return immediately on it.
+        self.current_state = None
+        try:
+            await self._page.reload(wait_until="domcontentloaded", timeout=60000)
+        except Exception as e:
+            await self.emit("on_error", f"refresh: reload failed: {e}")
+            return False
+        await self.emit("on_refresh")
+        return await self.wait_until_logged_in(timeout=timeout)
+
     # -------------------------------------------------------------------------
     # Delegated methods to ChatManager
     # -------------------------------------------------------------------------
