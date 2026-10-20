@@ -907,11 +907,11 @@ class ChatManager:
                         "on_error", f"Composer text did not match the message for {chat_query!r}"
                     )
                     return False
+                before_ids = await self._message_ids()
                 # Enter goes to the composer itself, not to whatever has focus.
                 await input_box.press("Enter")
-                await asyncio.sleep(2)
 
-                confirmed = await self.wait_for_whatsapp_ready(timeout=DEFAULT_WAIT_TIMEOUT)
+                confirmed = await self.wait_for_sent_confirmation(before_ids, DEFAULT_WAIT_TIMEOUT)
                 if not confirmed:
                     logger.warning(
                         "Message to %r sent but not confirmed by server", chat_query
@@ -925,6 +925,43 @@ class ChatManager:
                 return False
             finally:
                 await self.close()
+
+    async def _bubbles(self) -> List[Dict[str, Any]]:
+        """data-id of every message in the open chat, and whether it shows a
+        delivery status (only outgoing messages do)."""
+        status = loc.MSG_STATUS_CONFIRMED
+        if status.startswith("css="):  # str.removeprefix needs 3.9; we support 3.8
+            status = status[len("css="):]
+        try:
+            rows = await self._page.evaluate(
+                """([container, status]) => Array.from(
+                    document.querySelectorAll('#main ' + container)
+                ).map(e => ({id: e.getAttribute('data-id'), status: !!e.querySelector(status)}))""",
+                [loc.MESSAGE_CONTAINER, status],
+            )
+        except Exception:
+            return []
+        return rows if isinstance(rows, list) else []
+
+    async def _message_ids(self) -> set:
+        return {row.get("id") for row in await self._bubbles()}
+
+    async def wait_for_sent_confirmation(self, before_ids: set, timeout: int = DEFAULT_WAIT_TIMEOUT) -> bool:
+        """Wait until a message that was not in `before_ids` shows a delivery
+        status ("Enviado", "Entregado", "Leído") in the open chat.
+
+        An older outgoing message that is already read never counts. Verified
+        live 2026-10-20: a just-sent bubble gets a new data-id and a status span.
+        """
+        deadline = time.monotonic() + timeout / 1000
+        while True:
+            for row in await self._bubbles():
+                if row.get("id") not in before_ids and row.get("status"):
+                    return True
+            if time.monotonic() >= deadline:
+                logger.warning("No new message with a delivery status within %dms", timeout)
+                return False
+            await asyncio.sleep(0.5)
 
     async def wait_for_whatsapp_ready(self, timeout=30000) -> bool:
         try:
@@ -1009,9 +1046,9 @@ class ChatManager:
                 # El botón de enviar real es el DIV role=button (el SPAN interno no dispara)
                 send_btn_loc = self._page.locator(loc.SEND_BUTTON).first
                 await send_btn_loc.wait_for(state="visible", timeout=DEFAULT_WAIT_TIMEOUT)
+                before_ids = await self._message_ids()
                 await send_btn_loc.click()
-                await asyncio.sleep(2)
-                confirmed = await self.wait_for_whatsapp_ready(timeout=DEFAULT_WAIT_TIMEOUT)
+                confirmed = await self.wait_for_sent_confirmation(before_ids, DEFAULT_WAIT_TIMEOUT)
                 if not confirmed:
                     logger.warning("File to %r sent but not confirmed by server", chat_name)
                 return confirmed

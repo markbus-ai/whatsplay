@@ -102,6 +102,40 @@ async def test_send_file_reports_failure_when_not_confirmed(tmp_path, monkeypatc
     manager = ChatManager(client)
     manager._page = page
     manager.open = AsyncMock(return_value=True)
-    manager.wait_for_whatsapp_ready = AsyncMock(return_value=False)
+    manager.wait_for_sent_confirmation = AsyncMock(return_value=False)
 
     assert await manager.send_file("Cliente", str(path), is_group=True) is False
+
+
+def _manager_for_confirmation(evaluate_results):
+    from whatsplay.chat_manager import ChatManager
+
+    client = MagicMock()
+    manager = ChatManager(client)
+    manager._page = MagicMock()
+    manager._page.evaluate = AsyncMock(side_effect=evaluate_results)
+    return manager
+
+
+@pytest.mark.asyncio
+async def test_confirmation_requires_a_new_bubble_with_a_status(monkeypatch):
+    monkeypatch.setattr("whatsplay.chat_manager.asyncio.sleep", AsyncMock())
+    # An old outgoing bubble already shows "Leído"; the new one appears later.
+    manager = _manager_for_confirmation([
+        [],                                   # nothing new yet
+        [{"id": "NEW", "status": True}],      # our message, confirmed
+    ])
+
+    assert await manager.wait_for_sent_confirmation({"OLD"}, timeout=5000) is True
+
+
+@pytest.mark.asyncio
+async def test_confirmation_fails_when_no_new_bubble_appears(monkeypatch):
+    # The previous outgoing message being "Leído" must not count as success.
+    monkeypatch.setattr("whatsplay.chat_manager.asyncio.sleep", AsyncMock())
+    clock = iter(range(0, 100, 1))
+    monkeypatch.setattr("whatsplay.chat_manager.time.monotonic", lambda: next(clock))
+    manager = _manager_for_confirmation(lambda *a, **k: [])
+    manager._page.evaluate = AsyncMock(return_value=[])
+
+    assert await manager.wait_for_sent_confirmation({"OLD"}, timeout=5000) is False

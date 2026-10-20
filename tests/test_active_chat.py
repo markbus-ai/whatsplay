@@ -139,7 +139,7 @@ def _manager_with_open_chat(active_title):
     manager._page = page
     manager.open = AsyncMock(return_value=True)
     manager.close = AsyncMock()
-    manager.wait_for_whatsapp_ready = AsyncMock(return_value=True)
+    manager.wait_for_sent_confirmation = AsyncMock(return_value=True)
     manager.wa_elements = MagicMock()
     manager.wa_elements.active_chat_title = AsyncMock(return_value=active_title)
     return manager, page, composer
