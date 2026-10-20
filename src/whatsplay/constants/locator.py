@@ -103,6 +103,21 @@ CHAT_INPUT_BOX = (
     " | //div[@aria-label='Type a message' or @aria-label='Escribe un mensaje']"
     " | //div[@aria-placeholder='Type a message' or @aria-placeholder='Escribe un mensaje' or @title='Type a message']"
 )
+# The composer of the chat that is actually open. Scoped to #main so it can
+# never resolve to the search box or to another pane (verified live 2026-10-20).
+ACTIVE_CHAT_COMPOSER = '#main footer div[contenteditable="true"][role="textbox"]'
+# Fallback source for the open chat's title when the composer has no label.
+ACTIVE_CHAT_HEADER_TITLE = '#main header span[dir="auto"]'
+# The composer's aria-label names its chat: "Escribir un mensaje para +54 9 …",
+# "Escribir un mensaje para el grupo Cliente". Group prefix goes first.
+# Only labels observed live are listed; other UI languages fall back to the
+# header title (ACTIVE_CHAT_HEADER_TITLE).
+COMPOSER_LABEL_PREFIXES = (
+    "Escribir un mensaje para el grupo ",
+    "Escribir un mensaje para ",
+)
+# Titles of the chats listed in the side pane.
+CHAT_LIST_TITLES = "//div[@role='row']//div[@data-testid='cell-frame-title']//span[@title]"
 CHAT_DIV = "//div[@role='application']"
 UNREAD_CHAT_DIV = "//div[@aria-label='Chat list' or @aria-label='Lista de chats' or @id='pane-side']"
 
@@ -138,7 +153,13 @@ NEW_CHAT_BUTTON = 'xpath=//span[@data-icon="new-chat-outline" or @data-icon="cha
 NEW_GROUP_BUTTON = 'xpath=//div[@aria-label="New group" or @aria-label="Nuevo grupo" and @role="button"]'
 INPUT_MEMBERS_GROUP = 'xpath=//input[@placeholder="Search name or number" or @placeholder="Buscar un nombre o número"]'
 ENTER_GROUP_NAME = 'xpath=//div[@aria-label="Group subject (optional)" or @aria-label="Asunto del grupo (opcional)"]'
-GROUP_INFO_BUTTON = 'xpath=//div[@title="Profile details" or @title="Detalles del perfil" and @role="button"]'
+# Header button that opens the chat/contact info panel. WhatsApp Web renamed it
+# to "Información del perfil" (verified live 2026-10-20). The titles are grouped
+# so role=button applies to every alternative (it used to bind to the last one).
+GROUP_INFO_BUTTON = (
+    'xpath=//div[(@title="Información del perfil"'
+    ' or @title="Detalles del perfil" or @title="Profile details") and @role="button"]'
+)
 ADD_MEMBERS_BUTTON = 'xpath=//span[@data-icon="person-add-filled-refreshed" or @data-icon="person-add"]'
 CONFIRM_ADD_MEMBERS_BUTTON = 'xpath=//span[(@aria-label="Confirm" or @aria-label="Confirmar") and (@data-icon="checkmark-medium" or @data-icon="checkmark")]'
 REMOVE_MEMBER_BUTTON = 'xpath=//span[@data-icon="clear-refreshed" or @data-icon="x-rounded"]'

@@ -34,6 +34,7 @@ from .object.message import (
     _safe_dispose,
 )
 from .codec_detector import detect_codec
+from .wa_elements import same_chat
 
 # Constants
 DEFAULT_DOWNLOADS_DIR = Path.home() / "Downloads" / "WhatsAppFiles"
@@ -798,6 +799,17 @@ class ChatManager:
 
         return result
 
+    async def _ensure_active_chat(self, chat_name: str) -> bool:
+        """Last check before typing: refuse if another chat is open."""
+        active = await self.wa_elements.active_chat_title()
+        if active is not None and same_chat(active, chat_name):
+            return True
+        logger.error("Refusing to write: open chat is %r, not %r", active, chat_name)
+        await self.client.emit(
+            "on_error", f"Open chat is {active!r}, not {chat_name!r}; nothing was written"
+        )
+        return False
+
     async def send_message(self, chat_query: str, message: str, open_via_url: bool = False) -> bool:
         """
         Send a text message to a chat.
@@ -822,14 +834,16 @@ class ChatManager:
                     return False
                 logger.info("Chat %r opened, sending message", chat_query)
 
-                await self._page.wait_for_selector(loc.CHAT_INPUT_BOX, timeout=DEFAULT_WAIT_TIMEOUT)
-                input_box = await self._page.wait_for_selector(loc.CHAT_INPUT_BOX, timeout=DEFAULT_WAIT_TIMEOUT)
-
+                input_box = await self._page.wait_for_selector(
+                    loc.ACTIVE_CHAT_COMPOSER, timeout=DEFAULT_WAIT_TIMEOUT
+                )
                 if not input_box:
                     await self.client.emit(
                         "on_error",
                         "Could not find text input box for sending message",
                     )
+                    return False
+                if not await self._ensure_active_chat(chat_query):
                     return False
 
                 await input_box.click(force=True)
@@ -894,7 +908,11 @@ class ChatManager:
                     await self.client.emit("on_error", msg)
                     return False
 
-                await self._page.wait_for_selector(loc.CHAT_INPUT_BOX, timeout=DEFAULT_WAIT_TIMEOUT)
+                await self._page.wait_for_selector(
+                    loc.ACTIVE_CHAT_COMPOSER, timeout=DEFAULT_WAIT_TIMEOUT
+                )
+                if not await self._ensure_active_chat(chat_name):
+                    return False
 
                 attach_btn = await self._page.wait_for_selector(loc.ATTACH_BUTTON, timeout=5000)
                 await attach_btn.click()

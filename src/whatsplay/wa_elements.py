@@ -11,6 +11,7 @@ from playwright.async_api import (
     TimeoutError as PlaywrightTimeoutError,
 )
 import re
+import unicodedata
 
 from .constants import locator as loc
 from .logging_setup import get_logger
@@ -19,6 +20,46 @@ from .object.message import _safe_dispose
 logger = get_logger(__name__)
 from .constants.states import State
 from .filters import MessageFilter
+
+_PHONE_TITLE = re.compile(r"^\+?[\d\s().-]{7,}$")
+
+# Seconds to wait for the header/composer to switch to the clicked chat.
+ACTIVE_CHAT_SETTLE_SECS = 3.0
+
+
+def normalize_chat_title(title: str) -> str:
+    """Canonical form used to decide whether two chat titles are the same chat.
+
+    Phone numbers compare by digits only ("+54 9 2234 48-0402" == "5492234480402").
+    Names compare without accents, case or repeated spaces, and without the "~"
+    WhatsApp puts before unsaved push names. Partial matches never count:
+    "Cliente" and "Cliente (pruebas)" are different chats.
+    """
+    text = unicodedata.normalize("NFKD", title or "")
+    text = "".join(c for c in text if not unicodedata.combining(c))
+    text = text.strip().lstrip("~").strip()
+    if _PHONE_TITLE.match(text):
+        return re.sub(r"\D", "", text)
+    return " ".join(text.casefold().split())
+
+
+# Shortest digit run accepted when one phone lacks the country code.
+_MIN_PHONE_SUFFIX = 8
+
+
+def same_chat(a: str, b: str) -> bool:
+    """Whether two chat titles name the same chat.
+
+    Phones match when one digit string ends with the other ("2235988856" and
+    "+54 9 2235 98-8856") and the shorter has at least 8 digits.
+    """
+    na, nb = normalize_chat_title(a), normalize_chat_title(b)
+    if na == nb:
+        return bool(na)
+    if na.isdigit() and nb.isdigit():
+        short, long_ = sorted((na, nb), key=len)
+        return len(short) >= _MIN_PHONE_SUFFIX and long_.endswith(short)
+    return False
 
 
 class WhatsAppElements:
@@ -289,9 +330,75 @@ class WhatsAppElements:
 
         return results
 
+    async def active_chat_title(self) -> Optional[str]:
+        """Title of the chat that is actually open, or None if no chat is open.
+
+        Read from the open composer's aria-label ("Escribir un mensaje para X"),
+        the element text is typed into, with the header title as fallback.
+        """
+        try:
+            info = await self.page.evaluate(
+                """([composerSel, headerSel]) => {
+                    const composer = document.querySelector(composerSel);
+                    const header = document.querySelector(headerSel);
+                    return {
+                        composer: composer ? composer.getAttribute('aria-label') : null,
+                        header: header ? header.textContent : null,
+                    };
+                }""",
+                [loc.ACTIVE_CHAT_COMPOSER, loc.ACTIVE_CHAT_HEADER_TITLE],
+            )
+        except Exception:
+            return None
+        if not isinstance(info, dict):
+            return None
+
+        label = info.get("composer")
+        if isinstance(label, str):
+            for prefix in loc.COMPOSER_LABEL_PREFIXES:
+                if label.startswith(prefix):
+                    return label[len(prefix):].strip()
+        header = info.get("header")
+        if isinstance(header, str) and header.strip():
+            return header.strip()
+        return None
+
+    async def is_active_chat(self, chat_name: str) -> bool:
+        """Whether the open chat is exactly `chat_name` (see normalize_chat_title)."""
+        title = await self.active_chat_title()
+        return title is not None and same_chat(title, chat_name)
+
+    async def _wait_until_active(self, chat_name: str) -> bool:
+        """Give WhatsApp a moment to switch panes after a click, then verify."""
+        deadline = asyncio.get_running_loop().time() + ACTIVE_CHAT_SETTLE_SECS
+        while True:
+            if await self.is_active_chat(chat_name):
+                return True
+            if asyncio.get_running_loop().time() >= deadline:
+                return False
+            await asyncio.sleep(0.3)
+
+    async def _click_listed_chat(self, chat_name: str) -> bool:
+        """Click the side-pane row whose title is exactly `chat_name`."""
+        cells = await self.page.query_selector_all(f"xpath={loc.CHAT_LIST_TITLES}")
+        try:
+            for cell in cells:
+                title = await cell.get_attribute("title")
+                if isinstance(title, str) and same_chat(title, chat_name):
+                    await cell.click()
+                    self._search_active = False
+                    return True
+            return False
+        finally:
+            for cell in cells:
+                await _safe_dispose(cell)
+
     async def open(self, chat_name: str, timeout: int = 10000, open_via_url: bool = False) -> bool:
         """
         Abre un chat por su nombre visible o número. Si no está visible, lo busca.
+
+        Returns True only when the open chat is verifiably `chat_name`. It never
+        falls back to "whatever comes first", so callers can type safely.
         """
         import time as _time
         _t0 = _time.time()
@@ -321,6 +428,9 @@ class WhatsAppElements:
                         return False
                 finally:
                     await _safe_dispose(invalid_warning)
+                if not await self._wait_until_active(chat_name):
+                    _log(f"chat activo tras URL no es '{chat_name}': {await self.active_chat_title()!r}")
+                    return False
                 _log("chat abierto via URL OK")
                 return True
             except PlaywrightTimeoutError:
@@ -330,22 +440,9 @@ class WhatsAppElements:
                 _log(f"EXCEPTION via URL: {e}")
                 return False
 
-        span_xpath = (
-            f"//div[@role='row']//div[@data-testid='cell-frame-title']"
-            f"//span[contains(@title, {repr(chat_name)})]"
-        )
-
         try:
-            chat_element = await self.page.query_selector(f"xpath={span_xpath}")
-            _log(f"query_selector directo: {'encontrado' if chat_element else 'no encontrado'}")
-
-            if chat_element:
-                try:
-                    await chat_element.click()
-                    self._search_active = False
-                    _log("click directo OK")
-                finally:
-                    await _safe_dispose(chat_element)
+            if await self._click_listed_chat(chat_name):
+                _log("click directo OK")
             else:
                 _log("chat no visible, entrando a ruta de busqueda")
                 await asyncio.sleep(2)
@@ -387,7 +484,7 @@ class WhatsAppElements:
                         try:
                             if title_el:
                                 title = await title_el.get_attribute("title")
-                                if title and chat_name.lower() in title.lower():
+                                if isinstance(title, str) and same_chat(title, chat_name):
                                     _log(f"clickeando chat: {title}")
                                     await chat.click()
                                     self._search_active = False
@@ -401,15 +498,18 @@ class WhatsAppElements:
                         await _safe_dispose(chat)
                     await _safe_dispose(search_box)
                 if not found:
-                    _log("chat no encontrado en results, usando ArrowDown+Enter")
-                    await self.page.keyboard.press("ArrowDown")
-                    await asyncio.sleep(0.5)
-                    await self.page.keyboard.press("Enter")
-                    self._search_active = False
+                    # Never fall back to the first result: it is often another
+                    # chat (or a group) and the caller would type into it.
+                    _log("chat no encontrado en results; no se abre ningún otro")
+                    await self.close_search()
+                    return False
 
-            _log(f"esperando CHAT_INPUT_BOX (timeout={timeout}ms)...")
-            await self.page.wait_for_selector(loc.CHAT_INPUT_BOX, timeout=timeout)
-            _log("CHAT_INPUT_BOX encontrado, SUCCESS")
+            _log(f"esperando ACTIVE_CHAT_COMPOSER (timeout={timeout}ms)...")
+            await self.page.wait_for_selector(loc.ACTIVE_CHAT_COMPOSER, timeout=timeout)
+            if not await self._wait_until_active(chat_name):
+                _log(f"chat activo no es '{chat_name}': {await self.active_chat_title()!r}")
+                return False
+            _log("chat verificado, SUCCESS")
             return True
 
         except PlaywrightTimeoutError:

@@ -186,7 +186,8 @@ async def test_open_search_route_uses_shared_preparation(monkeypatch):
     title = AsyncMock()
     title.get_attribute.return_value = "Alice"
     chat.query_selector.return_value = title
-    page.query_selector_all.return_value = [chat]
+    page.query_selector_all.side_effect = [[], [chat]]  # not listed, then search results
+    elements.active_chat_title = AsyncMock(return_value="Alice")
 
     monkeypatch.setattr("whatsplay.wa_elements.asyncio.sleep", AsyncMock())
 
@@ -203,16 +204,16 @@ async def test_open_direct_lookup_targets_chat_title_cell():
     page = AsyncMock()
     elements = WhatsAppElements(page)
     chat = AsyncMock()
-    page.query_selector.return_value = chat
+    chat.get_attribute.return_value = "+54 9 2235 98-8856"
+    page.query_selector_all.return_value = [chat]
+    elements.active_chat_title = AsyncMock(return_value="+54 9 2235 98-8856")
 
     assert await elements.open("2235988856") is True
 
-    selector = page.query_selector.await_args.args[0]
+    selector = page.query_selector_all.await_args_list[0].args[0]
     assert selector == (
-        "xpath=//div[@role='row']//div[@data-testid='cell-frame-title']"
-        "//span[contains(@title, '2235988856')]"
+        "xpath=//div[@role='row']//div[@data-testid='cell-frame-title']//span[@title]"
     )
-    assert selector != "xpath=//span[contains(@title, '2235988856')]"
     chat.click.assert_awaited_once_with()
 
 
