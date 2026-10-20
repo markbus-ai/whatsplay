@@ -314,3 +314,18 @@ async def test_send_via_url_to_a_saved_contact_writes_to_the_opened_chat(monkeyp
     assert await manager.send_message("+54 9 2235 98-8856", "Hola", open_via_url=True) is True
 
     composer.fill.assert_awaited_once_with("Hola")
+
+
+@pytest.mark.asyncio
+async def test_send_accepts_the_editor_bullet_artifact(monkeypatch):
+    # Observed live 2026-10-20 on all 28 real bot replies: before a "\n* " list
+    # line, the Lexical composer's inner_text shows "•" in place of one
+    # character. Same length, otherwise identical, and the message is sent fine.
+    monkeypatch.setattr("whatsplay.chat_manager.asyncio.sleep", AsyncMock())
+    manager, page, composer = _manager_with_open_chat(active_title="Cliente")
+    message = "Precios:\n---\nCubiertas:\n* Rodado 26: $100"
+    composer.inner_text.return_value = "Precios:\n---\nCubierta•:\n* Rodado 26: $100"
+
+    assert await manager.send_message("Cliente", message) is True
+
+    composer.press.assert_awaited_once_with("Enter")

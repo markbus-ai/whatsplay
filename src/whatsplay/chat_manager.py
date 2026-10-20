@@ -42,6 +42,22 @@ UNREAD_ARIA_PATTERN = r"(?:mensaje(?:s)?\s+no\s+le[ií]do[s]?|unread)"
 MIN_VISIBLE_CHATS_THRESHOLD = 2
 DEFAULT_WAIT_TIMEOUT = 30000
 
+# Character the Lexical composer's inner_text shows in place of one character
+# before a "\n* " list line (observed live 2026-10-20 on every real bot reply
+# with lists; the message itself is sent intact).
+_COMPOSER_RENDER_ARTIFACT = "•"
+
+
+def composer_holds(typed: str, message: str) -> bool:
+    """Whether the composer text read back is `message`.
+
+    Same length, and any differing character is the editor's render artifact.
+    Stray keystrokes change the length, so they are still caught.
+    """
+    if len(typed) != len(message):
+        return False
+    return all(t == m or t == _COMPOSER_RENDER_ARTIFACT for t, m in zip(typed, message))
+
 
 class ChatManager:
     """
@@ -881,10 +897,10 @@ class ChatManager:
 
                 await input_box.click()
                 await input_box.fill(message)
-                # Only send what is in the box is exactly the message: stray
-                # keystrokes that landed here earlier would go out with it.
+                # Only send if the box holds the message: stray keystrokes that
+                # landed here earlier would go out with it.
                 typed = await input_box.inner_text()
-                if " ".join(typed.split()) != " ".join(message.split()):
+                if not composer_holds(typed, message):
                     logger.error("Composer holds %r, not the message; not sending", typed[:80])
                     await input_box.fill("")
                     await self.client.emit(
