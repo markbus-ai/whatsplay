@@ -25,7 +25,6 @@ from .utils import close_qr_window, show_qr_window, update_qr_code
 
 # Constants
 QR_CODE_TIMEOUT = 5000
-DEFAULT_SLEEP_AFTER_CONTINUE = 1
 
 
 class StateManager:
@@ -56,6 +55,8 @@ class StateManager:
         self.wa_elements = client.wa_elements
         self.last_qr_shown: Optional[bytes] = None
         self.qr_server_started: bool = False
+        # Whether on_warning was already emitted for the current blocking dialog.
+        self._dialog_warned: bool = False
 
     async def _get_state(self) -> Optional[State]:
         """
@@ -228,14 +229,18 @@ class StateManager:
             return
 
         try:
-            # Check for continue button (privacy policy updates, etc.)
-            continue_button = await self._page.query_selector(
-                "button:has(div:has-text('Continue'))"
-            )
-            if continue_button:
-                await continue_button.click()
-                await asyncio.sleep(DEFAULT_SLEEP_AFTER_CONTINUE)
+            # A modal dialog ("Novedades en WhatsApp Web", …) blocks every click.
+            # Only its X is used; a dialog without one (it may ask to accept
+            # something) is reported once instead of being clicked through.
+            if not await self.wa_elements.dismiss_blocking_dialog():
+                if not self._dialog_warned:
+                    self._dialog_warned = True
+                    await self.client.emit(
+                        "on_warning",
+                        "A modal dialog blocks WhatsApp Web and could not be closed",
+                    )
                 return
+            self._dialog_warned = False
 
             # Skip unread check if another page operation is in progress
             if self.client._page_lock.locked():

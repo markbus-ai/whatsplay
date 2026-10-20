@@ -10,6 +10,7 @@ class MockClient:
         self._page_lock = MagicMock()
         self._page_lock.locked.return_value = False
         self.wa_elements = MagicMock()
+        self.wa_elements.dismiss_blocking_dialog = AsyncMock(return_value=True)
         self.chat_manager = AsyncMock()
         self.emit = AsyncMock() # Make emit an AsyncMock
 
@@ -56,18 +57,16 @@ async def test_extract_image_from_canvas_error(mock_state_manager):
     mock_state_manager.client.emit.assert_not_called()
 
 @pytest.mark.asyncio
-async def test_handle_logged_in_state_with_continue_button(mock_state_manager):
-    # Simular que el botón 'Continue' está presente
-    mock_continue_button = AsyncMock()
-    mock_state_manager._page.query_selector.return_value = mock_continue_button
+async def test_handle_logged_in_state_with_blocking_dialog(mock_state_manager):
+    # A modal dialog that cannot be dismissed blocks every click: skip the
+    # unread scan and report it (once) instead of clicking through it.
+    mock_state_manager.wa_elements.dismiss_blocking_dialog = AsyncMock(return_value=False)
 
     await mock_state_manager._handle_logged_in_state()
 
-    # Verificar que el botón 'Continue' fue clicado
-    mock_continue_button.click.assert_called_once()
-    # Verificar que no se llamó a _check_unread_chats ni se emitió on_unread_chat
     mock_state_manager.client.chat_manager._check_unread_chats.assert_not_called()
-    mock_state_manager.client.emit.assert_not_called()
+    mock_state_manager.client.emit.assert_called_once()
+    assert mock_state_manager.client.emit.call_args.args[0] == "on_warning"
 
 @pytest.mark.asyncio
 async def test_handle_logged_in_state_with_unread_chats(mock_state_manager):

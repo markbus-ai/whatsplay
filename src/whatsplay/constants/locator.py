@@ -1,8 +1,11 @@
 # ==============================
 # State locators
 # ==============================
-AUTH = "//div[contains(., 'Steps to log in') or contains(., 'Pasos para iniciar sesión')]"
-QR_CODE = "//canvas[@aria-label='Scan this QR code to link a device!' or @aria-label='Escaneá este código QR para vincular un dispositivo']"
+# Login screen (verified live 2026-10-20, Spanish and English UI): the QR
+# canvas sits in data-testid="link-device-qr-code" and its aria-label is
+# English in every UI language, so the test ids are used instead of text.
+AUTH = '[data-testid="link-device-qr-code"], [data-testid^="link_device_"]'
+QR_CODE = '[data-testid="link-device-qr-code"] canvas'
 INVALID_NUMBER_WARNING = (
     "//div[contains(text(), 'invalid') or contains(text(), 'no es válido') or contains(text(), 'no está en WhatsApp')]"
 )
@@ -10,7 +13,15 @@ INVALID_NUMBER_WARNING = (
 # Banner inferior de cifrado (cambió el data-icon a 'lock-outline' en algunos builds)
 LOADING = "//div[@data-testid='wa-web-loading-screen'] | //span[@data-icon='lock-outline' or @data-icon='lock-refreshed']/ancestor::div[contains(., 'End-to-end encrypted') or contains(., 'Cifrado de extremo a extremo')]"
 LOADING_CHATS = "//div[contains(normalize-space(text()), 'Loading your chats') or contains(normalize-space(text()), 'Cargando tus chats')]"
-LOGGED_IN = "//span[@data-testid='wa-wordmark' or @data-icon='wa-wordmark' or @data-icon='wa-wordmark-refreshed' or @data-icon='whatsapp-logo']"
+# The wordmark is also on the QR page; only the chat list proves a session
+# (verified live: absent on the QR page, present once logged in).
+LOGGED_IN = "[data-testid='chat-list']"
+
+# A modal dialog (e.g. "Novedades en WhatsApp Web") intercepts every click
+# until it is closed. Only its X button is ever used to dismiss it (verified
+# live in the Spanish UI); other buttons such as "Continuar" are never clicked.
+BLOCKING_DIALOG = 'div[role="dialog"][aria-modal="true"]'
+DIALOG_CLOSE_BUTTON = 'div[role="dialog"][aria-modal="true"] [aria-label="Cerrar"]'
 
 # ==============================
 # Navigation buttons

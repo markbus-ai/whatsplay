@@ -305,6 +305,30 @@ class WhatsAppElements:
 
         return results
 
+    async def dismiss_blocking_dialog(self) -> bool:
+        """Close a modal dialog that intercepts clicks. True when none remains.
+
+        Only the dialog's own close (X) button is used; a dialog without one is
+        left alone, since its other buttons may confirm something.
+        """
+        try:
+            if await self.page.locator(loc.BLOCKING_DIALOG).count() == 0:
+                return True
+            close = self.page.locator(loc.DIALOG_CLOSE_BUTTON)
+            if await close.count() == 0:
+                logger.warning("A modal dialog blocks the page and has no close button")
+                return False
+            await close.first.click()
+            await asyncio.sleep(0.5)
+            if await self.page.locator(loc.BLOCKING_DIALOG).count() == 0:
+                logger.info("Dismissed a blocking dialog")
+                return True
+            logger.warning("A modal dialog is still open after clicking its close button")
+            return False
+        except Exception as e:
+            logger.warning(f"Could not dismiss a blocking dialog: {e}")
+            return False
+
     async def active_chat(self) -> Optional[tuple]:
         """(kind, title) of the open chat; kind is "group", "chat" or None.
 
@@ -445,6 +469,7 @@ class WhatsAppElements:
             logger.info(f"[open:{elapsed:.2f}s] {msg}")
 
         _log(f"inicio: chat_name='{chat_name}' timeout={timeout}")
+        await self.dismiss_blocking_dialog()
 
         if open_via_url:
             numero_limpio = re.sub(r"\D", "", chat_name)
