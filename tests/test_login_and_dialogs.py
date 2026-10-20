@@ -1,5 +1,6 @@
 """Login-state locators and the blocking 'what's new' dialog (verified live 2026-10-20)."""
 
+import asyncio
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
@@ -150,3 +151,28 @@ async def test_expired_qr_is_not_reported_while_still_expired(monkeypatch):
     await manager._handle_qr_auth_state()
 
     assert not any(c.args[0] == "on_qr_change" for c in client.emit.await_args_list)
+
+
+@pytest.mark.asyncio
+async def test_logged_in_tick_leaves_dialogs_alone_while_an_operation_holds_the_lock():
+    # e.g. send_file's media preview or a group dialog opened under the lock.
+    from whatsplay.page_lock import ReentrantLock
+
+    manager, client = _logged_in_state_manager()
+    client._page_lock = ReentrantLock()
+    client.wa_elements.dismiss_blocking_dialog = AsyncMock(return_value=True)
+    holder_inside = asyncio.Event()
+    release = asyncio.Event()
+
+    async def operation():
+        async with client._page_lock:
+            holder_inside.set()
+            await release.wait()
+
+    task = asyncio.create_task(operation())
+    await holder_inside.wait()
+    await manager._handle_logged_in_state()
+    release.set()
+    await task
+
+    client.wa_elements.dismiss_blocking_dialog.assert_not_awaited()

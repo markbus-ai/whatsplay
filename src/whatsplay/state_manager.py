@@ -238,10 +238,18 @@ class StateManager:
             return
 
         try:
+            # Another page operation is in progress (it may have opened a dialog
+            # of its own, e.g. send_file's media preview): touch nothing.
+            if self.client._page_lock.locked():
+                logger.debug("Skipping logged-in tick: page locked by another operation")
+                return
+
             # A modal dialog ("Novedades en WhatsApp Web", …) blocks every click.
-            # Only its X is used; a dialog without one (it may ask to accept
-            # something) is reported once instead of being clicked through.
-            if not await self.wa_elements.dismiss_blocking_dialog():
+            # Only its X is used, under the page lock; a dialog without one (it
+            # may ask to accept something) is reported once, never clicked through.
+            async with self.client._page_lock:
+                dismissed = await self.wa_elements.dismiss_blocking_dialog()
+            if not dismissed:
                 if not self._dialog_warned:
                     self._dialog_warned = True
                     await self.client.emit(
@@ -250,11 +258,6 @@ class StateManager:
                     )
                 return
             self._dialog_warned = False
-
-            # Skip unread check if another page operation is in progress
-            if self.client._page_lock.locked():
-                logger.debug("Skipping _check_unread_chats: page locked by another operation")
-                return
 
             # Check for unread chats
             unread_chats = await self.client.chat_manager._check_unread_chats()
