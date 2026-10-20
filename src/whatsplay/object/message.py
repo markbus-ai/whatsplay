@@ -303,15 +303,28 @@ def parse_timestamp(raw: str) -> Optional[datetime]:
       - con fecha (Sept 2026): ``[18:51, 3/9/2026] Sender:``
       - 12h con am/pm (observado Sept 2026): ``6:55 p.m. Sender:``
 
-    Returns a ``datetime`` with today's date and the parsed time,
-    or ``None`` if the format does not match.
+    Returns a ``datetime`` with the message's date when the attribute has
+    one (day first, as the Spanish UI writes it; month first only when the
+    first number cannot be a month), otherwise today's date, or ``None`` if
+    the format does not match.
     """
     # Forma con corchetes: [HH:MM(:SS)?] o [HH:MM, d/m/yyyy]
-    m = re.match(r"\[(\d{1,2}:\d{2}(?::\d{2})?)(?:,\s*\d{1,2}/\d{1,2}/\d{2,4})?\]", raw)
+    m = re.match(
+        r"\[(\d{1,2}):(\d{2})(?::\d{2})?(?:,\s*(\d{1,2})/(\d{1,2})/(\d{2,4}))?\]", raw
+    )
     if m:
-        hh, mm = m.group(1).split(":")[:2]
+        hh, mm = int(m.group(1)), int(m.group(2))
         now = datetime.now()
-        return now.replace(hour=int(hh), minute=int(mm), second=0, microsecond=0)
+        if m.group(3):
+            first, second, year = int(m.group(3)), int(m.group(4)), int(m.group(5))
+            if year < 100:
+                year += 2000
+            day, month = (second, first) if second > 12 else (first, second)
+            try:
+                return datetime(year, month, day, hh, mm)
+            except ValueError:
+                pass  # impossible date: keep the time, today's date
+        return now.replace(hour=hh, minute=mm, second=0, microsecond=0)
 
     # Forma 12h suelta: "6:55 p.m." / "7:07 p. m." / "12:30 am"
     m12 = re.match(r"(\d{1,2}):(\d{2})\s*([ap])\.?\s*m", raw.strip().lower())

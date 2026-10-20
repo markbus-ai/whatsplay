@@ -590,3 +590,19 @@ async def test_a_bubble_with_a_delivery_status_is_outgoing(monkeypatch):
     assert msg.is_outgoing is True
     assert msg.direction_signal == DirectionSignal.STATUS_OUT
     status.dispose.assert_awaited_once()
+
+
+def test_parse_timestamp_keeps_the_date_when_present():
+    # WhatsApp Web (verified live 2026-10-20): "[21:00, 29/9/2026] Sender: ".
+    # The date used to be dropped, so every message looked like today's.
+    from datetime import datetime
+    from whatsplay.object.message import parse_timestamp
+    assert parse_timestamp("[21:00, 29/9/2026] Bikes Amigorena - COLON 7199: ") == datetime(2026, 9, 29, 21, 0)
+    assert parse_timestamp("[9:05, 3/1/26] X: ") == datetime(2026, 1, 3, 9, 5)
+
+
+def test_parse_timestamp_impossible_date_falls_back_to_today():
+    from datetime import date
+    from whatsplay.object.message import parse_timestamp
+    result = parse_timestamp("[10:00, 31/2/2026] X: ")
+    assert result is not None and result.date() == date.today() and result.hour == 10
