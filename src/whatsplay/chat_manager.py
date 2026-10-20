@@ -871,9 +871,20 @@ class ChatManager:
                 if not await self._ensure_composer_targets(input_box, chat_query, is_group):
                     return False
 
-                await input_box.click(force=True)
+                await input_box.click()
                 await input_box.fill(message)
-                await self._page.keyboard.press("Enter")
+                # Only send what is in the box is exactly the message: stray
+                # keystrokes that landed here earlier would go out with it.
+                typed = await input_box.inner_text()
+                if " ".join(typed.split()) != " ".join(message.split()):
+                    logger.error("Composer holds %r, not the message; not sending", typed[:80])
+                    await input_box.fill("")
+                    await self.client.emit(
+                        "on_error", f"Composer text did not match the message for {chat_query!r}"
+                    )
+                    return False
+                # Enter goes to the composer itself, not to whatever has focus.
+                await input_box.press("Enter")
                 await asyncio.sleep(2)
 
                 confirmed = await self.wait_for_whatsapp_ready(timeout=DEFAULT_WAIT_TIMEOUT)

@@ -179,6 +179,7 @@ async def test_open_search_route_uses_shared_preparation(monkeypatch):
     page = AsyncMock()
     elements = WhatsAppElements(page)
     search_box = AsyncMock()
+    search_box.input_value.return_value = "Alice"
     elements.prepare_search = AsyncMock(return_value=search_box)
     page.query_selector.return_value = None
 

@@ -496,6 +496,14 @@ class WhatsAppElements:
                 await search_box.fill("")
                 await asyncio.sleep(0.5)
                 await search_box.type(chat_name, delay=100)
+                # type() sends keys to whatever has focus; if focus moved while
+                # typing, part of the query went elsewhere. Never search with it.
+                typed = await search_box.input_value()
+                if typed != chat_name:
+                    _log(f"el buscador quedó con {typed!r}, no con la consulta; se aborta")
+                    await self.close_search()
+                    await _safe_dispose(search_box)
+                    return False
                 _log("texto tipeado en input de busqueda")
 
                 # Wait for search spinner to detach from DOM.

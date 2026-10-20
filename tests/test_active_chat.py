@@ -160,6 +160,7 @@ async def test_send_message_never_types_into_another_chat(monkeypatch):
 async def test_send_message_types_into_the_verified_chat(monkeypatch):
     monkeypatch.setattr("whatsplay.chat_manager.asyncio.sleep", AsyncMock())
     manager, page, composer = _manager_with_open_chat(active_title="+54 9 2235 98-8856")
+    composer.inner_text.return_value = "Hola"
 
     assert await manager.send_message("+5492235988856", "Hola") is True
 
@@ -226,3 +227,47 @@ async def test_send_refuses_when_only_the_header_names_the_target(monkeypatch):
     assert await manager.send_message("+54 9 2235 98-8856", "Hola") is False
 
     composer.fill.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_open_aborts_when_the_search_box_did_not_receive_the_query(monkeypatch):
+    # Keys typed while focus moved elsewhere: the box holds only part of it.
+    page = AsyncMock()
+    page.query_selector_all.return_value = []
+    search_box = AsyncMock()
+    search_box.input_value.return_value = "+54 9 22"
+    elements = WhatsAppElements(page)
+    elements.prepare_search = AsyncMock(return_value=search_box)
+    elements.close_search = AsyncMock(return_value=True)
+    monkeypatch.setattr("whatsplay.wa_elements.asyncio.sleep", AsyncMock())
+
+    assert await elements.open("+54 9 2235 98-8856") is False
+
+    elements.close_search.assert_awaited()
+    page.wait_for_selector.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_send_presses_enter_on_the_composer_not_on_focus(monkeypatch):
+    monkeypatch.setattr("whatsplay.chat_manager.asyncio.sleep", AsyncMock())
+    manager, page, composer = _manager_with_open_chat(active_title="Cliente")
+    composer.inner_text.return_value = "Hola"
+
+    assert await manager.send_message("Cliente", "Hola") is True
+
+    composer.press.assert_awaited_once_with("Enter")
+    page.keyboard.press.assert_not_awaited()
+    assert composer.click.await_args.kwargs.get("force") is not True
+
+
+@pytest.mark.asyncio
+async def test_send_does_not_press_enter_when_the_composer_text_differs(monkeypatch):
+    # e.g. stray digits left in the composer by a misdirected keystroke.
+    monkeypatch.setattr("whatsplay.chat_manager.asyncio.sleep", AsyncMock())
+    manager, page, composer = _manager_with_open_chat(active_title="Cliente")
+    composer.inner_text.return_value = "2235Hola"
+
+    assert await manager.send_message("Cliente", "Hola") is False
+
+    composer.press.assert_not_awaited()
+    page.keyboard.press.assert_not_awaited()
