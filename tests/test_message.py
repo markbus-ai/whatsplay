@@ -553,3 +553,40 @@ async def test_collect_messages_default_keep_handles():
     client.chat_manager.collect_messages.assert_awaited_once_with(
         own_push_names=None, dispose=False
     )
+
+
+@pytest.mark.asyncio
+async def test_a_bubble_with_a_delivery_status_is_outgoing(monkeypatch):
+    """Verified live 2026-10-20: only outgoing messages carry the delivery
+    status span ("Enviado"/"Entregado"/"Leído"); consecutive outgoing bubbles
+    have no tail, and class/data-id direction bits are gone."""
+    import whatsplay.constants.locator as loc
+    from whatsplay.object import message as message_module
+    from whatsplay.object.message import DirectionSignal, Message
+
+    async def no_side(_elem):
+        return None
+
+    monkeypatch.setattr(message_module, "_resolve_positional_side", no_side)
+    monkeypatch.setattr(message_module, "_self_or_descendant_has_class", AsyncMock(return_value=False))
+    page = AsyncMock()
+    elem = AsyncMock()
+    elem.get_attribute.side_effect = lambda attr: {
+        "data-id": "3EB03AD8F22D90A4C36F0C",
+        "data-testid": "conv-msg-3EB03AD8F22D90A4C36F0C",
+    }.get(attr)
+    status = AsyncMock()
+    status.dispose = AsyncMock()
+
+    async def query_selector(selector):
+        if selector == loc.MSG_STATUS_CONFIRMED.replace("css=", "", 1):
+            return status
+        return None
+
+    elem.query_selector = query_selector
+
+    msg = await Message.from_element(elem, page)
+
+    assert msg.is_outgoing is True
+    assert msg.direction_signal == DirectionSignal.STATUS_OUT
+    status.dispose.assert_awaited_once()

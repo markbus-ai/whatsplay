@@ -13,6 +13,7 @@ from ..logging_setup import get_logger
 logger = get_logger(__name__)
 
 from ..codec_detector import detect_codec
+from ..constants import locator as _loc
 
 
 def normalize_sender_name(value: Optional[str]) -> str:
@@ -54,6 +55,7 @@ class DirectionSignal:
 
     TAIL_OUT = "tail-out"
     TAIL_IN = "tail-in"
+    STATUS_OUT = "status-out"
     CLASS_OUT = "class-out"
     CLASS_IN = "class-in"
     DATA_ID_OUT = "data-id-out"
@@ -77,6 +79,7 @@ class DirectionSignal:
 DIRECTION_ORDER = (
     DirectionSignal.TAIL_OUT,
     DirectionSignal.TAIL_IN,
+    DirectionSignal.STATUS_OUT,
     DirectionSignal.CLASS_OUT,
     DirectionSignal.CLASS_IN,
     DirectionSignal.DATA_ID_OUT,
@@ -107,6 +110,9 @@ CONTAINER_WALK_DEPTH = 8
 #: incoming default). Flagged path: incremented in
 #: ChatManager._apply_group_tail_inheritance with a log line, never silent.
 _DIRECTION_FALLBACK_COUNT = 0
+
+#: Delivery-status span of an outgoing message (plain CSS for query_selector).
+_DELIVERY_STATUS = _loc.MSG_STATUS_CONFIRMED.replace("css=", "", 1)
 
 
 def get_direction_fallback_count() -> int:
@@ -442,7 +448,7 @@ class Message:
         # below. The returned Message keeps only elem (the container) alive for
         # interactive methods (react); collect_messages owns the container.
         pre_plain = remitente_span = None
-        tail_out = tail_in = message_out = message_in = None
+        tail_out = tail_in = message_out = message_in = delivery_status = None
         selectable = None
         try:
             # 0) ID if exists (outer container first, inner row fallback:
@@ -485,6 +491,9 @@ class Message:
 
             tail_out = await elem.query_selector('[data-testid="tail-out"]')
             tail_in = await elem.query_selector('[data-testid="tail-in"]')
+            # Only outgoing messages carry a delivery status ("Enviado",
+            # "Entregado", "Leído"), tail or not (verified live 2026-10-20).
+            delivery_status = await elem.query_selector(_DELIVERY_STATUS)
             # Direction classes may sit on the container itself
             # (el.classList) or on a descendant; check both at once.
             # The descendant query_selector is kept as a fallback for
@@ -525,6 +534,8 @@ class Message:
                 is_outgoing, direction_signal = True, DirectionSignal.TAIL_OUT
             elif tail_in is not None:
                 direction_signal = DirectionSignal.TAIL_IN
+            elif delivery_status is not None:
+                is_outgoing, direction_signal = True, DirectionSignal.STATUS_OUT
             elif has_message_out:
                 is_outgoing, direction_signal = True, DirectionSignal.CLASS_OUT
             elif has_message_in:
@@ -578,6 +589,7 @@ class Message:
             await _safe_dispose(remitente_span)
             await _safe_dispose(tail_out)
             await _safe_dispose(tail_in)
+            await _safe_dispose(delivery_status)
             await _safe_dispose(message_out)
             await _safe_dispose(message_in)
             await _safe_dispose(selectable)
