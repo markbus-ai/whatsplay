@@ -21,6 +21,7 @@ from playwright.async_api import (
 
 from .constants import locator as loc
 from .constants.states import State
+from .object.message import _safe_dispose
 from .utils import close_qr_window, show_qr_window, update_qr_code
 
 # Constants
@@ -192,14 +193,22 @@ class StateManager:
         """
         try:
             # Detectar QR expirado (boton de refresh visible)
-            refresh_btn = await self._page.query_selector("[data-testid='refresh-large']")
-            if refresh_btn and await refresh_btn.is_visible():
-                logger.info("DEBUG: QR expired, clicking refresh...")
-                try:
-                    await refresh_btn.click()
-                    await asyncio.sleep(3)
-                except Exception as e:
-                    logger.warning(f"DEBUG: Error clicking refresh: {e}")
+            refresh_btn = await self._page.query_selector(loc.QR_REFRESH_BUTTON)
+            try:
+                if refresh_btn and await refresh_btn.is_visible():
+                    logger.info("QR expired, clicking refresh")
+                    try:
+                        await refresh_btn.click()
+                        await asyncio.sleep(3)
+                    except Exception as e:
+                        logger.warning(f"Error clicking the QR refresh button: {e}")
+                    # The expired canvas stays in the page under the button:
+                    # never hand out a QR that can no longer be scanned.
+                    if await refresh_btn.is_visible():
+                        logger.warning("QR still expired after refresh; not reporting it")
+                        return
+            finally:
+                await _safe_dispose(refresh_btn)
 
             # Re-query canvas despues de posible refresh (canvas viejo se desadjunta)
             qr_code_canvas = await self._page.query_selector(loc.QR_CODE)

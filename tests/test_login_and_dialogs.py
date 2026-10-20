@@ -108,3 +108,45 @@ async def test_logged_in_tick_never_clicks_a_continue_button():
     await manager._handle_logged_in_state()
 
     client._page.query_selector.assert_not_called()
+
+
+def _qr_state_manager(refresh_visible_after_click):
+    from whatsplay.state_manager import StateManager
+
+    client = MagicMock()
+    client._page = MagicMock()
+    client.emit = AsyncMock()
+    client.wa_elements = MagicMock()
+    manager = StateManager(client)
+    refresh = AsyncMock()
+    refresh.is_visible.side_effect = [True, refresh_visible_after_click]
+    canvas = AsyncMock()
+
+    async def query_selector(selector):
+        return refresh if selector == loc.QR_REFRESH_BUTTON else canvas
+
+    client._page.query_selector = query_selector
+    manager._extract_image_from_canvas = AsyncMock(return_value=b"new-qr")
+    manager._handle_qr_logic = AsyncMock(return_value=True)
+    return manager, client, refresh
+
+
+@pytest.mark.asyncio
+async def test_expired_qr_is_refreshed_with_the_current_button(monkeypatch):
+    monkeypatch.setattr("whatsplay.state_manager.asyncio.sleep", AsyncMock())
+    manager, client, refresh = _qr_state_manager(refresh_visible_after_click=False)
+
+    await manager._handle_qr_auth_state()
+
+    refresh.click.assert_awaited_once()
+    client.emit.assert_awaited_with("on_qr_change", b"new-qr")
+
+
+@pytest.mark.asyncio
+async def test_expired_qr_is_not_reported_while_still_expired(monkeypatch):
+    monkeypatch.setattr("whatsplay.state_manager.asyncio.sleep", AsyncMock())
+    manager, client, refresh = _qr_state_manager(refresh_visible_after_click=True)
+
+    await manager._handle_qr_auth_state()
+
+    assert not any(c.args[0] == "on_qr_change" for c in client.emit.await_args_list)

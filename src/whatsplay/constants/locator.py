@@ -6,6 +6,9 @@
 # English in every UI language, so the test ids are used instead of text.
 AUTH = '[data-testid="link-device-qr-code"], [data-testid^="link_device_"]'
 QR_CODE = '[data-testid="link-device-qr-code"] canvas'
+# Shown on top of the canvas when the QR expires ("Selecciona para actualizar
+# el código QR"); the old "refresh-large" test id no longer exists.
+QR_REFRESH_BUTTON = '[data-testid="link_device_qr_expired_refresh_button"]'
 INVALID_NUMBER_WARNING = (
     "//div[contains(text(), 'invalid') or contains(text(), 'no es válido') or contains(text(), 'no está en WhatsApp')]"
 )
