@@ -517,6 +517,10 @@ async def test_collect_messages_dispose_flag_releases_containers():
     from whatsplay.client import Client
 
     client = Client.__new__(Client)  # bypass __init__
+
+    from whatsplay.page_lock import ReentrantLock
+
+    client._page_lock = ReentrantLock()
     client.chat_manager = AsyncMock()
 
     # Two fake messages with spy containers
@@ -537,6 +541,10 @@ async def test_collect_messages_default_keep_handles():
     from whatsplay.client import Client
 
     client = Client.__new__(Client)
+
+    from whatsplay.page_lock import ReentrantLock
+
+    client._page_lock = ReentrantLock()
     client.chat_manager = AsyncMock()
     client.chat_manager.collect_messages.return_value = []
 

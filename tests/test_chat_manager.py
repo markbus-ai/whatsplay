@@ -233,7 +233,10 @@ async def test_refresh_reloads_and_waits_for_login():
     from whatsplay.client import Client
     from unittest.mock import AsyncMock, MagicMock
 
+    from whatsplay.page_lock import ReentrantLock
+
     client = Client.__new__(Client)
+    client._page_lock = ReentrantLock()
     client._page = AsyncMock()
     client._page.reload = AsyncMock()
     client.emit = AsyncMock()

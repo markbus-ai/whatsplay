@@ -15,6 +15,7 @@ from typing import Any, Dict, List, Optional, Union
 
 from .base_client import BaseWhatsAppClient
 from .chat_manager import ChatManager
+from .page_lock import ReentrantLock
 from .constants.states import State
 from .object.message import FileMessage, Message
 from .state_manager import StateManager
@@ -78,7 +79,8 @@ class Client(BaseWhatsAppClient):
         self.current_state: Optional[State] = None
         self.unread_messages_sleep = DEFAULT_UNREAD_MESSAGES_SLEEP
         self._shutdown_event = asyncio.Event()
-        self._page_lock = asyncio.Lock()
+        # Serializes every page operation; see page_lock.py.
+        self._page_lock = ReentrantLock()
         self._consecutive_errors = 0
         self.last_qr_shown: Optional[bytes] = None
         self.chat_manager: Optional[ChatManager] = None
@@ -176,6 +178,17 @@ class Client(BaseWhatsAppClient):
         finally:
             await self.emit("on_stop")
             self._shutdown_event.set()
+
+    @property
+    def page_lock(self) -> ReentrantLock:
+        """Lock held by every page operation. Hold it across several calls that
+        must not be interleaved with the background scan, e.g.::
+
+            async with client.page_lock:
+                if await client.open(chat):
+                    messages = await client.collect_messages()
+        """
+        return self._page_lock
 
     def _bind_components(self) -> None:
         """(Re)create the page-bound helpers for the current self._page."""
@@ -327,11 +340,17 @@ class Client(BaseWhatsAppClient):
         # Force a fresh state read: current_state is stale right after a
         # reload, and wait_until_logged_in would return immediately on it.
         self.current_state = None
-        try:
-            await self._page.reload(wait_until="domcontentloaded", timeout=60000)
-        except Exception as e:
-            await self.emit("on_error", f"refresh: reload failed: {e}")
-            return False
+        # No other page operation may run while the page is being replaced.
+        async with self._page_lock:
+            try:
+                await self._page.reload(wait_until="domcontentloaded", timeout=60000)
+            except Exception as e:
+                await self.emit("on_error", f"refresh: reload failed: {e}")
+                return False
+            # A tick may have read the old DOM during the reload; read again.
+            self.current_state = None
+            if getattr(self, "wa_elements", None):
+                self.wa_elements._search_active = False
         await self.emit("on_refresh")
         return await self.wait_until_logged_in(timeout=timeout)
 
@@ -341,7 +360,8 @@ class Client(BaseWhatsAppClient):
 
     async def close(self) -> None:
         """Close the currently open chat."""
-        return await self.chat_manager.close()
+        async with self._page_lock:
+            return await self.chat_manager.close()
 
     async def open(
         self,
@@ -362,9 +382,10 @@ class Client(BaseWhatsAppClient):
         Returns:
             True if chat was opened successfully
         """
-        return await self.chat_manager.open(
-            chat_name, timeout, open_via_url=open_via_url, is_group=is_group
-        )
+        async with self._page_lock:
+            return await self.chat_manager.open(
+                chat_name, timeout, open_via_url=open_via_url, is_group=is_group
+            )
 
     async def search_conversations(
         self, query: str, close: bool = True
@@ -379,7 +400,8 @@ class Client(BaseWhatsAppClient):
         Returns:
             List of matching conversations
         """
-        return await self.chat_manager.search_conversations(query, close)
+        async with self._page_lock:
+            return await self.chat_manager.search_conversations(query, close)
 
     async def collect_messages(
         self,
@@ -403,9 +425,10 @@ class Client(BaseWhatsAppClient):
         Returns:
             List of Message and FileMessage objects
         """
-        return await self.chat_manager.collect_messages(
-            own_push_names=own_push_names, dispose=dispose
-        )
+        async with self._page_lock:
+            return await self.chat_manager.collect_messages(
+                own_push_names=own_push_names, dispose=dispose
+            )
 
     async def download_all_files(
         self, carpeta: Optional[str] = None, detect_codecs: bool = True
@@ -420,7 +443,8 @@ class Client(BaseWhatsAppClient):
         Returns:
             List of dicts with path, type, and codec info
         """
-        return await self.chat_manager.download_all_files(carpeta, detect_codecs)
+        async with self._page_lock:
+            return await self.chat_manager.download_all_files(carpeta, detect_codecs)
 
     async def download_file_by_index(
         self, index: int, carpeta: Optional[str] = None
@@ -435,7 +459,8 @@ class Client(BaseWhatsAppClient):
         Returns:
             Dict with path and codec info, or None if failed
         """
-        return await self.chat_manager.download_file_by_index(index, carpeta)
+        async with self._page_lock:
+            return await self.chat_manager.download_file_by_index(index, carpeta)
 
     async def send_message(
         self,
@@ -456,9 +481,10 @@ class Client(BaseWhatsAppClient):
         Returns:
             True if message was sent successfully
         """
-        return await self.chat_manager.send_message(
-            chat_query, message, open_via_url=open_via_url, is_group=is_group
-        )
+        async with self._page_lock:
+            return await self.chat_manager.send_message(
+                chat_query, message, open_via_url=open_via_url, is_group=is_group
+            )
 
     async def send_file(
         self,
@@ -479,9 +505,10 @@ class Client(BaseWhatsAppClient):
         Returns:
             True if file was sent successfully
         """
-        return await self.chat_manager.send_file(
-            chat_name, path, open_via_url=open_via_url, is_group=is_group
-        )
+        async with self._page_lock:
+            return await self.chat_manager.send_file(
+                chat_name, path, open_via_url=open_via_url, is_group=is_group
+            )
 
     async def react_to_last_message(self, emoji: str) -> bool:
         """
@@ -493,7 +520,8 @@ class Client(BaseWhatsAppClient):
         Returns:
             True if reaction was successful
         """
-        return await self.chat_manager.react_to_last_message(emoji)
+        async with self._page_lock:
+            return await self.chat_manager.react_to_last_message(emoji)
 
     async def new_group(self, group_name: str, members: List[str]) -> bool:
         """
@@ -506,7 +534,8 @@ class Client(BaseWhatsAppClient):
         Returns:
             True if group was created successfully
         """
-        return await self.wa_elements.new_group(group_name, members)
+        async with self._page_lock:
+            return await self.wa_elements.new_group(group_name, members)
 
     async def add_members_to_group(self, group_name: str, members: List[str]) -> bool:
         """
@@ -519,7 +548,8 @@ class Client(BaseWhatsAppClient):
         Returns:
             True if members were added successfully
         """
-        return await self.wa_elements.add_members_to_group(group_name, members)
+        async with self._page_lock:
+            return await self.wa_elements.add_members_to_group(group_name, members)
 
     async def del_members_from_group(self, group_name: str, members: List[str]) -> bool:
         """
@@ -529,9 +559,10 @@ class Client(BaseWhatsAppClient):
             return False
 
         results = []
-        for member in members:
-            # pasamos el nombre individual, no la lista
-            success = await self.wa_elements.del_member_group(group_name, member)
-            results.append(success)
+        async with self._page_lock:
+            for member in members:
+                # pasamos el nombre individual, no la lista
+                success = await self.wa_elements.del_member_group(group_name, member)
+                results.append(success)
 
         return all(results)  # devuelve True solo si todos fueron eliminados
