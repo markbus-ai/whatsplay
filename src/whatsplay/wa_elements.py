@@ -516,15 +516,14 @@ class WhatsAppElements:
                 _log("click directo OK")
             else:
                 _log("chat no visible, entrando a ruta de busqueda")
-                await asyncio.sleep(2)
+                # No fixed sleeps: the typed query and the result are both
+                # verified below, which is what the sleeps used to guess at.
                 search_box = await self.prepare_search()
                 _log(f"search preparation: {search_box is not None}")
                 if not search_box:
                     raise Exception("Input de busqueda no encontrado")
 
-                await asyncio.sleep(1)
                 await search_box.fill("")
-                await asyncio.sleep(0.5)
                 await search_box.type(chat_name, delay=100)
                 # type() sends keys to whatever has focus; if focus moved while
                 # typing, part of the query went elsewhere. Never search with it.
