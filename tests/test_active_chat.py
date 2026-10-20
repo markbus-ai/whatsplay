@@ -181,6 +181,9 @@ def test_group_info_button_matches_current_whatsapp_web():
     [
         ("Escribir un mensaje para +54 9 2234 48-0402", ("chat", "+54 9 2234 48-0402")),
         ("Escribir un mensaje para el grupo Cliente", ("group", "Cliente")),
+        # English labels verified live 2026-10-20 (WhatsApp Web with an English phone).
+        ("Type a message to Mika Bici", ("chat", "Mika Bici")),
+        ("Type a message to group Tres Chiflados", ("group", "Tres Chiflados")),
         ("Añadir un comentario", None),
         (None, None),
     ],
@@ -271,3 +274,43 @@ async def test_send_does_not_press_enter_when_the_composer_text_differs(monkeypa
 
     composer.press.assert_not_awaited()
     page.keyboard.press.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_open_via_url_accepts_a_saved_contact_shown_by_name(monkeypatch):
+    # The URL names the phone; WhatsApp shows the saved contact's name instead.
+    page = AsyncMock()
+    invalid = AsyncMock()
+    invalid.is_visible.return_value = False
+    page.query_selector.return_value = invalid
+    elements = WhatsAppElements(page)
+    elements.active_chat = AsyncMock(return_value=("chat", "Juan Bici"))
+    monkeypatch.setattr("whatsplay.wa_elements.asyncio.sleep", AsyncMock())
+
+    assert await elements.open("+54 9 2235 98-8856", open_via_url=True) is True
+    assert elements.last_opened_title == "Juan Bici"
+
+
+@pytest.mark.asyncio
+async def test_open_via_url_rejects_a_group(monkeypatch):
+    page = AsyncMock()
+    invalid = AsyncMock()
+    invalid.is_visible.return_value = False
+    page.query_selector.return_value = invalid
+    elements = WhatsAppElements(page)
+    elements.active_chat = AsyncMock(return_value=("group", "Cliente"))
+    monkeypatch.setattr("whatsplay.wa_elements.asyncio.sleep", AsyncMock())
+
+    assert await elements.open("+54 9 2235 98-8856", open_via_url=True) is False
+
+
+@pytest.mark.asyncio
+async def test_send_via_url_to_a_saved_contact_writes_to_the_opened_chat(monkeypatch):
+    monkeypatch.setattr("whatsplay.chat_manager.asyncio.sleep", AsyncMock())
+    manager, page, composer = _manager_with_open_chat(active_title="Juan Bici")
+    manager.wa_elements.last_opened_title = "Juan Bici"
+    composer.inner_text.return_value = "Hola"
+
+    assert await manager.send_message("+54 9 2235 98-8856", "Hola", open_via_url=True) is True
+
+    composer.fill.assert_awaited_once_with("Hola")

@@ -75,6 +75,9 @@ class WhatsAppElements:
     def __init__(self, page: Page):
         self.page = page
         self._search_active = False
+        # Title of the chat the last successful open() verified. Opening by
+        # URL names a phone, but a saved contact is shown by name.
+        self.last_opened_title: Optional[str] = None
 
     async def get_state(self) -> Optional[State]:
         """
@@ -396,6 +399,17 @@ class WhatsAppElements:
                 return False
             await asyncio.sleep(0.3)
 
+    async def _wait_for_contact_chat(self) -> Optional[str]:
+        """Title of the open contact chat once its composer is labelled, else None."""
+        deadline = asyncio.get_running_loop().time() + ACTIVE_CHAT_SETTLE_SECS
+        while True:
+            active = await self.active_chat()
+            if active and active[0] == "chat":
+                return active[1]
+            if asyncio.get_running_loop().time() >= deadline:
+                return None
+            await asyncio.sleep(0.3)
+
     async def _click_listed_chat(self, chat_name: str) -> Optional[bool]:
         """Click the only side-pane row titled exactly `chat_name`.
 
@@ -465,10 +479,14 @@ class WhatsAppElements:
                         return False
                 finally:
                     await _safe_dispose(invalid_warning)
-                if not await self._wait_until_active(chat_name, is_group=False):
-                    _log(f"chat activo tras URL no es '{chat_name}': {await self.active_chat()!r}")
+                # The URL already targets the phone; a saved contact is shown
+                # by name, so verify it is a contact chat and remember its title.
+                title = await self._wait_for_contact_chat()
+                if title is None:
+                    _log(f"tras URL no hay un chat de contacto abierto: {await self.active_chat()!r}")
                     return False
-                _log("chat abierto via URL OK")
+                self.last_opened_title = title
+                _log(f"chat abierto via URL OK: {title!r}")
                 return True
             except PlaywrightTimeoutError:
                 _log(f"TIMEOUT via URL")
@@ -564,6 +582,7 @@ class WhatsAppElements:
             if not await self._wait_until_active(chat_name, is_group):
                 _log(f"chat activo no es '{chat_name}': {await self.active_chat()!r}")
                 return False
+            self.last_opened_title = chat_name
             _log("chat verificado, SUCCESS")
             return True
 

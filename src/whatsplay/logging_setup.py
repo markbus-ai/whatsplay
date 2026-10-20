@@ -27,9 +27,15 @@ import sys
 ROOT_LOGGER_NAME = "whatsplay"
 
 _logger = logging.getLogger(ROOT_LOGGER_NAME)
-# No propagar al root: si el consumidor configura su logging, no queremos que
-# nuestros mensajes se dupliquen ni que hereden handlers inesperados.
-_logger.propagate = False
+# Propagate to the root logger so a consumer that configured logging (files,
+# Sentry, pytest caplog) receives whatsplay records. The compat handler below
+# stays quiet in that case, so nothing is printed twice.
+_logger.propagate = True
+
+
+def _consumer_configured() -> bool:
+    """Whether the consumer installed handlers on the root logger."""
+    return bool(logging.getLogger().handlers)
 
 
 class _CompatHandler(logging.Handler):
@@ -43,6 +49,9 @@ class _CompatHandler(logging.Handler):
     """
 
     def emit(self, record: logging.LogRecord) -> None:  # pragma: no cover - IO
+        # The consumer configured logging: the record reaches it by propagation.
+        if _consumer_configured():
+            return
         try:
             print(f"{record.levelname}: {record.getMessage()}")
         except Exception:

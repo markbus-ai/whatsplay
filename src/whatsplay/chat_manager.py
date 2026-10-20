@@ -803,6 +803,13 @@ class ChatManager:
 
         return result
 
+    def _opened_target(self, chat_query: str, open_via_url: bool) -> str:
+        """Title the composer must name after open(): a URL open of a saved
+        contact shows the contact's name, which open() verified and recorded."""
+        if open_via_url and self.wa_elements.last_opened_title:
+            return self.wa_elements.last_opened_title
+        return chat_query
+
     async def _ensure_composer_targets(
         self, input_box, chat_name: str, is_group: Optional[bool] = None
     ) -> bool:
@@ -868,7 +875,8 @@ class ChatManager:
                         "Could not find text input box for sending message",
                     )
                     return False
-                if not await self._ensure_composer_targets(input_box, chat_query, is_group):
+                target = self._opened_target(chat_query, open_via_url)
+                if not await self._ensure_composer_targets(input_box, target, is_group):
                     return False
 
                 await input_box.click()
@@ -954,7 +962,8 @@ class ChatManager:
                     loc.ACTIVE_CHAT_COMPOSER, timeout=DEFAULT_WAIT_TIMEOUT
                 )
                 try:
-                    if not await self._ensure_composer_targets(composer, chat_name, is_group):
+                    target = self._opened_target(chat_name, open_via_url)
+                    if not await self._ensure_composer_targets(composer, target, is_group):
                         return False
                 finally:
                     await _safe_dispose(composer)

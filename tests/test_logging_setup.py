@@ -16,6 +16,13 @@ import pytest
 from whatsplay.logging_setup import get_logger, ROOT_LOGGER_NAME, _CompatHandler
 
 
+@pytest.fixture
+def unconfigured_consumer(monkeypatch):
+    """A consumer that never configured logging (pytest's own root handlers
+    would otherwise count as configured)."""
+    monkeypatch.setattr("whatsplay.logging_setup._consumer_configured", lambda: False)
+
+
 @pytest.fixture(autouse=True)
 def clean_whatsplay_logger():
     """Aísla el logger entre tests: limpia handlers y restaura el nivel.
@@ -50,7 +57,7 @@ def test_get_logger_namespaces_under_whatsplay():
     assert get_logger("some.other.thing").name == "whatsplay.some.other.thing"
 
 
-def test_visible_by_default_for_consumers_without_logging():
+def test_visible_by_default_for_consumers_without_logging(unconfigured_consumer):
     """Compat: si nadie configura logging, los mensajes se ven."""
     buf = io.StringIO()
     with contextlib.redirect_stdout(buf):
@@ -58,7 +65,7 @@ def test_visible_by_default_for_consumers_without_logging():
     assert "mensaje de compat" in buf.getvalue()
 
 
-def test_consumer_can_silence_debug_and_info():
+def test_consumer_can_silence_debug_and_info(unconfigured_consumer):
     """El consumidor debe poder bajar el ruido con setLevel."""
     logging.getLogger(ROOT_LOGGER_NAME).setLevel(logging.WARNING)
     lg = get_logger("whatsplay.chat_manager")
@@ -75,12 +82,13 @@ def test_consumer_can_silence_debug_and_info():
     assert "esto si importa" in out
 
 
-def test_does_not_propagate_to_root():
-    """No debe duplicar mensajes en el logging del consumidor."""
-    assert logging.getLogger(ROOT_LOGGER_NAME).propagate is False
+def test_propagates_to_root():
+    """Records reach the consumer's logging; duplicates are avoided by the
+    compat handler staying quiet when the root logger is configured."""
+    assert logging.getLogger(ROOT_LOGGER_NAME).propagate is True
 
 
-def test_debug_and_info_visible_when_level_is_info():
+def test_debug_and_info_visible_when_level_is_info(unconfigured_consumer):
     """Con el nivel por defecto (INFO), info se ve y debug no."""
     buf = io.StringIO()
     with contextlib.redirect_stdout(buf):
@@ -110,3 +118,36 @@ def test_no_stray_prints_left_in_library_code():
             if stripped.startswith("print("):
                 offenders.append(f"{py.name}:{num}")
     assert offenders == [], f"quedan prints sueltos: {offenders}"
+
+
+def test_records_reach_the_consumers_root_handlers():
+    """A consumer that configured logging must receive whatsplay records."""
+    seen = []
+
+    class Capture(logging.Handler):
+        def emit(self, record):
+            seen.append(record.getMessage())
+
+    root = logging.getLogger()
+    handler = Capture()
+    root.addHandler(handler)
+    try:
+        get_logger("whatsplay.chat_manager").warning("Refusing to write")
+    finally:
+        root.removeHandler(handler)
+
+    assert "Refusing to write" in seen
+
+
+def test_compat_output_is_not_duplicated_when_the_consumer_configured_logging():
+    root = logging.getLogger()
+    handler = logging.NullHandler()
+    root.addHandler(handler)
+    buf = io.StringIO()
+    try:
+        with contextlib.redirect_stdout(buf):
+            get_logger("whatsplay.compat").warning("solo una vez")
+    finally:
+        root.removeHandler(handler)
+
+    assert "solo una vez" not in buf.getvalue()
