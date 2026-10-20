@@ -34,7 +34,7 @@ from .object.message import (
     _safe_dispose,
 )
 from .codec_detector import detect_codec
-from .wa_elements import same_chat
+from .wa_elements import parse_composer_label, same_chat
 
 # Constants
 DEFAULT_DOWNLOADS_DIR = Path.home() / "Downloads" / "WhatsAppFiles"
@@ -450,6 +450,7 @@ class ChatManager:
         chat_name: str,
         timeout: int = DEFAULT_WAIT_TIMEOUT,
         open_via_url: bool = False,
+        is_group: Optional[bool] = None,
     ) -> bool:
         """
         Open a chat by name.
@@ -458,11 +459,14 @@ class ChatManager:
             chat_name: Name of the chat to open
             timeout: Maximum time to wait in milliseconds
             open_via_url: If True, forces opening via URL (for phone numbers)
+            is_group: If set, the chat must be a group (True) or a contact (False)
 
         Returns:
             True if chat was opened successfully, False otherwise
         """
-        return await self.wa_elements.open(chat_name, timeout, open_via_url=open_via_url)
+        return await self.wa_elements.open(
+            chat_name, timeout, open_via_url=open_via_url, is_group=is_group
+        )
 
     async def search_conversations(self, query: str, close: bool = True) -> List[Dict[str, Any]]:
         """
@@ -799,18 +803,39 @@ class ChatManager:
 
         return result
 
-    async def _ensure_active_chat(self, chat_name: str) -> bool:
-        """Last check before typing: refuse if another chat is open."""
-        active = await self.wa_elements.active_chat_title()
-        if active is not None and same_chat(active, chat_name):
+    async def _ensure_composer_targets(
+        self, input_box, chat_name: str, is_group: Optional[bool] = None
+    ) -> bool:
+        """Last check before typing, on the very element that will receive the text.
+
+        Its own aria-label must name the target chat ("Escribir un mensaje para
+        <chat>"). The header is not enough: it does not say which editor has
+        the text, and an unknown label (another language, a caption box) is
+        refused rather than guessed.
+        """
+        try:
+            label = await input_box.get_attribute("aria-label")
+        except Exception:
+            label = None
+        parsed = parse_composer_label(label)
+        ok = parsed is not None and same_chat(parsed[1], chat_name)
+        if ok and is_group is not None:
+            ok = parsed[0] == ("group" if is_group else "chat")
+        if ok:
             return True
-        logger.error("Refusing to write: open chat is %r, not %r", active, chat_name)
+        logger.error("Refusing to write: composer is %r, target is %r", label, chat_name)
         await self.client.emit(
-            "on_error", f"Open chat is {active!r}, not {chat_name!r}; nothing was written"
+            "on_error", f"Composer is {label!r}, not {chat_name!r}; nothing was written"
         )
         return False
 
-    async def send_message(self, chat_query: str, message: str, open_via_url: bool = False) -> bool:
+    async def send_message(
+        self,
+        chat_query: str,
+        message: str,
+        open_via_url: bool = False,
+        is_group: Optional[bool] = None,
+    ) -> bool:
         """
         Send a text message to a chat.
 
@@ -828,7 +853,7 @@ class ChatManager:
                 return False
 
             try:
-                opened = await self.open(chat_query, open_via_url=open_via_url)
+                opened = await self.open(chat_query, open_via_url=open_via_url, is_group=is_group)
                 if not opened:
                     await self.client.emit("on_error", f"Could not open chat: {chat_query}")
                     return False
@@ -843,7 +868,7 @@ class ChatManager:
                         "Could not find text input box for sending message",
                     )
                     return False
-                if not await self._ensure_active_chat(chat_query):
+                if not await self._ensure_composer_targets(input_box, chat_query, is_group):
                     return False
 
                 await input_box.click(force=True)
@@ -879,7 +904,13 @@ class ChatManager:
             return False
 
     # You continue with the message sending...
-    async def send_file(self, chat_name: str, path: str, open_via_url: bool = False) -> bool:
+    async def send_file(
+        self,
+        chat_name: str,
+        path: str,
+        open_via_url: bool = False,
+        is_group: Optional[bool] = None,
+    ) -> bool:
         """
         Send a file attachment to a chat.
 
@@ -903,16 +934,19 @@ class ChatManager:
                     await self.client.emit("on_error", msg)
                     return False
 
-                if not await self.open(chat_name, open_via_url=open_via_url):
+                if not await self.open(chat_name, open_via_url=open_via_url, is_group=is_group):
                     msg = f"Could not open chat: {chat_name}"
                     await self.client.emit("on_error", msg)
                     return False
 
-                await self._page.wait_for_selector(
+                composer = await self._page.wait_for_selector(
                     loc.ACTIVE_CHAT_COMPOSER, timeout=DEFAULT_WAIT_TIMEOUT
                 )
-                if not await self._ensure_active_chat(chat_name):
-                    return False
+                try:
+                    if not await self._ensure_composer_targets(composer, chat_name, is_group):
+                        return False
+                finally:
+                    await _safe_dispose(composer)
 
                 attach_btn = await self._page.wait_for_selector(loc.ATTACH_BUTTON, timeout=5000)
                 await attach_btn.click()

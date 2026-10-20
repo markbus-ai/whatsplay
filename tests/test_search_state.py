@@ -187,7 +187,7 @@ async def test_open_search_route_uses_shared_preparation(monkeypatch):
     title.get_attribute.return_value = "Alice"
     chat.query_selector.return_value = title
     page.query_selector_all.side_effect = [[], [chat]]  # not listed, then search results
-    elements.active_chat_title = AsyncMock(return_value="Alice")
+    elements.active_chat = AsyncMock(return_value=("chat", "Alice"))
 
     monkeypatch.setattr("whatsplay.wa_elements.asyncio.sleep", AsyncMock())
 
@@ -206,9 +206,9 @@ async def test_open_direct_lookup_targets_chat_title_cell():
     chat = AsyncMock()
     chat.get_attribute.return_value = "+54 9 2235 98-8856"
     page.query_selector_all.return_value = [chat]
-    elements.active_chat_title = AsyncMock(return_value="+54 9 2235 98-8856")
+    elements.active_chat = AsyncMock(return_value=("chat", "+54 9 2235 98-8856"))
 
-    assert await elements.open("2235988856") is True
+    assert await elements.open("+54 9 2235 98-8856") is True
 
     selector = page.query_selector_all.await_args_list[0].args[0]
     assert selector == (

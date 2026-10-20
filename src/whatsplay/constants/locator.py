@@ -109,12 +109,12 @@ ACTIVE_CHAT_COMPOSER = '#main footer div[contenteditable="true"][role="textbox"]
 # Fallback source for the open chat's title when the composer has no label.
 ACTIVE_CHAT_HEADER_TITLE = '#main header span[dir="auto"]'
 # The composer's aria-label names its chat: "Escribir un mensaje para +54 9 …",
-# "Escribir un mensaje para el grupo Cliente". Group prefix goes first.
-# Only labels observed live are listed; other UI languages fall back to the
-# header title (ACTIVE_CHAT_HEADER_TITLE).
+# "Escribir un mensaje para el grupo Cliente". (kind, prefix) pairs, group
+# first. Only labels observed live are listed: in any other UI language the
+# library refuses to write rather than guess.
 COMPOSER_LABEL_PREFIXES = (
-    "Escribir un mensaje para el grupo ",
-    "Escribir un mensaje para ",
+    ("group", "Escribir un mensaje para el grupo "),
+    ("chat", "Escribir un mensaje para "),
 )
 # Titles of the chats listed in the side pane.
 CHAT_LIST_TITLES = "//div[@role='row']//div[@data-testid='cell-frame-title']//span[@title]"

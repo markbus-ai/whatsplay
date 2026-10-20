@@ -331,7 +331,11 @@ class Client(BaseWhatsAppClient):
         return await self.chat_manager.close()
 
     async def open(
-        self, chat_name: str, timeout: int = 10000, open_via_url: bool = False
+        self,
+        chat_name: str,
+        timeout: int = 10000,
+        open_via_url: bool = False,
+        is_group: Optional[bool] = None,
     ) -> bool:
         """
         Open a chat by name.
@@ -340,12 +344,13 @@ class Client(BaseWhatsAppClient):
             chat_name: Name of the chat to open
             timeout: Maximum wait time in milliseconds
             open_via_url: Force opening via URL (for phone numbers)
+            is_group: If set, the chat must be a group (True) or a contact (False)
 
         Returns:
             True if chat was opened successfully
         """
         return await self.chat_manager.open(
-            chat_name, timeout, open_via_url=open_via_url
+            chat_name, timeout, open_via_url=open_via_url, is_group=is_group
         )
 
     async def search_conversations(
@@ -420,7 +425,11 @@ class Client(BaseWhatsAppClient):
         return await self.chat_manager.download_file_by_index(index, carpeta)
 
     async def send_message(
-        self, chat_query: str, message: str, open_via_url: bool = False
+        self,
+        chat_query: str,
+        message: str,
+        open_via_url: bool = False,
+        is_group: Optional[bool] = None,
     ) -> bool:
         """
         Send a text message.
@@ -429,15 +438,22 @@ class Client(BaseWhatsAppClient):
             chat_query: Chat name or identifier
             message: Message text to send
             open_via_url: Open chat via URL before sending
+            is_group: If set, the chat must be a group (True) or a contact (False)
 
         Returns:
             True if message was sent successfully
         """
         return await self.chat_manager.send_message(
-            chat_query, message, open_via_url=open_via_url
+            chat_query, message, open_via_url=open_via_url, is_group=is_group
         )
 
-    async def send_file(self, chat_name: str, path: str, open_via_url: bool = False) -> bool:
+    async def send_file(
+        self,
+        chat_name: str,
+        path: str,
+        open_via_url: bool = False,
+        is_group: Optional[bool] = None,
+    ) -> bool:
         """
         Send a file attachment.
 
@@ -445,11 +461,14 @@ class Client(BaseWhatsAppClient):
             chat_name: Name of the chat
             path: Absolute path to the file
             open_via_url: Open chat via URL before sending (required for phone numbers)
+            is_group: If set, the chat must be a group (True) or a contact (False)
 
         Returns:
             True if file was sent successfully
         """
-        return await self.chat_manager.send_file(chat_name, path, open_via_url=open_via_url)
+        return await self.chat_manager.send_file(
+            chat_name, path, open_via_url=open_via_url, is_group=is_group
+        )
 
     async def react_to_last_message(self, emoji: str) -> bool:
         """

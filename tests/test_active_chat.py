@@ -11,7 +11,7 @@ import pytest
 
 import whatsplay.constants.locator as loc
 from whatsplay.chat_manager import DEFAULT_WAIT_TIMEOUT, ChatManager
-from whatsplay.wa_elements import WhatsAppElements, same_chat
+from whatsplay.wa_elements import WhatsAppElements, parse_composer_label, same_chat
 
 
 @pytest.mark.parametrize(
@@ -22,7 +22,6 @@ from whatsplay.wa_elements import WhatsAppElements, same_chat
         ("Juan Pérez", "juan  perez"),
         ("~ Juan", "Juan"),
         ("Cliente", "cliente"),
-        ("2235988856", "+54 9 2235 98-8856"),
     ],
 )
 def test_same_chat_accepts_the_same_chat(a, b):
@@ -36,6 +35,10 @@ def test_same_chat_accepts_the_same_chat(a, b):
         ("+54 9 2234 48-0402", "+54 9 2234 48-0403"),
         ("Juan", "Juana"),
         ("8856", "+54 9 2235 98-8856"),
+        # A local number is not enough: 2235988856 is also a valid suffix of
+        # numbers in other countries (e.g. +1 223 598 8856).
+        ("2235988856", "+54 9 2235 98-8856"),
+        ("2235988856", "+1 223 598 8856"),
         ("", ""),
     ],
 )
@@ -97,7 +100,7 @@ async def test_open_fails_when_the_active_chat_is_not_the_target(monkeypatch):
     page.query_selector_all.return_value = [chat]
     elements = WhatsAppElements(page)
     # The click "worked" but WhatsApp still shows the group.
-    elements.active_chat_title = AsyncMock(return_value="Cliente")
+    elements.active_chat = AsyncMock(return_value=("group", "Cliente"))
     monkeypatch.setattr("whatsplay.wa_elements.asyncio.sleep", AsyncMock())
 
     assert await elements.open("+54 9 2235 98-8856") is False
@@ -112,7 +115,7 @@ async def test_open_direct_lookup_skips_titles_that_only_contain_the_name(monkey
     exact.get_attribute.return_value = "Cliente"
     page.query_selector_all.return_value = [lookalike, exact]
     elements = WhatsAppElements(page)
-    elements.active_chat_title = AsyncMock(return_value="Cliente")
+    elements.active_chat = AsyncMock(return_value=("group", "Cliente"))
     monkeypatch.setattr("whatsplay.wa_elements.asyncio.sleep", AsyncMock())
 
     assert await elements.open("Cliente") is True
@@ -129,6 +132,8 @@ def _manager_with_open_chat(active_title):
     page = AsyncMock()
     page.keyboard = AsyncMock()
     composer = AsyncMock()
+    composer.get_attribute.return_value = f"Escribir un mensaje para {active_title}"
+    composer.inner_text.return_value = ""
     page.wait_for_selector.return_value = composer
     manager = ChatManager(client)
     manager._page = page
@@ -168,3 +173,56 @@ def test_group_info_button_matches_current_whatsapp_web():
     # Every title alternative must require role=button (was an or/and precedence bug).
     assert loc.GROUP_INFO_BUTTON.count("@role=\"button\"") == 1
     assert ") and @role" in loc.GROUP_INFO_BUTTON
+
+
+@pytest.mark.parametrize(
+    "label, expected",
+    [
+        ("Escribir un mensaje para +54 9 2234 48-0402", ("chat", "+54 9 2234 48-0402")),
+        ("Escribir un mensaje para el grupo Cliente", ("group", "Cliente")),
+        ("Añadir un comentario", None),
+        (None, None),
+    ],
+)
+def test_parse_composer_label_tells_groups_from_chats(label, expected):
+    assert parse_composer_label(label) == expected
+
+
+@pytest.mark.asyncio
+async def test_a_contact_named_like_a_group_is_not_the_group():
+    page = AsyncMock()
+    page.evaluate.return_value = {"composer": "Escribir un mensaje para Cliente", "header": "Cliente"}
+    elements = WhatsAppElements(page)
+
+    assert await elements.is_active_chat("Cliente", is_group=True) is False
+    assert await elements.is_active_chat("Cliente", is_group=False) is True
+
+
+@pytest.mark.asyncio
+async def test_open_refuses_when_two_listed_chats_share_the_title(monkeypatch):
+    page = AsyncMock()
+    first, second = AsyncMock(), AsyncMock()
+    first.get_attribute.return_value = "Cliente"
+    second.get_attribute.return_value = "Cliente"
+    page.query_selector_all.return_value = [first, second]
+    elements = WhatsAppElements(page)
+    elements.prepare_search = AsyncMock(return_value=None)
+    monkeypatch.setattr("whatsplay.wa_elements.asyncio.sleep", AsyncMock())
+
+    assert await elements.open("Cliente") is False
+
+    first.click.assert_not_awaited()
+    second.click.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_send_refuses_when_only_the_header_names_the_target(monkeypatch):
+    # The element we would type into must itself name the chat; a header that
+    # matches is not enough (another editor could have focus in the footer).
+    monkeypatch.setattr("whatsplay.chat_manager.asyncio.sleep", AsyncMock())
+    manager, page, composer = _manager_with_open_chat(active_title="+54 9 2235 98-8856")
+    composer.get_attribute.return_value = "Añadir un comentario"
+
+    assert await manager.send_message("+54 9 2235 98-8856", "Hola") is False
+
+    composer.fill.assert_not_awaited()

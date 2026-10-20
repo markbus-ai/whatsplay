@@ -43,23 +43,30 @@ def normalize_chat_title(title: str) -> str:
     return " ".join(text.casefold().split())
 
 
-# Shortest digit run accepted when one phone lacks the country code.
-_MIN_PHONE_SUFFIX = 8
-
-
 def same_chat(a: str, b: str) -> bool:
-    """Whether two chat titles name the same chat.
+    """Whether two chat titles name the same chat (exact, after normalizing).
 
-    Phones match when one digit string ends with the other ("2235988856" and
-    "+54 9 2235 98-8856") and the shorter has at least 8 digits.
+    Phones must carry the same full digit string: a local number such as
+    "2235988856" is also a suffix of numbers in other countries, so it never
+    matches "+54 9 2235 98-8856".
     """
     na, nb = normalize_chat_title(a), normalize_chat_title(b)
-    if na == nb:
-        return bool(na)
-    if na.isdigit() and nb.isdigit():
-        short, long_ = sorted((na, nb), key=len)
-        return len(short) >= _MIN_PHONE_SUFFIX and long_.endswith(short)
-    return False
+    return bool(na) and na == nb
+
+
+def parse_composer_label(label: Optional[str]) -> Optional[tuple]:
+    """Split a composer aria-label into (kind, title), kind being "group" or "chat".
+
+    Returns None for any label that is not a known chat composer (a caption
+    box, a search editor, an unknown UI language).
+    """
+    if not isinstance(label, str):
+        return None
+    for kind, prefix in loc.COMPOSER_LABEL_PREFIXES:
+        if label.startswith(prefix):
+            title = label[len(prefix):].strip()
+            return (kind, title) if title else None
+    return None
 
 
 class WhatsAppElements:
@@ -330,11 +337,11 @@ class WhatsAppElements:
 
         return results
 
-    async def active_chat_title(self) -> Optional[str]:
-        """Title of the chat that is actually open, or None if no chat is open.
+    async def active_chat(self) -> Optional[tuple]:
+        """(kind, title) of the open chat; kind is "group", "chat" or None.
 
         Read from the open composer's aria-label ("Escribir un mensaje para X"),
-        the element text is typed into, with the header title as fallback.
+        with the header title as a read-only fallback (kind None).
         """
         try:
             info = await self.page.evaluate(
@@ -353,52 +360,82 @@ class WhatsAppElements:
         if not isinstance(info, dict):
             return None
 
-        label = info.get("composer")
-        if isinstance(label, str):
-            for prefix in loc.COMPOSER_LABEL_PREFIXES:
-                if label.startswith(prefix):
-                    return label[len(prefix):].strip()
+        parsed = parse_composer_label(info.get("composer"))
+        if parsed:
+            return parsed
         header = info.get("header")
         if isinstance(header, str) and header.strip():
-            return header.strip()
+            return (None, header.strip())
         return None
 
-    async def is_active_chat(self, chat_name: str) -> bool:
-        """Whether the open chat is exactly `chat_name` (see normalize_chat_title)."""
-        title = await self.active_chat_title()
-        return title is not None and same_chat(title, chat_name)
+    async def active_chat_title(self) -> Optional[str]:
+        """Title of the open chat, or None if no chat is open."""
+        active = await self.active_chat()
+        return active[1] if active else None
 
-    async def _wait_until_active(self, chat_name: str) -> bool:
+    async def is_active_chat(self, chat_name: str, is_group: Optional[bool] = None) -> bool:
+        """Whether the open chat is exactly `chat_name`.
+
+        With is_group set, a group and a contact that share a title are told
+        apart; when the kind cannot be read the check fails closed.
+        """
+        active = await self.active_chat()
+        if active is None or not same_chat(active[1], chat_name):
+            return False
+        if is_group is None:
+            return True
+        return active[0] == ("group" if is_group else "chat")
+
+    async def _wait_until_active(self, chat_name: str, is_group: Optional[bool] = None) -> bool:
         """Give WhatsApp a moment to switch panes after a click, then verify."""
         deadline = asyncio.get_running_loop().time() + ACTIVE_CHAT_SETTLE_SECS
         while True:
-            if await self.is_active_chat(chat_name):
+            if await self.is_active_chat(chat_name, is_group):
                 return True
             if asyncio.get_running_loop().time() >= deadline:
                 return False
             await asyncio.sleep(0.3)
 
-    async def _click_listed_chat(self, chat_name: str) -> bool:
-        """Click the side-pane row whose title is exactly `chat_name`."""
+    async def _click_listed_chat(self, chat_name: str) -> Optional[bool]:
+        """Click the only side-pane row titled exactly `chat_name`.
+
+        Returns True when clicked, False when no row matches, and None when
+        several rows match: picking one would be a guess, so nothing is clicked.
+        """
         cells = await self.page.query_selector_all(f"xpath={loc.CHAT_LIST_TITLES}")
         try:
+            matches = []
             for cell in cells:
                 title = await cell.get_attribute("title")
                 if isinstance(title, str) and same_chat(title, chat_name):
-                    await cell.click()
-                    self._search_active = False
-                    return True
+                    matches.append(cell)
+            if len(matches) > 1:
+                logger.error(
+                    "%d listed chats are titled %r; refusing to pick one", len(matches), chat_name
+                )
+                return None
+            if matches:
+                await matches[0].click()
+                self._search_active = False
+                return True
             return False
         finally:
             for cell in cells:
                 await _safe_dispose(cell)
 
-    async def open(self, chat_name: str, timeout: int = 10000, open_via_url: bool = False) -> bool:
+    async def open(
+        self,
+        chat_name: str,
+        timeout: int = 10000,
+        open_via_url: bool = False,
+        is_group: Optional[bool] = None,
+    ) -> bool:
         """
         Abre un chat por su nombre visible o número. Si no está visible, lo busca.
 
-        Returns True only when the open chat is verifiably `chat_name`. It never
-        falls back to "whatever comes first", so callers can type safely.
+        Returns True only when the open chat is verifiably `chat_name` (and a
+        group or a contact when `is_group` says so). It never falls back to
+        "whatever comes first" and refuses titles shared by several chats.
         """
         import time as _time
         _t0 = _time.time()
@@ -428,8 +465,8 @@ class WhatsAppElements:
                         return False
                 finally:
                     await _safe_dispose(invalid_warning)
-                if not await self._wait_until_active(chat_name):
-                    _log(f"chat activo tras URL no es '{chat_name}': {await self.active_chat_title()!r}")
+                if not await self._wait_until_active(chat_name, is_group=False):
+                    _log(f"chat activo tras URL no es '{chat_name}': {await self.active_chat()!r}")
                     return False
                 _log("chat abierto via URL OK")
                 return True
@@ -441,7 +478,11 @@ class WhatsAppElements:
                 return False
 
         try:
-            if await self._click_listed_chat(chat_name):
+            listed = await self._click_listed_chat(chat_name)
+            if listed is None:
+                _log("varios chats con ese título en la lista; no se abre ninguno")
+                return False
+            if listed:
                 _log("click directo OK")
             else:
                 _log("chat no visible, entrando a ruta de busqueda")
@@ -479,19 +520,25 @@ class WhatsAppElements:
 
                 found = False
                 try:
+                    matches = []
                     for chat in chat_results:
                         title_el = await chat.query_selector(f"xpath={loc.SPAN_TITLE}")
                         try:
                             if title_el:
                                 title = await title_el.get_attribute("title")
                                 if isinstance(title, str) and same_chat(title, chat_name):
-                                    _log(f"clickeando chat: {title}")
-                                    await chat.click()
-                                    self._search_active = False
-                                    found = True
-                                    break
+                                    matches.append(chat)
                         finally:
                             await _safe_dispose(title_el)
+                    if len(matches) > 1:
+                        _log(f"{len(matches)} resultados con ese título; no se abre ninguno")
+                        await self.close_search()
+                        return False
+                    if matches:
+                        _log(f"clickeando chat: {chat_name}")
+                        await matches[0].click()
+                        self._search_active = False
+                        found = True
                 finally:
                     # Release every result handle; the click already happened.
                     for chat in chat_results:
@@ -506,8 +553,8 @@ class WhatsAppElements:
 
             _log(f"esperando ACTIVE_CHAT_COMPOSER (timeout={timeout}ms)...")
             await self.page.wait_for_selector(loc.ACTIVE_CHAT_COMPOSER, timeout=timeout)
-            if not await self._wait_until_active(chat_name):
-                _log(f"chat activo no es '{chat_name}': {await self.active_chat_title()!r}")
+            if not await self._wait_until_active(chat_name, is_group):
+                _log(f"chat activo no es '{chat_name}': {await self.active_chat()!r}")
                 return False
             _log("chat verificado, SUCCESS")
             return True
