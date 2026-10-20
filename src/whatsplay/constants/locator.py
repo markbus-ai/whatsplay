@@ -54,36 +54,23 @@ ROW_TIME = ".//div[@role='gridcell' and @aria-colindex='2']/following-sibling::d
 # ==============================
 # Search related locators
 # ==============================
-SEARCH_BUTTON = [
-    # Nuevo input de búsqueda siempre visible (2026)
-    "input[aria-label='Buscar un chat o iniciar uno nuevo'], input[aria-label='Search for a chat or start a new one']",
-    "css=input[aria-label*='Search' i], input[aria-label*='Buscar' i]",
-    # Contenedor con data-testid
-    "div[data-testid='chat-list-search-container']",
-    # Legacy selectores
-    "css=button[aria-label='Search'], button[aria-label='Buscar']",
-    "//div[@aria-label='Search input textbox']",
-    "//button[@aria-label='Search or start new chat' or @aria-label='Buscar o crear chat']",
-]
+# Search (verified live 2026-10-20): the side pane has exactly one text input,
+# both idle and while searching. Its aria-label ("Buscar un chat o iniciar uno
+# nuevo" / "Search or start a new chat") becomes "" while it holds a query, so
+# it is located by position and role, not by label.
+SEARCH_INPUT = '#side input[type="text"][role="textbox"]'
+SEARCH_BUTTON = [SEARCH_INPUT]  # kept for API compatibility
 
-SEARCH_TEXT_BOX = [
-    # Native search input is always present in current WhatsApp Web builds.
-    "input[aria-label='Buscar un chat o iniciar uno nuevo'], input[aria-label='Search for a chat or start a new one']",
-    "css=input[aria-label*='Search' i], input[aria-label*='Buscar' i]",
-    # Legacy search editors with search-specific labels.
-    "//div[@contenteditable='true' and @role='textbox' and (@aria-label='Search input textbox' or @aria-label='Cuadro de texto de búsqueda' or @aria-label='Search' or @aria-label='Buscar')]",
-    "//div[@id='pane-side']//div[contains(@class, 'lexical-rich-text-input')]//div[@contenteditable='true']",
-]
+SEARCH_TEXT_BOX = [SEARCH_INPUT]
 
-SEARCH_CLOSE_BUTTON = [
-    "button[aria-label='Close search'], button[aria-label='Cerrar búsqueda']",
-    "div[role='button'][aria-label='Close search'], div[role='button'][aria-label='Cerrar búsqueda']",
-]
+# Clear-query button shown while searching (label verified live, Spanish UI).
+SEARCH_CLOSE_BUTTON = ['#side [aria-label="End icon button"]']
 
-# Contenedor de resultados de búsqueda (en builds nuevos es un grid también)
-SEARCH_RESULT = "//div[@aria-label='Search results.' or @aria-label='Resultados de búsqueda.'] | //div[@role='grid' and ancestor::div[@id='pane-side']]"
-# Ítem de resultado (usa las mismas filas de la grilla)
-SEARCH_ITEM = "//div[@role='row']"
+# The side-pane grid: "Lista de chats" idle, "Resultados de la búsqueda." while
+# searching (verified live). Messages of the open chat are role=row too, so
+# rows must be scoped to this grid.
+SEARCH_RESULT = '#pane-side [role="grid"]'
+SEARCH_ITEM = '#pane-side [role="grid"] [role="row"]'
 # Partes del resultado: columna de título/preview
 SEARCH_ITEM_COMPONENTS = ".//div[@role='gridcell' and @aria-colindex='2']/parent::div/div"
 # Contador 'unread' dentro del ítem
@@ -120,7 +107,10 @@ COMPOSER_LABEL_PREFIXES = (
     ("chat", "Type a message to "),
 )
 # Titles of the chats listed in the side pane.
-CHAT_LIST_TITLES = "//div[@role='row']//div[@data-testid='cell-frame-title']//span[@title]"
+CHAT_LIST_TITLES = (
+    "//div[@id='pane-side']//div[@role='grid']//div[@role='row']"
+    "//div[@data-testid='cell-frame-title']//span[@title]"
+)
 CHAT_DIV = "//div[@role='application']"
 UNREAD_CHAT_DIV = "//div[@aria-label='Chat list' or @aria-label='Lista de chats' or @id='pane-side']"
 

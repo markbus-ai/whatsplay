@@ -84,7 +84,8 @@ async def test_prepare_search_fails_closed_when_all_filter_cannot_be_selected():
     page = AsyncMock()
     elements = WhatsAppElements(page)
     search_box = AsyncMock()
-    elements._search_active = True
+    # A previous query is still in the box; Escape clears it.
+    elements._search_query = AsyncMock(side_effect=["old", "old", ""])
     elements.click_search_button = AsyncMock(return_value=True)
     elements._get_search_box = AsyncMock(return_value=search_box)
     elements.click_chat_filter = AsyncMock(return_value=False)
@@ -112,7 +113,7 @@ async def test_active_search_uses_one_targeted_escape():
     page = AsyncMock()
     elements = WhatsAppElements(page)
     search_box = AsyncMock()
-    elements._search_active = True
+    elements._search_query = AsyncMock(side_effect=["Alice", ""])
     elements._get_search_box = AsyncMock(return_value=search_box)
 
     assert await elements.close_search() is True
@@ -183,11 +184,11 @@ async def test_open_search_route_uses_shared_preparation(monkeypatch):
     elements.prepare_search = AsyncMock(return_value=search_box)
     page.query_selector.return_value = None
 
-    chat = AsyncMock()
-    title = AsyncMock()
-    title.get_attribute.return_value = "Alice"
-    chat.query_selector.return_value = title
-    page.query_selector_all.side_effect = [[], [chat]]  # not listed, then search results
+    # Search results render in the same side-pane grid as the chat list.
+    cell = AsyncMock()
+    cell.get_attribute.return_value = "Alice"
+    page.query_selector_all.side_effect = [[], [cell], [cell]]  # not listed, then results (two reads)
+    elements.close_search = AsyncMock(return_value=True)
     elements.active_chat = AsyncMock(return_value=("chat", "Alice"))
 
     monkeypatch.setattr("whatsplay.wa_elements.asyncio.sleep", AsyncMock())
@@ -196,8 +197,8 @@ async def test_open_search_route_uses_shared_preparation(monkeypatch):
 
     elements.prepare_search.assert_awaited_once_with()
     search_box.type.assert_awaited_once_with("Alice", delay=100)
-    chat.click.assert_awaited_once_with()
-    assert elements._search_active is False
+    cell.click.assert_awaited_once_with()
+    elements.close_search.assert_awaited()  # no query left behind
 
 
 @pytest.mark.asyncio
@@ -212,21 +213,25 @@ async def test_open_direct_lookup_targets_chat_title_cell():
     assert await elements.open("+54 9 2235 98-8856") is True
 
     selector = page.query_selector_all.await_args_list[0].args[0]
+    # Scoped to the side-pane grid: messages of the open chat are role=row too.
     assert selector == (
-        "xpath=//div[@role='row']//div[@data-testid='cell-frame-title']//span[@title]"
+        "xpath=//div[@id='pane-side']//div[@role='grid']//div[@role='row']"
+        "//div[@data-testid='cell-frame-title']//span[@title]"
     )
     chat.click.assert_awaited_once_with()
 
 
 @pytest.mark.asyncio
-async def test_keyboard_search_fallback_does_not_escape():
+async def test_search_has_no_keyboard_shortcut_fallback():
+    # A shortcut that does nothing leaves focus where it was (maybe the chat
+    # composer) and the query would be typed there.
     page = AsyncMock()
     page.wait_for_selector.side_effect = Exception("not found")
     elements = WhatsAppElements(page)
 
-    assert await elements.click_search_button() is True
+    assert await elements.click_search_button() is False
 
-    page.keyboard.press.assert_awaited_once_with("Control+/")
+    page.keyboard.press.assert_not_awaited()
 
 
 @pytest.mark.asyncio
@@ -271,3 +276,44 @@ async def test_all_filter_accepts_english_dropdown_label(monkeypatch):
         call("button[role='menuitem']:has-text('All'), button[role='menuitem']:has-text('Todos')"),
     ]
     item.first.click.assert_awaited_once_with()
+
+
+@pytest.mark.asyncio
+async def test_search_activity_is_read_from_the_dom_not_a_cached_flag():
+    elements = WhatsAppElements(AsyncMock())
+    elements._search_active = True
+    elements._search_query = AsyncMock(return_value="")
+
+    assert await elements.verify_search_active() is False
+    assert elements._search_active is False
+
+
+@pytest.mark.asyncio
+async def test_close_search_reports_failure_when_the_query_stays():
+    page = AsyncMock()
+    elements = WhatsAppElements(page)
+    elements._search_query = AsyncMock(return_value="Alice")
+    elements._get_search_box = AsyncMock(return_value=AsyncMock())
+
+    assert await elements.close_search() is False
+
+
+@pytest.mark.asyncio
+async def test_open_by_search_refuses_a_duplicate_that_renders_late(monkeypatch):
+    page = AsyncMock()
+    first, second = AsyncMock(), AsyncMock()
+    first.get_attribute.return_value = "Cliente"
+    second.get_attribute.return_value = "Cliente"
+    # not listed; results show one match, then the second one renders.
+    page.query_selector_all.side_effect = [[], [first], [first, second]]
+    search_box = AsyncMock()
+    search_box.input_value.return_value = "Cliente"
+    elements = WhatsAppElements(page)
+    elements.prepare_search = AsyncMock(return_value=search_box)
+    elements.close_search = AsyncMock(return_value=True)
+    monkeypatch.setattr("whatsplay.wa_elements.asyncio.sleep", AsyncMock())
+
+    assert await elements.open("Cliente") is False
+
+    first.click.assert_not_awaited()
+    second.click.assert_not_awaited()

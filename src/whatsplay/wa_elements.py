@@ -25,6 +25,8 @@ _PHONE_TITLE = re.compile(r"^\+?[\d\s().-]{7,}$")
 
 # Seconds to wait for the header/composer to switch to the clicked chat.
 ACTIVE_CHAT_SETTLE_SECS = 3.0
+# Seconds to wait for a typed search to show the requested chat.
+SEARCH_RESULTS_WAIT_SECS = 8.0
 
 
 def normalize_chat_title(title: str) -> str:
@@ -128,7 +130,7 @@ class WhatsAppElements:
             return None
 
     async def _get_search_box(self, timeout: int = 2000) -> Optional[ElementHandle]:
-        """Return a search editor without falling back to the chat composer."""
+        """Return the side-pane search input, never the chat composer."""
         for selector in loc.SEARCH_TEXT_BOX:
             try:
                 element = await self.wait_for_selector(selector, timeout=timeout)
@@ -138,92 +140,46 @@ class WhatsAppElements:
                 continue
         return None
 
-    async def click_search_button(self) -> bool:
-        """Activa el campo de búsqueda (click o foco en el input siempre visible)"""
+    async def _search_query(self) -> Optional[str]:
+        """Current text in the search input, or None if the input is missing."""
         try:
-            # En la nueva WhatsApp Web (2026), el search es un <input> siempre visible.
-            # Intentamos hacerle click directamente.
-            search_input_selectors = [
-                "input[aria-label='Buscar un chat o iniciar uno nuevo']",
-                "input[aria-label='Search for a chat or start a new one']",
-                "input[aria-label*='Buscar' i]",
-                "input[aria-label*='Search' i]",
-            ]
-            for sel in search_input_selectors:
-                try:
-                    inp = await self.page.wait_for_selector(sel, timeout=3000, state="visible")
-                    if inp:
-                        await inp.click()
-                        await asyncio.sleep(0.3)
-                        self._search_active = True
-                        return True
-                except Exception:
-                    continue
+            return await self.page.evaluate(
+                "(sel) => { const i = document.querySelector(sel); return i ? i.value : null; }",
+                loc.SEARCH_TEXT_BOX[0],
+            )
+        except Exception:
+            return None
 
-            # Fallback: intentar con los selectores de locator.py
-            for selector in loc.SEARCH_BUTTON:
-                try:
-                    element = await self.page.wait_for_selector(
-                        selector, timeout=2000, state="visible"
-                    )
-                    if element:
-                        await element.click()
-                        self._search_active = True
-                        return True
-                except Exception:
-                    continue
+    async def click_search_button(self) -> bool:
+        """Focus the side-pane search input.
 
-            # Último recurso: atajos de teclado
-            shortcuts = [
-                "Control+/",
-                "Control+Alt+/",
-                "Control+f",
-                "/",
-            ]
-            for shortcut in shortcuts:
-                try:
-                    await self.page.keyboard.press(shortcut)
-                    await asyncio.sleep(0.5)
-                    self._search_active = True
-                    return True
-                except Exception:
-                    continue
-
+        No keyboard-shortcut fallback: a shortcut that does nothing would
+        leave focus wherever it was (possibly the chat composer) and the
+        query would be typed there.
+        """
+        box = await self._get_search_box(timeout=3000)
+        if not box:
+            logger.warning("Search input not found")
             return False
-
+        try:
+            await box.click()
+            self._search_active = True
+            return True
         except Exception as e:
-            logger.warning(f"Error clicking search button: {e}")
+            logger.warning(f"Error focusing the search input: {e}")
             return False
+        finally:
+            await _safe_dispose(box)
 
     async def verify_search_active(self) -> bool:
-        """Return whether search is active, not merely visible in the DOM."""
-        if self._search_active:
-            return True
-        try:
-            focused_search = await self.page.evaluate(
-                """() => {
-                    const active = document.activeElement;
-                    if (!active) return false;
-                    const text = [
-                        active.getAttribute('aria-label'),
-                        active.getAttribute('placeholder'),
-                        active.getAttribute('title'),
-                    ].filter(Boolean).join(' ').toLowerCase();
-                    if (active.tagName === 'INPUT') {
-                        return text.includes('search') || text.includes('buscar');
-                    }
-                    if (active.getAttribute('contenteditable') === 'true') {
-                        return text.includes('search') || text.includes('buscar');
-                    }
-                    return false;
-                }"""
-            )
-            if focused_search is True:
-                self._search_active = True
-                return True
-            return False
-        except Exception:
-            return False
+        """Whether a search is in progress: the search input holds text.
+
+        Read from the DOM every time; a cached flag drifts from the page.
+        """
+        query = await self._search_query()
+        active = bool(query)
+        self._search_active = active
+        return active
 
     async def prepare_search(self) -> Optional[ElementHandle]:
         """Select All/Todos, activate search, and return its input."""
@@ -246,29 +202,38 @@ class WhatsAppElements:
         return search_box
 
     async def close_search(self) -> bool:
-        """Close only an active search, without bubbling Escape to the chat."""
+        """Close the search and verify it closed. True when no search remains.
+
+        Escape is pressed on the search input itself (verified live: it clears
+        the query and keeps the open chat); the clear button is the fallback.
+        """
         if not await self.verify_search_active():
-            return False
+            return True
 
         search_box = await self._get_search_box(timeout=1000)
         if search_box:
             try:
                 await search_box.press("Escape")
-                self._search_active = False
-                return True
             except Exception:
                 pass
+            finally:
+                await _safe_dispose(search_box)
+            if not await self.verify_search_active():
+                return True
 
         for selector in loc.SEARCH_CLOSE_BUTTON:
-            try:
-                close_button = await self.wait_for_selector(selector, timeout=1000)
-                if close_button:
+            close_button = await self.wait_for_selector(selector, timeout=1000)
+            if close_button:
+                try:
                     await close_button.click()
-                    self._search_active = False
+                except Exception:
+                    pass
+                finally:
+                    await _safe_dispose(close_button)
+                if not await self.verify_search_active():
                     return True
-            except Exception:
-                continue
 
+        logger.warning("Search could not be closed; query still %r", await self._search_query())
         return False
 
     async def get_qr_code(self) -> Optional[bytes]:
@@ -410,32 +375,54 @@ class WhatsAppElements:
                 return None
             await asyncio.sleep(0.3)
 
-    async def _click_listed_chat(self, chat_name: str) -> Optional[bool]:
+    async def _listed_matches(self, chat_name: str) -> tuple:
+        """(matching cells, all cells) of side-pane rows titled exactly `chat_name`.
+
+        The caller must dispose every cell in the second list.
+        """
+        cells = await self.page.query_selector_all(f"xpath={loc.CHAT_LIST_TITLES}")
+        matches = []
+        for cell in cells:
+            title = await cell.get_attribute("title")
+            if isinstance(title, str) and same_chat(title, chat_name):
+                matches.append(cell)
+        return matches, cells
+
+    async def _click_listed_chat(self, chat_name: str, wait_secs: float = 0.0) -> Optional[bool]:
         """Click the only side-pane row titled exactly `chat_name`.
 
         Returns True when clicked, False when no row matches, and None when
         several rows match: picking one would be a guess, so nothing is clicked.
+        With `wait_secs`, waits for the row to show up (search results render
+        progressively) and only clicks once two consecutive reads agree on a
+        single match, so a duplicate that is still rendering is not missed.
         """
-        cells = await self.page.query_selector_all(f"xpath={loc.CHAT_LIST_TITLES}")
-        try:
-            matches = []
-            for cell in cells:
-                title = await cell.get_attribute("title")
-                if isinstance(title, str) and same_chat(title, chat_name):
-                    matches.append(cell)
-            if len(matches) > 1:
-                logger.error(
-                    "%d listed chats are titled %r; refusing to pick one", len(matches), chat_name
-                )
-                return None
-            if matches:
-                await matches[0].click()
-                self._search_active = False
-                return True
-            return False
-        finally:
-            for cell in cells:
-                await _safe_dispose(cell)
+        loop = asyncio.get_running_loop()
+        deadline = loop.time() + wait_secs
+        previous = None
+        while True:
+            matches, cells = await self._listed_matches(chat_name)
+            try:
+                count = len(matches)
+                if count > 1:
+                    logger.error(
+                        "%d listed chats are titled %r; refusing to pick one", count, chat_name
+                    )
+                    return None
+                settled = wait_secs <= 0 or previous == count
+                if count == 1 and settled:
+                    await matches[0].click()
+                    self._search_active = False
+                    return True
+                if count == 0 and wait_secs <= 0:
+                    return False
+                if loop.time() >= deadline:
+                    return False
+                previous = count
+            finally:
+                for cell in cells:
+                    await _safe_dispose(cell)
+            await asyncio.sleep(0.3)
 
     async def open(
         self,
@@ -523,59 +510,22 @@ class WhatsAppElements:
                     await _safe_dispose(search_box)
                     return False
                 _log("texto tipeado en input de busqueda")
+                await _safe_dispose(search_box)
 
-                # Wait for search spinner to detach from DOM.
-                try:
-                    await self.page.wait_for_selector("svg[role='status']", state="detached", timeout=10000)
-                    _log("spinner detached from DOM")
-                except PlaywrightTimeoutError:
-                    _log("timeout waiting for spinner, continuing")
-
-                await asyncio.sleep(1)
-
-                _log("esperando SEARCH_ITEM...")
-                results = await self.page.wait_for_selector(loc.SEARCH_ITEM, timeout=5000)
-                _log(f"SEARCH_ITEM: {results is not None}")
-                if not results:
-                    await _safe_dispose(search_box)
-                    raise Exception("No se encontraron resultados de busqueda")
-
-                await asyncio.sleep(1)
-                chat_results = await self.page.query_selector_all(loc.SEARCH_ITEM)
-                _log(f"chat_results count={len(chat_results)}")
-
-                found = False
-                try:
-                    matches = []
-                    for chat in chat_results:
-                        title_el = await chat.query_selector(f"xpath={loc.SPAN_TITLE}")
-                        try:
-                            if title_el:
-                                title = await title_el.get_attribute("title")
-                                if isinstance(title, str) and same_chat(title, chat_name):
-                                    matches.append(chat)
-                        finally:
-                            await _safe_dispose(title_el)
-                    if len(matches) > 1:
-                        _log(f"{len(matches)} resultados con ese título; no se abre ninguno")
-                        await self.close_search()
-                        return False
-                    if matches:
-                        _log(f"clickeando chat: {chat_name}")
-                        await matches[0].click()
-                        self._search_active = False
-                        found = True
-                finally:
-                    # Release every result handle; the click already happened.
-                    for chat in chat_results:
-                        await _safe_dispose(chat)
-                    await _safe_dispose(search_box)
-                if not found:
-                    # Never fall back to the first result: it is often another
-                    # chat (or a group) and the caller would type into it.
-                    _log("chat no encontrado en results; no se abre ningún otro")
+                # Results render in the same side-pane grid as the chat list,
+                # so the exact-title match is shared with the direct route.
+                listed = await self._click_listed_chat(
+                    chat_name, wait_secs=SEARCH_RESULTS_WAIT_SECS
+                )
+                if listed is not True:
+                    _log("varios resultados con ese título" if listed is None
+                         else "chat no encontrado en resultados; no se abre ningún otro")
                     await self.close_search()
                     return False
+                _log(f"clickeando chat: {chat_name}")
+                # Leave no query behind; Escape on the search input keeps the
+                # opened chat (verified live).
+                await self.close_search()
 
             _log(f"esperando ACTIVE_CHAT_COMPOSER (timeout={timeout}ms)...")
             await self.page.wait_for_selector(loc.ACTIVE_CHAT_COMPOSER, timeout=timeout)
