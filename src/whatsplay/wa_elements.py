@@ -568,7 +568,11 @@ class WhatsAppElements:
             return True
 
         except PlaywrightTimeoutError:
-            _log("TIMEOUT esperando CHAT_INPUT_BOX")
+            # Also reached when search results never appear: leave no query
+            # behind in the search box.
+            if self._search_active:
+                await self.close_search()
+            _log("TIMEOUT abriendo el chat")
             return False
 
         except Exception as e:
@@ -634,7 +638,7 @@ class WhatsAppElements:
         Agrega miembros a un grupo existente. Asume que el chat del grupo ya está abierto.
         """
         try:
-            if not self.open(group_name, timeout=5000):
+            if not await self.open(group_name, timeout=5000, is_group=True):
                 logger.warning(f"❌ No se pudo abrir el grupo '{group_name}'")
                 return False
             

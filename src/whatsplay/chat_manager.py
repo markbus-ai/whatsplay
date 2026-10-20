@@ -986,8 +986,10 @@ class ChatManager:
                 await send_btn_loc.wait_for(state="visible", timeout=DEFAULT_WAIT_TIMEOUT)
                 await send_btn_loc.click()
                 await asyncio.sleep(2)
-                await self.wait_for_whatsapp_ready(timeout=DEFAULT_WAIT_TIMEOUT)
-                return True
+                confirmed = await self.wait_for_whatsapp_ready(timeout=DEFAULT_WAIT_TIMEOUT)
+                if not confirmed:
+                    logger.warning("File to %r sent but not confirmed by server", chat_name)
+                return confirmed
             except Exception as e:
                 await self.client.emit("on_error", f"Error sending file: {e}")
                 return False

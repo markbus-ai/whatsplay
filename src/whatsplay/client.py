@@ -177,6 +177,21 @@ class Client(BaseWhatsAppClient):
             await self.emit("on_stop")
             self._shutdown_event.set()
 
+    def _bind_components(self) -> None:
+        """(Re)create the page-bound helpers for the current self._page."""
+        self.wa_elements = WhatsAppElements(self._page)
+        self.chat_manager = ChatManager(self)
+        self.state_manager = StateManager(self)
+
+    async def reconnect(self) -> None:
+        """Reconnect and rebind every helper to the new page.
+
+        The base reconnect opens a new page; helpers created for the old one
+        would otherwise keep driving a closed page.
+        """
+        await super().reconnect()
+        self._bind_components()
+
     async def start(self) -> None:
         """
         Start the WhatsApp Web client.
@@ -189,9 +204,7 @@ class Client(BaseWhatsAppClient):
         """
         try:
             await super().start()
-            self.wa_elements = WhatsAppElements(self._page)
-            self.chat_manager = ChatManager(self)
-            self.state_manager = StateManager(self)
+            self._bind_components()
             self._is_running = True
             await self._main_loop()
 
