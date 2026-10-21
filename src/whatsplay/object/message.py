@@ -157,6 +157,38 @@ async def _safe_dispose(handle: Optional[ElementHandle]) -> None:
         pass
 
 
+_MODEL_TEXT_JS = """(msgId) => {
+    try {
+        const C = window.require('WAWebCollections');
+        const bare = msgId.split('_').pop();
+        const m = C.Msg.get(msgId)
+            || C.Msg.getModelsArray().find(x => x.id && x.id.id === bare);
+        if (!m) return null;
+        // Media bodies hold the thumbnail; their text is the caption.
+        return String((m.type === 'chat' ? m.body : m.caption) || '');
+    } catch (e) {
+        return null;
+    }
+}"""
+
+
+async def _model_text(page: Page, msg_id: str) -> Optional[str]:
+    """Text of a bubble as WhatsApp stores it, or None when unavailable.
+
+    The DOM only exposes the first selectable-text node: an image caption is
+    not one (the bubble reads as empty) and in a reply it is the quoted
+    message, not what the sender wrote. The message model has both right.
+    """
+    if not msg_id:
+        return None
+    try:
+        text = await page.evaluate(_MODEL_TEXT_JS, msg_id)
+    except Exception as e:
+        logger.debug("message model lookup failed for %s: %s", msg_id, e)
+        return None
+    return text.strip() if isinstance(text, str) else None
+
+
 async def _self_or_descendant_has_class(elem: ElementHandle, class_name: str) -> bool:
     """Check a direction CSS class on the bubble container itself or below it.
 
@@ -580,6 +612,9 @@ class Message:
                         texto = "\n".join(lineas[1:]).strip()
                     else:
                         texto = raw_inner.strip()
+            model_text = await _model_text(page, msg_id)
+            if model_text is not None:
+                texto = model_text
 
             return cls(
                 page=page,
