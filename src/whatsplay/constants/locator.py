@@ -181,3 +181,11 @@ MSG_STATUS_SENT = "css=span[aria-label*='Enviado'], span[aria-label*='Sent']"
 MSG_STATUS_DELIVERED = "css=span[aria-label*='Entregado'], span[aria-label*='Delivered']"
 MSG_STATUS_READ = "css=span[aria-label*='Leído'], span[aria-label*='Read']"
 MSG_STATUS_CONFIRMED = "css=span[aria-label*='Enviado'], span[aria-label*='Sent'], span[aria-label*='Entregado'], span[aria-label*='Delivered'], span[aria-label*='Leído'], span[aria-label*='Read']"
+
+# Voice-note icon in a chat-list preview. Current WhatsApp Web (verified live
+# 2026-10-21) draws icons as <svg><title>ic-keyboard-voice-filled</title>
+# and no longer sets data-icon; data-icon="mic" is the older markup.
+CHAT_LIST_VOICE_ICON = (
+    'xpath=.//span[@data-icon="mic"]'
+    ' | .//*[local-name()="title" and contains(., "keyboard-voice")]'
+)

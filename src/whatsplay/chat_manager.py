@@ -363,7 +363,7 @@ class ChatManager:
             unread_count = await unread_el.inner_text() if unread_el else "0"
 
             # Check for audio message
-            mic_span = await components[1].query_selector('xpath=.//span[@data-icon="mic"]')
+            mic_span = await components[1].query_selector(loc.CHAT_LIST_VOICE_ICON)
 
             if count == 3:
                 # Group chat layout
