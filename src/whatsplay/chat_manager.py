@@ -88,6 +88,32 @@ class ChatManager:
         self._page = client._page
         self.wa_elements = client.wa_elements
 
+    async def _reset_chat_list(self) -> None:
+        """
+        Show the "All" filter scrolled to the top before a scan.
+
+        The chat list is virtualized: only rendered rows can be swept, and new
+        activity lands at the top. If the list was left on another filter or
+        scrolled down (e.g. after opening an older chat), unread chats stay
+        invisible until something scrolls it back.
+        """
+        try:
+            tab = self._page.locator(loc.ALL_CHATS_BUTTON).first
+            if await tab.count() and await tab.get_attribute("aria-selected") != "true":
+                await tab.click()
+        except Exception as e:
+            logger.debug(f"Could not select the 'All' filter: {e}")
+        try:
+            await self._page.evaluate(
+                """() => {
+                    const pane = document.querySelector('#pane-side');
+                    if (pane) pane.scrollTop = 0;
+                }"""
+            )
+            await self._page.wait_for_timeout(300)  # let the top rows render
+        except Exception as e:
+            logger.debug(f"Could not scroll the chat list to the top: {e}")
+
     async def _check_unread_chats(self, debug: bool = True) -> List[Dict[str, Any]]:
         """
         Detect all unread chats in the sidebar.
@@ -247,6 +273,7 @@ class ChatManager:
             try:
                 # Step 0: Wait for UI to be ready
                 await _wait_for_grid()
+                await self._reset_chat_list()
 
                 # Step 1: Debug initial state
                 try:
