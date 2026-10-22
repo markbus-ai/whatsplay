@@ -92,3 +92,55 @@ async def test_from_element_keeps_the_dom_text_when_the_model_is_missing():
     elem.query_selector = query_selector
     msg = await Message.from_element(elem, page)
     assert msg.text == "Hola"
+
+
+BUBBLES = """
+<div data-testid="conv-msg-1" data-id="IMG1"></div>
+<div data-testid="conv-msg-2"><div data-id="false_1@lid_TXT1"></div></div>
+<div data-testid="conv-msg-3" data-id="GONE"></div>
+"""
+
+
+@pytest.mark.asyncio
+async def test_one_lookup_returns_the_texts_of_every_rendered_bubble():
+    async_api = pytest.importorskip("playwright.async_api")
+    from whatsplay.object.message import _model_texts
+    async with async_api.async_playwright() as p:
+        try:
+            browser = await p.chromium.launch(executable_path=os.environ.get("CHROMIUM_PATH") or None)
+        except Exception as e:  # no browser installed in this environment
+            pytest.skip(f"chromium unavailable: {e}")
+        page = await browser.new_page()
+        await page.set_content(STUB + BUBBLES)
+        texts = await _model_texts(page)
+        bare = await browser.new_page()  # a fresh window has no window.require
+        await bare.set_content(BUBBLES)
+        without_modules = await _model_texts(bare)
+        await browser.close()
+    # IMG2 is a loaded model but not rendered: not returned
+    assert texts == {"IMG1": "quería saber si la bici ya está para retirar ?",
+                     "TXT1": "Bicicleta rodado 29 aluminio"}
+    assert without_modules is None
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("texts, expected", [
+    ({"TXT1": "Bicicleta rodado 29 aluminio"}, "Bicicleta rodado 29 aluminio"),
+    ({}, "¡Hola! ¡Bienvenido/a a Bicicletería Amigorena!"),  # not loaded: DOM text
+])
+async def test_from_element_uses_the_batch_without_querying_the_page(texts, expected):
+    page = AsyncMock()
+    elem = AsyncMock()
+    elem.get_attribute.side_effect = lambda attr: {
+        "data-id": "false_1@lid_TXT1", "data-testid": "conv-msg-AC-test",
+    }.get(attr)
+    quoted = AsyncMock()
+    quoted.inner_text.return_value = "¡Hola! ¡Bienvenido/a a Bicicletería Amigorena!"
+
+    async def query_selector(selector):
+        return quoted if "selectable-text" in selector else None
+
+    elem.query_selector = query_selector
+    msg = await Message.from_element(elem, page, model_texts=texts)
+    assert msg.text == expected
+    page.evaluate.assert_not_awaited()

@@ -172,6 +172,44 @@ _MODEL_TEXT_JS = """(msgId) => {
 }"""
 
 
+_MODEL_TEXTS_JS = """() => {
+    try {
+        const C = window.require('WAWebCollections');
+        const ids = new Set();
+        for (const el of document.querySelectorAll('div[data-testid^="conv-msg-"]')) {
+            const inner = el.querySelector('[data-id]');
+            const id = el.getAttribute('data-id') || (inner && inner.getAttribute('data-id'));
+            if (id) ids.add(id.split('_').pop());
+        }
+        const out = {};
+        if (!ids.size) return out;
+        for (const m of C.Msg.getModelsArray()) {
+            const key = m.id && m.id.id;
+            if (key && ids.has(key)) {
+                // Media bodies hold the thumbnail; their text is the caption.
+                out[key] = String((m.type === 'chat' ? m.body : m.caption) || '');
+            }
+        }
+        return out;
+    } catch (e) {
+        return null;
+    }
+}"""
+
+
+async def _model_texts(page: Page) -> Optional[Dict[str, str]]:
+    """Texts of every rendered bubble, keyed by the bare message id, in one
+    page round trip. None when WhatsApp's modules are not reachable."""
+    try:
+        texts = await page.evaluate(_MODEL_TEXTS_JS)
+    except Exception as e:
+        logger.debug("message model batch lookup failed: %s", e)
+        return None
+    if not isinstance(texts, dict):
+        return None
+    return {k: v.strip() for k, v in texts.items() if isinstance(v, str)}
+
+
 async def _model_text(page: Page, msg_id: str) -> Optional[str]:
     """Text of a bubble as WhatsApp stores it, or None when unavailable.
 
@@ -464,6 +502,7 @@ class Message:
         elem: ElementHandle,
         page: Page,
         own_push_names: Optional[Iterable[str]] = None,
+        model_texts: Optional[Dict[str, str]] = None,
     ) -> Optional["Message"]:
         """
         Create a Message instance from a DOM element.
@@ -612,7 +651,11 @@ class Message:
                         texto = "\n".join(lineas[1:]).strip()
                     else:
                         texto = raw_inner.strip()
-            model_text = await _model_text(page, msg_id)
+            if model_texts is not None:
+                # Batch read by collect_messages: no page round trip per bubble.
+                model_text = model_texts.get(msg_id.split("_")[-1]) if msg_id else None
+            else:
+                model_text = await _model_text(page, msg_id)
             if model_text is not None:
                 texto = model_text
 
@@ -786,6 +829,7 @@ class FileMessage(Message):
         elem: ElementHandle,
         page: Page,
         own_push_names: Optional[Iterable[str]] = None,
+        model_texts: Optional[Dict[str, str]] = None,
     ) -> Optional["FileMessage"]:
         """
         Create a FileMessage from a DOM element.
@@ -814,7 +858,7 @@ class FileMessage(Message):
                 return None
 
             # 3) Extract base message data
-            base_msg = await Message.from_element(elem, page, own_push_names)
+            base_msg = await Message.from_element(elem, page, own_push_names, model_texts=model_texts)
             if not base_msg:
                 await _safe_dispose(icon)
                 return None
@@ -928,6 +972,7 @@ class VoiceMessage(Message):
         elem: ElementHandle,
         page: Page,
         own_push_names: Optional[Iterable[str]] = None,
+        model_texts: Optional[Dict[str, str]] = None,
     ) -> Optional["VoiceMessage"]:
         """
         Create a VoiceMessage from a DOM element.
@@ -1009,7 +1054,7 @@ class VoiceMessage(Message):
             except Exception:
                 logger.warning("VoiceMessage: failed to extract voice duration")
 
-            base_msg = await Message.from_element(elem, page, own_push_names)
+            base_msg = await Message.from_element(elem, page, own_push_names, model_texts=model_texts)
             if not base_msg:
                 return None
 

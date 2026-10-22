@@ -31,6 +31,7 @@ from .object.message import (
     Message,
     VoiceMessage,
     _flag_direction_fallback,
+    _model_texts,
     _safe_dispose,
 )
 from .codec_detector import detect_codec
@@ -620,11 +621,15 @@ class ChatManager:
 
         msg_elements = await self._page.query_selector_all('div[data-testid^="conv-msg-"]')
         logger.debug("collect_messages: %d containers found", len(msg_elements))
+        # One page round trip for every bubble instead of one per bubble.
+        model_texts = await _model_texts(self._page)
+        if model_texts is None:
+            model_texts = {}  # modules unreachable: DOM text, no per-bubble retries
 
         last_sender = ""
         last_is_outgoing = False
         for i, elem in enumerate(msg_elements):
-            voice_msg = await VoiceMessage.from_element(elem, self._page, own_push_names)
+            voice_msg = await VoiceMessage.from_element(elem, self._page, own_push_names, model_texts=model_texts)
             if voice_msg:
                 self._inherit_sender(voice_msg, last_sender, last_is_outgoing)
                 if voice_msg.sender:
@@ -633,7 +638,7 @@ class ChatManager:
                 results.append(voice_msg)
                 continue
 
-            file_msg = await FileMessage.from_element(elem, self._page, own_push_names)
+            file_msg = await FileMessage.from_element(elem, self._page, own_push_names, model_texts=model_texts)
             if file_msg:
                 self._inherit_sender(file_msg, last_sender, last_is_outgoing)
                 if file_msg.sender:
@@ -642,7 +647,7 @@ class ChatManager:
                 results.append(file_msg)
                 continue
 
-            simple_msg = await Message.from_element(elem, self._page, own_push_names)
+            simple_msg = await Message.from_element(elem, self._page, own_push_names, model_texts=model_texts)
             if simple_msg:
                 self._inherit_sender(simple_msg, last_sender, last_is_outgoing)
                 if simple_msg.sender:
