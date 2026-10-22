@@ -667,7 +667,7 @@ class Message:
             else:
                 model_text = await _model_text(page, msg_id)
             if model_text is not None:
-                if model_text != texto:
+                if model_text.split() != texto.split():  # blank lines are not news
                     # Captions and replies: worth seeing in the consumer's log.
                     logger.info("message %s: model text %r replaces DOM text %r",
                                 msg_id, model_text[:60], texto[:60])

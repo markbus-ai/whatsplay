@@ -148,3 +148,27 @@ async def test_from_element_uses_the_batch_without_querying_the_page(texts, expe
     msg = await Message.from_element(elem, page, model_texts=texts)
     assert msg.text == expected
     page.evaluate.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("dom, model, logged", [
+    ("¡Hola!   Estamos en Colón", "¡Hola!\nEstamos en Colón", False),  # only spacing differs
+    ("¡Hola! ¡Bienvenido/a!", "Bicicleta rodado 29 aluminio", True),     # quoted reply recovered
+])
+async def test_only_real_text_changes_are_logged(dom, model, logged, caplog):
+    page = AsyncMock()
+    elem = AsyncMock()
+    elem.get_attribute.side_effect = lambda attr: {
+        "data-id": "TXT1", "data-testid": "conv-msg-AC-test",
+    }.get(attr)
+    selectable = AsyncMock()
+    selectable.inner_text.return_value = dom
+
+    async def query_selector(selector):
+        return selectable if "selectable-text" in selector else None
+
+    elem.query_selector = query_selector
+    with caplog.at_level("INFO", logger="whatsplay"):
+        msg = await Message.from_element(elem, page, model_texts={"TXT1": model})
+    assert msg.text == model
+    assert ("replaces DOM text" in caplog.text) is logged
