@@ -157,6 +157,17 @@ async def _safe_dispose(handle: Optional[ElementHandle]) -> None:
         pass
 
 
+#: Text a sender wrote, from a WhatsApp message model. Media bodies hold the
+#: thumbnail, so their text is the caption; a document without one reports
+#: its file name as caption ("Ticket.pdf"), which nobody typed.
+_TEXT_OF_JS = """(m) => {
+    if (m.type === 'chat') return String(m.body || '');
+    const caption = String(m.caption || '');
+    if (m.type === 'document' && caption === String(m.filename || '')) return '';
+    return caption;
+}"""
+
+
 _MODEL_TEXT_JS = """(msgId) => {
     try {
         const C = window.require('WAWebCollections');
@@ -164,8 +175,7 @@ _MODEL_TEXT_JS = """(msgId) => {
         const m = C.Msg.get(msgId)
             || C.Msg.getModelsArray().find(x => x.id && x.id.id === bare);
         if (!m) return null;
-        // Media bodies hold the thumbnail; their text is the caption.
-        return String((m.type === 'chat' ? m.body : m.caption) || '');
+        return (""" + _TEXT_OF_JS + """)(m);
     } catch (e) {
         return null;
     }
@@ -174,6 +184,7 @@ _MODEL_TEXT_JS = """(msgId) => {
 
 _MODEL_TEXTS_JS = """() => {
     try {
+        const textOf = """ + _TEXT_OF_JS + """;
         const C = window.require('WAWebCollections');
         const ids = new Set();
         for (const el of document.querySelectorAll('div[data-testid^="conv-msg-"]')) {
@@ -186,8 +197,7 @@ _MODEL_TEXTS_JS = """() => {
         for (const m of C.Msg.getModelsArray()) {
             const key = m.id && m.id.id;
             if (key && ids.has(key)) {
-                // Media bodies hold the thumbnail; their text is the caption.
-                out[key] = String((m.type === 'chat' ? m.body : m.caption) || '');
+                out[key] = textOf(m);
             }
         }
         return out;
@@ -657,6 +667,10 @@ class Message:
             else:
                 model_text = await _model_text(page, msg_id)
             if model_text is not None:
+                if model_text != texto:
+                    # Captions and replies: worth seeing in the consumer's log.
+                    logger.info("message %s: model text %r replaces DOM text %r",
+                                msg_id, model_text[:60], texto[:60])
                 texto = model_text
 
             return cls(

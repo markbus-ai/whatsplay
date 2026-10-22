@@ -17,6 +17,8 @@ const models = [
   {id: {id: 'IMG1'}, type: 'image', body: '/9j/4AAQSkZJRg', caption: 'quería saber si la bici ya está para retirar ?'},
   {id: {id: 'IMG2'}, type: 'image', body: '/9j/4AAQSkZJRg', caption: undefined},
   {id: {id: 'TXT1'}, type: 'chat', body: 'Bicicleta rodado 29 aluminio', quotedStanzaID: 'Q1'},
+  {id: {id: 'DOC1'}, type: 'document', body: '', caption: 'Ticket.pdf', filename: 'Ticket.pdf'},
+  {id: {id: 'DOC2'}, type: 'document', body: '', caption: 'te paso el comprobante', filename: 'Ticket.pdf'},
 ];
 window.require = (name) => {
   if (name !== 'WAWebCollections') throw new Error('unknown module');
@@ -46,6 +48,8 @@ async def _eval(html, msg_id):
     ("TXT1", "Bicicleta rodado 29 aluminio"),                      # reply: own text, not the quote
     ("false_93497327620330@lid_IMG1", "quería saber si la bici ya está para retirar ?"),
     ("MISSING", None),                                             # not loaded: keep the DOM text
+    ("DOC1", ""),                                                  # a document's caption is its file name
+    ("DOC2", "te paso el comprobante"),                            # unless the sender wrote one
 ])
 async def test_text_from_the_message_model(msg_id, expected):
     assert await _eval(STUB, msg_id) == expected
