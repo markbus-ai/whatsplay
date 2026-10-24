@@ -255,18 +255,19 @@ mkdocs serve
 - Stable attribute-based selectors (no more fragile CSS classes)
 - Multi-language (Spanish / English)
 - Group management (create, add / remove members)
-- Reactions to the last message
+- Reactions (`react_to_last_message()`, `Message.react()`)
 - Structured logging
 - Page lock for concurrent handlers
 - Memory management for long-running bots (`refresh()`, `dispose`)
 
 ### In progress 🚧
-- Full message reactions API
-- Webhook integration
+- Real `on_message` event (no more manual open + collect polling)
+- Selector health check that warns loudly when WhatsApp Web changes its DOM
 
 ### Planned 🔮
-- Multi-account simultaneous support
-- Monitoring dashboard
+- Send results that explain why a send failed (ambiguous chat, wrong composer, no delivery status)
+- Reading older chat history by scrolling
+- Warning for unsupported (non English / Spanish) locales
 
 ---
 
