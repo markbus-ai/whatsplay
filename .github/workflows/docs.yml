@@ -25,22 +25,8 @@ jobs:
 
       - name: Install dependencies
         run: |
-<<<<<<< Updated upstream
           pip install "mkdocs<2" mkdocs-material pymdown-extensions mkdocstrings-python mkdocs-static-i18n
-=======
-          pip install \
-            mkdocs \
-            mkdocs-material \
-            mkdocstrings-python \
-            mkdocs-i18n \
-            pymdown-extensions
->>>>>>> Stashed changes
 
       - name: Build & deploy to GitHub Pages
         run: |
-<<<<<<< Updated upstream
           mkdocs gh-deploy --force --clean --message "Deploy documentation from {sha}"
-=======
-          mkdocs gh-deploy --force --clean \
-            --message "docs: deploy from ${GITHUB_SHA}"
->>>>>>> Stashed changes
