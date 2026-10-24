@@ -70,8 +70,9 @@ class Client(BaseWhatsAppClient):
             locale: Browser locale setting
             auth: Authentication provider instance
         """
-        super().__init__(user_data_dir=user_data_dir, headless=headless, auth=auth)
-        self.locale = locale
+        super().__init__(
+            user_data_dir=user_data_dir, headless=headless, auth=auth, locale=locale
+        )
         self._cached_chats: set = set()
         self.poll_freq = DEFAULT_POLL_FREQUENCY
         self.wa_elements: Optional[WhatsAppElements] = None

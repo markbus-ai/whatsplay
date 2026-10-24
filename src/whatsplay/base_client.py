@@ -55,6 +55,7 @@ class BaseWhatsAppClient(EventHandler):
         user_data_dir: Optional[str] = None,
         headless: bool = False,
         auth: Optional[Any] = None,
+        locale: str = DEFAULT_LOCALE,
     ) -> None:
         """
         Initialize the base WhatsApp client.
@@ -63,10 +64,12 @@ class BaseWhatsAppClient(EventHandler):
             user_data_dir: Directory for browser profile data
             headless: Run browser in headless mode
             auth: Authentication provider instance
+            locale: Browser locale (also sent as Accept-Language)
         """
         super().__init__(EVENT_LIST)
         self.user_data_dir = user_data_dir
         self.headless = headless
+        self.locale = locale
         self.auth = auth
         self._page: Optional[Page] = None
         self._browser: Optional[Browser] = None
@@ -173,7 +176,7 @@ class BaseWhatsAppClient(EventHandler):
             user_data_dir=user_data_dir,
             headless=self.headless,
             args=launch_args.get("args", []),
-            locale=DEFAULT_LOCALE,
+            locale=self.locale,
             timezone_id=DEFAULT_TIMEZONE,
             viewport=DEFAULT_VIEWPORT,
             user_agent=USER_AGENT_CHROME_114_WIN10,
@@ -195,7 +198,7 @@ class BaseWhatsAppClient(EventHandler):
         """
         self._browser = await browser_type.launch(**launch_args)
         self._context = await self._browser.new_context(
-            locale=DEFAULT_LOCALE,
+            locale=self.locale,
             timezone_id=DEFAULT_TIMEZONE,
             viewport=DEFAULT_VIEWPORT,
             user_agent=USER_AGENT_CHROME_114_WIN10,
@@ -209,7 +212,7 @@ class BaseWhatsAppClient(EventHandler):
         """
         # Set Accept-Language header
         await self._context.set_extra_http_headers(
-            {"Accept-Language": f"{DEFAULT_LOCALE},en;q=0.9"}
+            {"Accept-Language": f"{self.locale},en;q=0.9"}
         )
 
         # Basic webdriver detection evasion
