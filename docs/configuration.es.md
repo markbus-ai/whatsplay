@@ -1,8 +1,8 @@
 # Configuración
 
-Esta guía detalla cómo configurar el `Client` y las estrategias de autenticación en WhatsPlay.
+Esta guía detalla cómo configurar el `Client`, las estrategias de autenticación y el logging en WhatsPlay.
 
-## Configuración del Cliente
+## Configuración del cliente
 
 La clase `Client` es el punto de entrada principal. Puedes configurarla usando los siguientes parámetros en su constructor.
 
@@ -12,45 +12,44 @@ from whatsplay import Client
 client = Client(
     auth=...,           # Estrategia de autenticación
     headless=False,     # Ejecutar con ventana de navegador visible
-    locale="en-US",     # Idioma del navegador
-    user_data_dir=...   # (Opcional) Ruta directa al perfil del navegador
 )
 ```
 
 ### Parámetros
 
-| Parámetro | Tipo | Por Defecto | Descripción |
+| Parámetro | Tipo | Por defecto | Descripción |
 | :--- | :--- | :--- | :--- |
-| `auth` | `AuthBase` | `None` | La estrategia de autenticación a usar. Ver **Autenticación** abajo. |
-| `headless` | `bool` | `False` | Si es `True`, ejecuta el navegador en segundo plano (sin interfaz visible). Útil para servidores o bots. Si es `False`, se abrirá una ventana. |
-| `locale` | `str` | `"en-US"` | El código de configuración regional del navegador (ej. `"es-ES"`, `"pt-BR"`). Esto afecta cómo WhatsApp Web muestra el texto. |
-| `user_data_dir` | `str` | `None` | Una ruta directa a un directorio de datos de usuario de Chrome. **Nota:** Se recomienda usar `LocalProfileAuth` en lugar de establecer esto directamente. |
+| `auth` | `AuthBase` | `None` | La estrategia de autenticación a usar. Consulta **Estrategias de autenticación** más abajo. |
+| `headless` | `bool` | `False` | Si es `True`, ejecuta el navegador en segundo plano (sin interfaz visible). Útil para servidores o bots. |
+| `user_data_dir` | `str` | `None` | Una ruta directa a un directorio de datos de usuario de Chrome. **Nota:** es preferible usar `LocalProfileAuth` en lugar de establecer esto directamente. |
+| `locale` | `str` | `"en-US"` | Configuración regional del navegador; también se envía como cabecera `Accept-Language` (por ejemplo, `"es-AR"`). Usa una configuración regional en inglés o en español: el envío solo es compatible con esos idiomas de interfaz (consulta **Idioma de la interfaz**). |
 
-## Estrategias de Autenticación
+## Estrategias de autenticación
 
-WhatsPlay soporta diferentes formas de manejar tu sesión de WhatsApp.
+WhatsPlay admite diferentes formas de manejar tu sesión de WhatsApp.
 
-### 1. LocalProfileAuth (Recomendado)
+### 1. LocalProfileAuth (recomendada)
 
-Esta estrategia guarda tu sesión de inicio (cookies, almacenamiento local) en una carpeta en tu disco. Esto significa que solo necesitas escanear el código QR una vez.
+Esta estrategia conserva tu sesión en un perfil de navegador en disco, así que solo necesitas escanear el código QR una vez.
 
 ```python
+from whatsplay import Client
 from whatsplay.auth import LocalProfileAuth
 
-# Guardar sesión en la carpeta "./mi_sesion"
-auth = LocalProfileAuth(data_dir="./mi_sesion")
+# Guardar la sesión en la carpeta "./my_session"
+auth = LocalProfileAuth(data_dir="./my_session")
 
 client = Client(auth=auth)
 ```
 
 **Parámetros:**
 
-*   `data_dir` (str): El directorio donde se almacenarán los datos de la sesión. Si no existe, se creará.
-*   `profile` (str, por defecto `"Default"`): El nombre de la subcarpeta del perfil. Útil si quieres gestionar múltiples cuentas en el mismo `data_dir`.
+*   `data_dir` (str): el directorio donde se almacenan los datos de sesión. Se crea si no existe.
+*   `profile` (str, por defecto `"Default"`): el nombre de la subcarpeta del perfil. Útil para gestionar varias cuentas en el mismo `data_dir`.
 
 ### 2. NoAuth
 
-Esta estrategia **no** guarda ningún dato de sesión. Cada vez que ejecutes el script, se creará una instancia nueva del navegador y tendrás que escanear el código QR nuevamente.
+Esta estrategia **no** guarda ningún dato de sesión. Cada ejecución inicia un navegador nuevo y necesitas escanear el código QR otra vez.
 
 ```python
 from whatsplay.auth import NoAuth
@@ -59,19 +58,45 @@ auth = NoAuth()
 client = Client(auth=auth)
 ```
 
-## Configuración Avanzada del Navegador
+## Registros
 
-WhatsPlay utiliza **Playwright** (Chromium) internamente.
+WhatsPlay usa el módulo estándar `logging` de Python. Cada módulo registra bajo el espacio de nombres `whatsplay` (`whatsplay.client`, `whatsplay.chat_manager`, `whatsplay.wa_elements`, `whatsplay.state_manager`, `whatsplay.object.message`, ...), de modo que un solo `setLevel()` sobre `"whatsplay"` lo controla todo.
 
-### Viewport y Zona Horaria
-Por defecto, el navegador se lanza con:
+- **Si tu aplicación configura el logging** (el logger raíz tiene handlers), los registros de WhatsPlay se propagan a él como los de cualquier otra biblioteca: archivos, Sentry, `caplog` de `pytest`, etc.
+- **Si no lo hace**, un handler de compatibilidad imprime `LEVEL: message` en stdout con nivel `INFO`, para que nada se pierda en silencio.
+
+```python
+import logging
+
+# Silencioso: solo advertencias y errores
+logging.getLogger("whatsplay").setLevel(logging.WARNING)
+
+# Detallado: detección de estado y decisiones sobre el DOM
+logging.getLogger("whatsplay.wa_elements").setLevel(logging.DEBUG)
+```
+
+El sondeo de estado registra en `DEBUG`; cada escaneo de chats no leídos registra una única línea de resumen en `INFO`.
+
+## Configuración avanzada del navegador
+
+WhatsPlay usa **Playwright** (Chromium) internamente.
+
+### Ejecutable del navegador
+Si existe `/usr/bin/chromium` o `/usr/bin/google-chrome`, WhatsPlay lo usa. De lo contrario, usa el Chromium instalado con `python -m playwright install chromium`.
+
+### Viewport, configuración regional y zona horaria
+El navegador se inicia con:
 *   **Viewport:** 1280x720
-*   **Zona Horaria:** UTC
-*   **User Agent:** Un user agent estándar de Chrome/Windows para prevenir bloqueos básicos.
+*   **Configuración regional:** el `locale` pasado a `Client` (por defecto `en-US`)
+*   **Zona horaria:** UTC
+*   **User Agent:** un user agent estándar de Chrome/Windows para evitar bloqueos básicos.
 
-Estos están configurados actualmente como constantes en el cliente base para asegurar estabilidad con WhatsApp Web.
+El viewport, la zona horaria y el user agent son constantes en el cliente base para mantener estable WhatsApp Web.
 
-### Variables de Entorno
-Dado que WhatsPlay depende de Playwright, se aplican las variables de entorno estándar de Playwright:
-*   `DEBUG=pw:api`: Habilita el registro detallado (verbose logging) para las llamadas a la API de Playwright.
-*   `PLAYWRIGHT_BROWSERS_PATH`: Ruta personalizada para los binarios del navegador.
+### Idioma de la interfaz
+El envío depende de que la etiqueta accesible del cuadro de redacción nombre el chat de destino. Se admiten interfaces de WhatsApp Web en **español e inglés**; con cualquier otro idioma de interfaz, el envío se rechaza (devuelve `False`) en lugar de arriesgarse a escribir en el chat equivocado.
+
+### Variables de entorno
+WhatsPlay no tiene variables de entorno propias. Las variables estándar de Playwright siguen aplicándose:
+*   `DEBUG=pw:api`: logging detallado de las llamadas a la API de Playwright.
+*   `PLAYWRIGHT_BROWSERS_PATH`: ruta personalizada para los binarios del navegador.

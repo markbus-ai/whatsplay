@@ -9,15 +9,14 @@ If you get this error after installing WhatsPlay, you likely need to install Pla
 
 **Solution:**
 ```bash
-pip install playwright
-playwright install
+python -m playwright install chromium
 ```
 
 ### `Error: EACCES: permission denied` (Linux/Mac)
 If you encounter permission errors when running the script or installing dependencies.
 
 **Solution:**
-Ensure you have read/write access to your current directory and the `user_data_dir` you specified. Avoid running scripts with `sudo` unless necessary, as it can mess up file ownership.
+Ensure you have read/write access to your current directory and the `data_dir` you passed to `LocalProfileAuth`. Avoid running scripts with `sudo` unless necessary, as it can mess up file ownership.
 
 ---
 
@@ -42,7 +41,7 @@ You scan the QR code, but next time you run the script, it asks for a scan again
 **Solution:**
 Ensure you are using `LocalProfileAuth` and providing a valid path.
 ```python
-auth = LocalProfileAuth(user_data_dir="./whatsapp_session")
+auth = LocalProfileAuth(data_dir="./whatsapp_session")
 ```
 Also, ensure the script stops gracefully (using `await client.stop()`) so the browser context can save the profile data correctly.
 
@@ -62,6 +61,20 @@ This is the most common error in web automation. It means WhatsPlay tried to fin
 1.  **Check for Updates:** Run `pip install --upgrade whatsplay` to get the latest selectors.
 2.  **Use Search:** Instead of relying on a chat being visible, use `client.search_conversations()` or `client.open(..., open_via_url=True)` for phone numbers.
 3.  **Increase Timeout:** Some methods accept a `timeout` parameter.
+
+### `send_message()` / `send_file()` returns `False`
+WhatsPlay only reports success when WhatsApp shows the new message with a delivery status. It returns `False` (and logs the reason) when:
+
+1.  **The chat could not be opened:** the name doesn't match exactly, or more than one chat has that title. Use the exact title, pass `is_group=True/False`, or use a full phone number with `open_via_url=True`.
+2.  **The composer belongs to another chat:** WhatsPlay refuses to type into a chat you didn't ask for.
+3.  **The interface language is not Spanish or English:** the composer label can't be verified, so sending is refused.
+4.  **No delivery status appeared:** the message may still be pending (e.g. no connection on the phone). Check WhatsApp before retrying, to avoid duplicates.
+
+### `open()` returns `False`
+`open()` refuses instead of guessing. Check the logs (`whatsplay.wa_elements`) for "ambiguous" errors, and remember phone numbers must match the full international number.
+
+### Memory keeps growing in long-running bots
+WhatsApp Web's renderer accumulates memory over time. Use `collect_messages(dispose=True)` when you only need message data, and call `await client.refresh()` periodically (e.g. every few hours). See [Advanced Features](guides/advanced-features.md#long-running-bots-and-memory).
 
 ### `Target closed` or `Browser closed`
 The browser window was closed unexpectedly.
@@ -87,5 +100,5 @@ Running WhatsPlay on a server (CI/CD, VPS) without a screen requires special att
 
 If you've tried these solutions and still face problems:
 
-1.  **Enable Debugging:** Add print statements to your events (`on_error`, `on_warning`) to get more details.
+1.  **Enable Debug Logging:** `logging.getLogger("whatsplay").setLevel(logging.DEBUG)` shows state detection and DOM decisions. Also handle `on_error` and `on_warning`. See [Configuration › Logging](configuration.md#logging).
 2.  **Report a Bug:** Open an issue on our GitHub repository with the error log and a screenshot if possible.

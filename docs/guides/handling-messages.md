@@ -8,6 +8,8 @@ This gives you full control over when and how you process new conversations.
 
 This is the primary event for detecting new activity. It is triggered whenever WhatsPlay finds one or more chats with unread messages.
 
+Each scan first selects the **All** filter and scrolls the chat list to the top, so unread chats are found no matter where the list was left. The first scan runs about 10 seconds after login.
+
 ### Payload Structure
 
 The event handler receives a list of dictionaries. Each dictionary represents an unread chat and contains the following keys:
@@ -18,7 +20,9 @@ The event handler receives a list of dictionaries. Each dictionary represents an
 *   **`last_activity`** (str): The time or date of the last message (e.g., "10:30 PM", "Yesterday").
 *   **`type`** (str): Usually "CHATS".
 *   **`group`** (str or None): The group name if it's a group chat, or empty if it's a direct message.
-*   **`last_message_type`** (str): "text" or "audio" depending on the icon visible.
+*   **`last_message_type`** (str): `"audio"` for voice notes, otherwise `"text"`.
+
+The payload holds plain data only — no browser handles.
 
 ### Basic Pattern: Detect, Open, and Read
 
@@ -34,47 +38,39 @@ from whatsplay import Client
 from whatsplay.auth import LocalProfileAuth
 
 async def auto_reply_bot():
-    auth = LocalProfileAuth(user_data_dir="./whatsapp_session")
+    auth = LocalProfileAuth(data_dir="./whatsapp_session")
     client = Client(auth=auth, headless=True)
 
-    @client.event("on_start")
-    async def on_start():
+    @client.event("on_logged_in")
+    async def on_logged_in():
         print("Bot started! Watching for new messages...")
 
     @client.event("on_unread_chat")
     async def on_unread_chat(chats):
-        """
-        Triggered when there are unread chats.
-        'chats' is a list of dicts: [{'name': 'John', 'unread_count': '2', ...}, ...]
-        """
-        print(f"Found {len(chats)} chats with new messages.")
-
+        """'chats' is a list of dicts: [{'name': 'John', 'unread_count': '2', ...}, ...]"""
         for chat_info in chats:
-            chat_name = chat_info.get('name')
-            print(f"Processing chat: {chat_name}")
+            chat_name = chat_info["name"]
 
-            # 1. Open the chat to load messages
-            if await client.open(chat_name):
-                
-                # 2. Collect visible messages
-                messages = await client.collect_messages()
-                
-                if messages:
-                    last_message = messages[-1]
-                    sender = last_message.sender.name or "Unknown"
-                    text = last_message.text
-                    
-                    print(f"  Last message from {sender}: {text}")
+            # 1. Open the chat (False if it can't be verified or the title is ambiguous).
+            #    Pass is_group=True/False when a group and a contact may share a name.
+            if not await client.open(chat_name):
+                print(f"Failed to open chat: {chat_name}")
+                continue
 
-                    # 3. Simple Auto-reply Logic
-                    if text and "hello" in text.lower():
-                        await client.send_message(chat_name, "Hello! I am a WhatsPlay bot. 🤖")
-                        print(f"  -> Replied to {chat_name}")
-                    
-                    # Optional: Mark as read or archive (logic depends on your needs)
-                    # Currently, opening the chat marks it as read in WhatsApp.
-            else:
-                print(f"  Failed to open chat: {chat_name}")
+            # 2. Collect the loaded messages
+            messages = await client.collect_messages()
+            incoming = [m for m in messages if not m.is_outgoing]
+
+            if incoming:
+                last = incoming[-1]
+                print(f"  Last message from {last.sender or 'Unknown'}: {last.text}")
+
+                # 3. Simple auto-reply logic
+                if last.text and "hello" in last.text.lower():
+                    await client.send_message(chat_name, "Hello! I am a WhatsPlay bot. 🤖")
+
+            # Opening the chat marks it as read in WhatsApp.
+            await client.close()
 
     @client.event("on_qr")
     async def on_qr(qr):
@@ -88,23 +84,37 @@ if __name__ == "__main__":
 
 ## Processing Messages
 
-The `client.collect_messages()` method returns a list of `Message` objects. These are the same objects described in the API Reference.
+`client.collect_messages()` returns a list of `Message` objects. Documents and attachments are `FileMessage` instances and voice notes are `VoiceMessage` instances (both subclasses of `Message`).
 
 ### Common `Message` Attributes
 
-*   `message.text`: The text content.
-*   `message.timestamp`: Time the message was received.
-*   `message.sender.name`: Name of the sender.
-*   `message.is_media`: `True` if it's an image, video, etc.
+*   `message.text`: The text content. It is read from WhatsApp's own message model, so it includes image captions and the text of a reply (not the quoted message). A document's file name is **not** treated as text.
+*   `message.timestamp`: A `datetime` with the date and time shown by WhatsApp (both 24h and 12h formats are parsed).
+*   `message.sender`: Name (or number) of the sender, as a string.
+*   `message.is_outgoing`: `True` if you sent the message.
+*   `message.msg_id`: WhatsApp's message id.
+*   `message.filename`: Only on `FileMessage`.
+*   `message.duration`: Only on `VoiceMessage`.
+
+### Message direction
+
+`is_outgoing` is decided by a chain of signals: the bubble tail, a delivery status (only your own messages have one), CSS classes and ids, group sender inheritance, bubble position, and finally the sender name. The signal that decided is stored in `message.direction_signal`.
+
+If your own messages show up with your push name as sender, pass it so they are recognised:
+
+```python
+messages = await client.collect_messages(own_push_names=["My Name"])
+mine = [m for m in messages if m.is_from_self(["My Name"])]
+```
 
 ### Filtering
 
-Since you get a list of messages (usually the last few visible ones), you might want to filter them. While `on_message` filters (mentioned in other contexts) are for future streaming APIs, you can easily filter the list manually or using Python's built-in tools.
+You get a list of messages (usually the last ones loaded), so you can filter them with plain Python:
 
 ```python
-# Example: Get only messages from today containing "urgent"
+# Example: messages containing "urgent"
 relevant_messages = [
-    m for m in messages 
+    m for m in messages
     if "urgent" in (m.text or "").lower()
 ]
 ```

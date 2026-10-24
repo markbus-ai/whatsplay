@@ -12,9 +12,9 @@ Thank you for your interest in contributing to WhatsPlay! We welcome contributio
     ```
 4.  **Make Changes:** Implement your changes. Please ensure your code follows the existing style and conventions.
 5.  **Test Your Changes:** Run existing tests and add new ones if applicable.
-6.  **Commit and Push:** Commit your changes and push them to your fork.
+6.  **Commit and Push:** Commit your changes (using [Conventional Commits](https://www.conventionalcommits.org/), e.g. `fix: ...`, `feat: ...`) and push them to your fork.
     ```bash
-    git commit -m "Add a new feature"
+    git commit -m "feat: add a new feature"
     git push origin feature/my-new-feature
     ```
 7.  **Create a Pull Request:** Open a Pull Request (PR) on the main repository. Describe your changes clearly.
@@ -23,15 +23,24 @@ Thank you for your interest in contributing to WhatsPlay! We welcome contributio
 
 To set up your development environment:
 
-1.  **Install Dependencies:**
+1.  **Install the package in editable mode, plus test and docs tooling:**
     ```bash
-    pip install -r requirements.txt
+    pip install -e . pytest pytest-asyncio
     pip install -r requirements-docs.txt
     ```
-2.  **Install Playwright Browsers:**
+2.  **Install the Playwright browser:**
     ```bash
-    playwright install
+    python -m playwright install chromium
     ```
+3.  **Run the tests:**
+    ```bash
+    pytest tests/ -v
+    ```
+4.  **Preview the docs locally:**
+    ```bash
+    mkdocs serve
+    ```
+    The site is deployed to GitHub Pages automatically on every push to `main`.
 
 ## Reporting Bugs
 
@@ -44,4 +53,4 @@ If you find a bug, please open an issue on GitHub. Include:
 
 ## License
 
-By contributing, you agree that your contributions will be licensed under the MIT License.
+By contributing, you agree that your contributions will be licensed under the Apache License 2.0.
