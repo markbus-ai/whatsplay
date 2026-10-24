@@ -1,16 +1,18 @@
-# Guía: Envío y Recepción de Archivos Multimedia
+# Guía: Envío y recepción de multimedia
 
-WhatsPlay hace fácil trabajar con multimedia como imágenes, videos y documentos. Esta guía cubre tanto el envío de archivos desde tu disco local como la descarga de medios de mensajes entrantes.
+WhatsPlay facilita el trabajo con archivos como imágenes, videos, documentos y notas de voz. Esta guía cubre tanto el envío de archivos desde tu disco local como la descarga de multimedia desde un chat.
 
-## Enviando Multimedia
+## Enviar multimedia
 
-El método principal para enviar cualquier tipo de archivo es `client.send_file()`. Necesitas proporcionar el destinatario (nombre de chat o ID) y la ruta local al archivo. WhatsPlay manejará el resto.
+Usa `client.send_file()` para enviar cualquier tipo de archivo. Indica el destinatario (nombre del chat o número de teléfono) y la ruta local del archivo.
 
-También puedes proporcionar un `caption` opcional para el medio.
+```python
+await client.send_file(chat_name, path, open_via_url=False, is_group=None)
+```
 
-### Ejemplo: Enviando una Imagen con una Leyenda
+Al igual que `send_message()`, devuelve `True` solo cuando WhatsApp muestra el nuevo mensaje con un estado de entrega, y `False` en caso contrario (el motivo queda registrado).
 
-Este script envía un archivo de imagen local a un destinatario especificado.
+### Ejemplo: enviar una imagen
 
 ```python
 import asyncio
@@ -19,37 +21,29 @@ from whatsplay import Client
 from whatsplay.auth import LocalProfileAuth
 
 async def send_media_file():
-    auth = LocalProfileAuth(user_data_dir="./whatsapp_session")
+    auth = LocalProfileAuth(data_dir="./whatsapp_session")
     client = Client(auth=auth, headless=True)
 
-    @client.event("on_start")
-    async def on_start():
-        print("Cliente listo. Enviando una imagen...")
-        
+    @client.event("on_logged_in")
+    async def on_logged_in():
         recipient = "NUMERO_DE_TELEFONO_O_NOMBRE_DE_CONTACTO"
-        
-        # Asegúrate de tener una imagen en esta ruta
-        # Por ejemplo: /home/user/pictures/mi_imagen.jpg
         file_path = Path("/path/to/your/image.jpg")
-        caption = "¡Aquí hay una foto desde WhatsPlay! 🖼️"
 
         if not file_path.exists():
-            print(f"Error: Archivo no encontrado en {file_path}")
+            print(f"Error: no se encontró el archivo en {file_path}")
             await client.stop()
             return
 
-        success = await client.send_file(recipient, file_path, caption=caption)
-        
-        if success:
-            print(f"Multimedia enviada exitosamente a {recipient}.")
+        if await client.send_file(recipient, str(file_path)):
+            print(f"Multimedia enviada a {recipient}.")
         else:
-            print(f"Falló el envío de multimedia a {recipient}.")
-            
+            print(f"No se pudo confirmar el envío de multimedia a {recipient}.")
+
         await client.stop()
 
     @client.event("on_qr")
     async def on_qr(qr):
-        print("Por favor escanea el código QR para iniciar sesión.")
+        print("Escanea el código QR para iniciar sesión.")
 
     await client.start()
 
@@ -57,90 +51,68 @@ if __name__ == "__main__":
     asyncio.run(send_media_file())
 ```
 
-Puedes usar el mismo método `client.send_file()` para cualquier tipo de archivo, incluyendo:
+Puedes usar el mismo método `client.send_file()` para cualquier tipo de archivo, incluidos:
 *   Imágenes (`.jpg`, `.png`, etc.)
 *   Videos (`.mp4`, `.mov`, etc.)
 *   Documentos (`.pdf`, `.docx`, `.zip`, etc.)
 *   Archivos de audio (`.mp3`, `.ogg`, etc.)
 
-## Descargando Multimedia
+## Descargar multimedia
 
-Cuando recibes un mensaje que contiene multimedia, el objeto `Message` proporciona una forma conveniente de descargarlo.
+Las descargas funcionan sobre el chat que está abierto, así que primero llama a `client.open()`.
 
-### Usando `message.download_media()`
+### Usar `client.download_all_files()`
 
-Esta es la forma estándar de descargar un mensaje multimedia específico.
+Descarga todos los archivos y notas de voz cargados en el chat abierto a `carpeta` (por defecto: `~/Downloads/WhatsAppFiles`). Devuelve una lista de diccionarios:
 
-1.  Verifica si el mensaje contiene medios usando `message.is_media`.
-2.  Si lo hace, llama al método `await message.download_media()`.
-
-Este método descarga el archivo a una ubicación especificada. Si no se proporciona una ruta, puede usar un directorio por defecto.
-
-#### Ejemplo: Bot Auto-descargador
-
-Este bot descarga automáticamente cualquier medio que recibe.
+*   `path` (`Path`): dónde se guardó el archivo.
+*   `type` (str): `"FileMessage"` o `"VoiceMessage"`.
+*   `codec` (str): el códec de audio detectado, cuando `detect_codecs=True` y se encuentra uno.
 
 ```python
-import asyncio
+await client.open("Family Group")
+
+files = await client.download_all_files(carpeta="./downloads/family")
+
+for info in files:
+    print(info["type"], info["path"], info.get("codec"))
+```
+
+### Usar `client.download_file_by_index()`
+
+Descarga un archivo según su posición entre los archivos cargados en el chat abierto:
+
+*   `index=0`: el primer archivo (el más antiguo).
+*   `index=-1`: el último archivo (el más reciente).
+
+Devuelve un diccionario con `path` y `type`, o `None` si no se descargó nada.
+
+```python
+await client.open("My Group")
+
+result = await client.download_file_by_index(index=-1, carpeta="./downloads")
+
+if result:
+    print(f"Último archivo guardado en: {result['path']}")
+```
+
+### Descargar desde los mensajes recopilados
+
+`collect_messages()` devuelve objetos `FileMessage` y `VoiceMessage` para los archivos adjuntos y las notas de voz. Puedes descargarlos de forma individual:
+
+```python
 from pathlib import Path
-from whatsplay import Client
-from whatsplay.auth import LocalProfileAuth
-from whatsplay.event import Message
+from whatsplay import FileMessage, VoiceMessage
 
-async def media_downloader_bot():
-    # Crear un directorio para guardar archivos descargados
-    download_dir = Path("./media_downloads")
-    download_dir.mkdir(exist_ok=True)
-    
-    print(f"Guardaré los medios descargados en: {download_dir.resolve()}")
+await client.open("My Group")
+messages = await client.collect_messages()
 
-    auth = LocalProfileAuth(user_data_dir="./whatsapp_session")
-    client = Client(auth=auth, headless=True)
-
-    @client.event("on_start")
-    async def on_start():
-        print("Bot descargador iniciado. Esperando medios...")
-
-    @client.event("on_unread_chat")
-    async def on_unread_chat(chats):
-        for chat in chats:
-            if await client.open(chat['name']):
-                messages = await client.collect_messages()
-                for message in messages:
-                    if message.is_media:
-                        # Definir ruta de guardado
-                        save_path = download_dir / f"{message.id}-{message.media_filename or 'download'}"
-                        
-                        try:
-                            await message.download_media(save_path)
-                            print(f"Descargado: {save_path.name}")
-                        except Exception as e:
-                            print(f"Error: {e}")
-
-    @client.event("on_qr")
-    async def on_qr(qr):
-        print("Por favor escanea el código QR para iniciar sesión.")
-
-    await client.start()
-
-if __name__ == "__main__":
-    asyncio.run(media_downloader_bot())
+for msg in messages:
+    if isinstance(msg, VoiceMessage):
+        print(f"Nota de voz: {msg.duration}")
+    if isinstance(msg, (FileMessage, VoiceMessage)):
+        saved = await msg.download(msg.page, Path("./downloads"))
+        print(f"Guardado: {saved}")
 ```
 
-### Usando `client.download_file_by_index()`
-
-Si deseas descargar un archivo basado en su posición en la lista de mensajes actualmente visibles (por ejemplo, "descargar el último archivo enviado"), puedes usar `client.download_file_by_index()`.
-
-*   `index=0`: El primer archivo visible (el más antiguo).
-*   `index=-1`: El último archivo visible (el más reciente).
-
-```python
-# Abrir el chat primero
-await client.open("Mi Grupo")
-
-# Descargar el archivo más reciente
-file_path = await client.download_file_by_index(index=-1, carpeta="./descargas")
-
-if file_path:
-    print(f"Último archivo guardado en: {file_path}")
-```
+> **Nota:** no pases `dispose=True` a `collect_messages()` si piensas descargar esos mensajes o reaccionar a ellos: `dispose` libera los handles del navegador que necesitan.

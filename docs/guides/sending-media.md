@@ -1,16 +1,18 @@
 # Guide: Sending and Receiving Media
 
-WhatsPlay makes it easy to work with media like images, videos, and documents. This guide covers both sending files from your local disk and downloading media from incoming messages.
+WhatsPlay makes it easy to work with files like images, videos, documents, and voice notes. This guide covers both sending files from your local disk and downloading media from a chat.
 
 ## Sending Media
 
-The primary method for sending any kind of file is `client.send_file()`. You need to provide the recipient (chat name or ID) and the local path to the file. WhatsPlay will handle the rest.
+Use `client.send_file()` to send any kind of file. Provide the recipient (chat name or phone number) and the local path to the file.
 
-You can also provide an optional `caption` for the media.
+```python
+await client.send_file(chat_name, path, open_via_url=False, is_group=None)
+```
 
-### Example: Sending an Image with a Caption
+Like `send_message()`, it returns `True` only when WhatsApp shows the new message with a delivery status, and `False` otherwise (the reason is logged).
 
-This script sends a local image file to a specified recipient.
+### Example: Sending an Image
 
 ```python
 import asyncio
@@ -19,32 +21,24 @@ from whatsplay import Client
 from whatsplay.auth import LocalProfileAuth
 
 async def send_media_file():
-    auth = LocalProfileAuth(user_data_dir="./whatsapp_session")
+    auth = LocalProfileAuth(data_dir="./whatsapp_session")
     client = Client(auth=auth, headless=True)
 
-    @client.event("on_start")
-    async def on_start():
-        print("Client ready. Sending an image...")
-        
+    @client.event("on_logged_in")
+    async def on_logged_in():
         recipient = "PHONE_NUMBER_OR_CONTACT_NAME"
-        
-        # Ensure you have an image at this path
-        # For example: /home/user/pictures/my_image.jpg
         file_path = Path("/path/to/your/image.jpg")
-        caption = "Here is a picture from WhatsPlay! 🖼️"
 
         if not file_path.exists():
             print(f"Error: File not found at {file_path}")
             await client.stop()
             return
 
-        success = await client.send_file(recipient, file_path, caption=caption)
-        
-        if success:
-            print(f"Media sent successfully to {recipient}.")
+        if await client.send_file(recipient, str(file_path)):
+            print(f"Media sent to {recipient}.")
         else:
-            print(f"Failed to send media to {recipient}.")
-            
+            print(f"Could not confirm the media to {recipient}.")
+
         await client.stop()
 
     @client.event("on_qr")
@@ -65,82 +59,60 @@ You can use the same `client.send_file()` method for any file type, including:
 
 ## Downloading Media
 
-When you receive a message that contains media, the `Message` object provides a convenient way to download it.
+Downloads work on the chat that is currently open, so call `client.open()` first.
 
-### Using `message.download_media()`
+### Using `client.download_all_files()`
 
-This is the standard way to download a specific media message.
+Downloads every file and voice note loaded in the open chat to `carpeta` (default: `~/Downloads/WhatsAppFiles`). It returns a list of dictionaries:
 
-1.  Check if the message contains media using `message.is_media`.
-2.  If it does, call the `await message.download_media()` method.
-
-This method downloads the file to a specified location. If no path is provided, it may use a default directory.
-
-#### Example: Auto-downloader Bot
-
-This bot automatically downloads any media it receives.
+*   `path` (`Path`): where the file was saved.
+*   `type` (str): `"FileMessage"` or `"VoiceMessage"`.
+*   `codec` (str): the detected audio codec, when `detect_codecs=True` and one is found.
 
 ```python
-import asyncio
-from pathlib import Path
-from whatsplay import Client
-from whatsplay.auth import LocalProfileAuth
-from whatsplay.event import Message
+await client.open("Family Group")
 
-async def media_downloader_bot():
-    # Create a directory to save downloaded files
-    download_dir = Path("./media_downloads")
-    download_dir.mkdir(exist_ok=True)
-    
-    print(f"Will save downloaded media to: {download_dir.resolve()}")
+files = await client.download_all_files(carpeta="./downloads/family")
 
-    auth = LocalProfileAuth(user_data_dir="./whatsapp_session")
-    client = Client(auth=auth, headless=True)
-
-    @client.event("on_start")
-    async def on_start():
-        print("Downloader bot started. Waiting for media...")
-
-    @client.event("on_unread_chat")
-    async def on_unread_chat(chats):
-        for chat in chats:
-            if await client.open(chat['name']):
-                messages = await client.collect_messages()
-                for message in messages:
-                    if message.is_media:
-                        # Define a path to save the file
-                        save_path = download_dir / f"{message.id}-{message.media_filename or 'download'}"
-                        
-                        try:
-                            await message.download_media(save_path)
-                            print(f"Downloaded: {save_path.name}")
-                        except Exception as e:
-                            print(f"Error: {e}")
-
-    @client.event("on_qr")
-    async def on_qr(qr):
-        print("Please scan the QR code to log in.")
-
-    await client.start()
-
-if __name__ == "__main__":
-    asyncio.run(media_downloader_bot())
+for info in files:
+    print(info["type"], info["path"], info.get("codec"))
 ```
 
 ### Using `client.download_file_by_index()`
 
-If you want to download a file based on its position in the list of currently visible messages (e.g., "download the last file sent"), you can use `client.download_file_by_index()`.
+Downloads one file by its position among the files loaded in the open chat:
 
-*   `index=0`: The first visible file (oldest).
-*   `index=-1`: The last visible file (newest).
+*   `index=0`: the first (oldest) file.
+*   `index=-1`: the last (newest) file.
+
+It returns a dictionary with `path` and `type`, or `None` if nothing was downloaded.
 
 ```python
-# Open the chat first
 await client.open("My Group")
 
-# Download the most recent file
-file_path = await client.download_file_by_index(index=-1, carpeta="./downloads")
+result = await client.download_file_by_index(index=-1, carpeta="./downloads")
 
-if file_path:
-    print(f"Last file saved to: {file_path}")
+if result:
+    print(f"Last file saved to: {result['path']}")
 ```
+
+### Downloading from collected messages
+
+`collect_messages()` returns `FileMessage` and `VoiceMessage` objects for attachments and voice notes. You can download them individually:
+
+```python
+from pathlib import Path
+from whatsplay import FileMessage, VoiceMessage
+
+await client.open("My Group")
+messages = await client.collect_messages()
+
+for msg in messages:
+    if isinstance(msg, VoiceMessage):
+        print(f"Voice note: {msg.duration}")
+    if isinstance(msg, (FileMessage, VoiceMessage)):
+        saved = await msg.download(msg.page, Path("./downloads"))
+        print(f"Saved: {saved}")
+```
+
+> **Note:** don't pass `dispose=True` to `collect_messages()` if you plan to download or react to those messages — disposing releases the browser handles they need.

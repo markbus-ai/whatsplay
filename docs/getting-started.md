@@ -4,19 +4,19 @@ This guide will walk you through installing WhatsPlay and writing your first scr
 
 ## 1. Installation
 
-WhatsPlay requires Python 3.8 or newer. You can install it directly from PyPI. We also recommend installing Playwright's browser dependencies.
-
-First, install the library:
+WhatsPlay requires Python 3.8 or newer. Install it from PyPI:
 
 ```bash
 pip install whatsplay
 ```
 
-Next, install the necessary browser binaries for Playwright (this will download a browser like Chromium):
+Then download the Chromium browser used by Playwright:
 
 ```bash
-playwright install
+python -m playwright install chromium
 ```
+
+> **Note:** if a system Chromium (`/usr/bin/chromium`) or Google Chrome (`/usr/bin/google-chrome`) is installed, WhatsPlay launches it instead of Playwright's bundled browser.
 
 ## 2. Your First Script: Sending a Message
 
@@ -30,77 +30,82 @@ from whatsplay import Client
 from whatsplay.auth import LocalProfileAuth
 
 async def main():
-    """
-    Main function to initialize the client, send a message, and stop.
-    """
-    
     # --- Step 1: Set up Authentication ---
-    # This tells WhatsPlay to save session data in a folder named "whatsapp_session".
-    # This way, you only need to scan the QR code once.
-    auth = LocalProfileAuth(user_data_dir="./whatsapp_session")
-    
+    # Session data is saved in the "whatsapp_session" folder,
+    # so you only need to scan the QR code once.
+    auth = LocalProfileAuth(data_dir="./whatsapp_session")
+
     # --- Step 2: Initialize the Client ---
-    # We run in headless=False for the first time to make it easy to scan the QR code.
-    # You can set it to headless=True later for background execution.
+    # Use headless=False the first time so you can scan the QR code.
+    # Switch to headless=True later for background execution.
     client = Client(auth=auth, headless=False)
 
     # --- Step 3: Define Event Handlers ---
-    # `on_logged_in` is triggered once the client is logged in and ready.
+    # `on_logged_in` fires once the client is logged in and ready.
     @client.event("on_logged_in")
     async def on_logged_in():
-        print("Client is ready! Preparing to send a message...")
-        
-        # Define your recipient and message
-        # IMPORTANT: Replace with a real phone number or contact name.
-        # For phone numbers, use the format with country code but no '+' or '00'.
-        recipient = "1234567890" 
+        # Replace with a real contact name, group name, or phone number.
+        # Phone numbers need the full international number (country code included).
+        recipient = "5491123456789"
         message = "This is my first message from WhatsPlay! 🎉"
-        
-        # Send the message
-        success = await client.send_message(recipient, message)
-        
-        if success:
-            print(f"Message sent successfully to {recipient}!")
+
+        # True only when WhatsApp shows the new message with a delivery status.
+        if await client.send_message(recipient, message, open_via_url=True):
+            print(f"Message sent to {recipient}!")
         else:
-            print(f"Oops! Failed to send message to {recipient}.")
-            
-        # Stop the client after the job is done
-        print("Work complete. Shutting down...")
+            print(f"Could not confirm the message to {recipient}. Check the logs.")
+
         await client.stop()
 
-    # `on_qr` is triggered if a QR scan is needed.
+    # `on_qr` fires when a QR scan is needed.
     @client.event("on_qr")
     async def on_qr(qr):
-        print("Login required. A browser window should open for you to scan the QR code.")
+        print("Scan the QR code shown in the browser window.")
 
-    # `on_auth` is triggered if authentication is required
-    @client.event("on_auth")
-    async def on_auth():
-        print("Authentication is required.")
-
-    # `on_error` catches potential errors during execution
+    # `on_error` reports failures (WhatsPlay returns False/None instead of raising).
     @client.event("on_error")
     async def on_error(error):
         print(f"An error occurred: {error}")
-        await client.stop()
 
     # --- Step 4: Start the Client ---
-    # This call starts the browser and begins the login process.
+    # Starts the browser and runs the main loop until client.stop() is called.
     await client.start()
-    print("Script has finished executing.")
 
-# --- Run the main function ---
 if __name__ == "__main__":
     asyncio.run(main())
 ```
 
 ### How to Run It
 
-1.  **Save the code:** Save the script as `send_hello.py`.
-2.  **Modify the recipient:** Change `"1234567890"` to a real phone number or a contact name saved in your WhatsApp.
-3.  **Execute from your terminal:**
+1.  **Save the code** as `send_hello.py`.
+2.  **Change the recipient** to a real phone number (with `open_via_url=True`) or to a contact or group name exactly as it appears in WhatsApp (without `open_via_url`).
+3.  **Run it:**
     ```bash
     python send_hello.py
     ```
-4.  **First-time Login:** A browser window will open. Scan the WhatsApp Web QR code with your phone.
-5.  **Subsequent Runs:** The script will reuse the session and should log in automatically. The message will be sent, and the script will exit.
+4.  **First-time login:** a browser window opens. Scan the WhatsApp Web QR code with your phone.
+5.  **Subsequent runs:** the saved session is reused and the client logs in automatically.
+
+## 3. What to Expect from `send_message()`
+
+`send_message()` is deliberately strict. It returns `False` (and logs why) instead of guessing when:
+
+- the chat cannot be opened, or more than one chat has the same title;
+- the message composer does not belong to the requested chat;
+- the composer does not hold exactly the text you passed;
+- no new message with a delivery status appears after pressing Enter.
+
+When you need to target a group or a contact with the same name, pass `is_group=True` or `is_group=False`. See [Advanced Features](guides/advanced-features.md) for details.
+
+## 4. Seeing What Happens
+
+WhatsPlay logs through Python's standard `logging` module. If your application doesn't configure logging, WhatsPlay prints `INFO` messages to stdout. To see more detail:
+
+```python
+import logging
+
+logging.basicConfig(level=logging.INFO)
+logging.getLogger("whatsplay").setLevel(logging.DEBUG)
+```
+
+See [Configuration › Logging](configuration.md#logging) for more.

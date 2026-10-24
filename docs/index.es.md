@@ -1,20 +1,33 @@
 # Bienvenido a WhatsPlay
 
-WhatsPlay es una biblioteca de Python para automatizar WhatsApp Web usando Playwright. Proporciona una interfaz simple y basada en eventos para interactuar con chats, enviar mensajes, gestionar grupos y mucho más.
+[![PyPI version](https://img.shields.io/pypi/v/whatsplay)](https://pypi.org/project/whatsplay/)
+[![Downloads](https://img.shields.io/pypi/dm/whatsplay)](https://pypi.org/project/whatsplay/)
+[![Python](https://img.shields.io/pypi/pyversions/whatsplay)](https://www.python.org/)
+[![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 
-Ya sea que quieras construir un bot, automatizar tus reportes diarios o extraer datos de chats, WhatsPlay te da las herramientas para hacerlo eficientemente.
+**WhatsPlay** es una biblioteca moderna de Python para automatizar WhatsApp Web usando Playwright. Proporciona una interfaz estable y basada en eventos para interactuar con chats, enviar mensajes, gestionar grupos y manejar archivos multimedia, sin depender de la API de WhatsApp Business.
 
-## Características Principales
+Ya sea que quieras construir un bot, automatizar reportes, recopilar mensajes o integrar WhatsApp en tu flujo de trabajo, WhatsPlay te da las herramientas para hacerlo de forma confiable.
 
-*   **Basado en Eventos:** Maneja fácilmente eventos como mensajes entrantes, escaneos QR o cuando el cliente está listo.
-*   **API Asíncrona Moderna:** Construido con `asyncio` para un alto rendimiento.
-*   **Gestión de Sesión:** Guarda tu sesión localmente para que no tengas que escanear el código QR cada vez.
-*   **Gestión de Grupos:** Crea grupos, añade/elimina miembros y más.
-*   **Soporte de Archivos y Multimedia:** Envía imágenes, documentos y otros archivos con facilidad.
+## Características principales
 
-## Un Ejemplo Rápido
+- **Selectores estables:** usa selectores basados en atributos (`data-pre-plain-text`, `aria-label`, `data-testid`), no nombres de clases CSS frágiles que se rompen con cada actualización de WhatsApp Web.
+- **Envío seguro:** un mensaje solo se escribe en el chat que pediste, y `send_message()` devuelve `True` solo después de que WhatsApp muestra el nuevo mensaje con un estado de entrega.
+- **Coincidencia exacta de chats:** los grupos y los contactos se pueden distinguir con `is_group`, los números de teléfono deben coincidir por completo y los títulos ambiguos se rechazan en lugar de adivinarse.
+- **Texto de mensaje preciso:** el texto, los pies de foto y las respuestas se leen del propio modelo de mensajes de WhatsApp, con el DOM como alternativa.
+- **Multilenguaje:** funciona de inmediato con WhatsApp Web en español y en inglés.
+- **API asíncrona moderna:** construida con `asyncio`; cada operación sobre la página se serializa mediante un único lock reentrante, de modo que los manejadores concurrentes nunca se intercalan.
+- **Sesiones persistentes:** escanea el código QR una vez; las ejecuciones siguientes reutilizan la sesión guardada.
+- **Soporte de archivos y multimedia:** envía archivos y descarga documentos, imágenes y mensajes de voz (con detección de códec).
+- **Basada en eventos:** maneja eventos como `on_logged_in`, `on_unread_chat`, `on_error` y más.
+- **Gestión de grupos:** crea grupos y añade o elimina miembros de forma programática.
+- **Bots de larga duración:** `refresh()` y `collect_messages(dispose=True)` mantienen bajo control la memoria del renderizador.
+- **Logging estándar:** todo se registra mediante el módulo `logging` de Python bajo el espacio de nombres `whatsplay`.
+- **Modo headless:** funciona en servidores y en CI sin interfaz gráfica.
 
-Aquí tienes un script simple para enviar un mensaje a un contacto:
+## Un ejemplo rápido
+
+Envía un mensaje con solo unas pocas líneas:
 
 ```python
 import asyncio
@@ -23,34 +36,28 @@ from whatsplay.auth import LocalProfileAuth
 
 async def main():
     auth = LocalProfileAuth("./whatsapp_session")
-    client = Client(auth=auth, headless=True)
+    client = Client(auth=auth, headless=False)
 
     @client.event("on_logged_in")
     async def on_logged_in():
-        print("¡Cliente iniciado! Enviando mensaje...")
-        
-        # Usa un número de teléfono (ej., "1234567890") o un nombre de contacto guardado
-        # Para números de teléfono, incluye el código de país sin '+' ni '00'
-        recipient = "NUMERO_DE_TELEFONO_O_NOMBRE_DE_CONTACTO"
-        message = "¡Hola desde WhatsPlay! 🚀"
-        
-        success = await client.send_message(recipient, message)
-        
-        if success:
-            print(f"Mensaje enviado exitosamente a {recipient}.")
-        else:
-            print(f"Falló el envío del mensaje a {recipient}.")
-            
+        await client.send_message("ContactName", "¡Hola desde WhatsPlay! 🚀")
         await client.stop()
 
-    # Este evento se dispara si necesitas escanear el código QR
-    @client.event("on_qr")
-    async def on_qr(qr):
-        print("Se requiere escaneo de código QR. Por favor escanea el QR en el navegador.")
-
     await client.start()
-    print("Script finalizado.")
 
 if __name__ == "__main__":
     asyncio.run(main())
 ```
+
+> **Primera ejecución:** se abre un navegador; escanea el código QR con tu teléfono.  
+> **Ejecuciones siguientes:** la sesión persiste automáticamente, no se necesita QR.
+
+## Próximos pasos
+
+- **[Primeros pasos](getting-started.md):** instalación y tu primer script.
+- **[Configuración](configuration.md):** opciones del cliente, autenticación y logging.
+- **[Manejo de mensajes](guides/handling-messages.md):** bots de respuesta automática y filtrado de mensajes.
+- **[Envío de multimedia](guides/sending-media.md):** envía archivos y descarga multimedia recibida.
+- **[Gestión de grupos](guides/group-management.md):** crea y gestiona grupos de WhatsApp.
+- **[Funciones avanzadas](guides/advanced-features.md):** búsqueda, números directos, concurrencia y bots de larga duración.
+- **[Referencia de API](api-reference.md):** documentación completa de la API.

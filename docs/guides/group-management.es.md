@@ -14,11 +14,11 @@ from whatsplay import Client
 from whatsplay.auth import LocalProfileAuth
 
 async def create_my_group():
-    auth = LocalProfileAuth(user_data_dir="./whatsapp_session")
+    auth = LocalProfileAuth(data_dir="./whatsapp_session")
     client = Client(auth=auth, headless=True) # Establece headless=False si quieres ver el navegador
 
-    @client.event("on_start")
-    async def on_start():
+    @client.event("on_logged_in")
+    async def on_logged_in():
         print("Cliente listo. Intentando crear un nuevo grupo...")
         
         group_name = "Mi Grupo Increíble de WhatsPlay"
@@ -54,11 +54,11 @@ from whatsplay import Client
 from whatsplay.auth import LocalProfileAuth
 
 async def add_members_to_existing_group():
-    auth = LocalProfileAuth(user_data_dir="./whatsapp_session")
+    auth = LocalProfileAuth(data_dir="./whatsapp_session")
     client = Client(auth=auth, headless=True)
 
-    @client.event("on_start")
-    async def on_start():
+    @client.event("on_logged_in")
+    async def on_logged_in():
         print("Cliente listo. Intentando añadir miembros a un grupo...")
         
         group_name = "Mi Grupo Increíble de WhatsPlay" # Debe ser un grupo existente
@@ -93,11 +93,11 @@ from whatsplay import Client
 from whatsplay.auth import LocalProfileAuth
 
 async def remove_members_from_group():
-    auth = LocalProfileAuth(user_data_dir="./whatsapp_session")
+    auth = LocalProfileAuth(data_dir="./whatsapp_session")
     client = Client(auth=auth, headless=True)
 
-    @client.event("on_start")
-    async def on_start():
+    @client.event("on_logged_in")
+    async def on_logged_in():
         print("Cliente listo. Intentando eliminar miembros de un grupo...")
         
         group_name = "Mi Grupo Increíble de WhatsPlay" # Debe ser un grupo existente
