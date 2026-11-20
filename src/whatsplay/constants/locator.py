@@ -37,7 +37,13 @@ COMMUNITIES_BUTTON = "//button[@aria-label='Communities' or @aria-label='Comunid
 # ==============================
 # Chat filter buttons (tabs)
 # ==============================
-ALL_CHATS_BUTTON = "//button[@role='tab'][contains(., 'All') or contains(., 'Todos')]"
+# WhatsApp Web now renders the filters as toggle buttons
+# (<button id="all-filter" aria-pressed="true">, no role="tab"; seen 2026-11-20).
+# Both markups match; the selected state is aria-pressed or aria-selected.
+ALL_CHATS_BUTTON = (
+    "//button[@id='all-filter' or "
+    "(@role='tab' and (contains(., 'All') or contains(., 'Todos')))]"
+)
 UNREAD_CHATS_BUTTON = "//button[@role='tab'][contains(., 'Unread') or contains(., 'No leídos')]"
 FAVOURITES_CHATS_BUTTON = "//button[@role='tab'][contains(., 'Favourites') or contains(., 'Favoritos')]"
 GROUPS_CHATS_BUTTON = "//button[@role='tab'][contains(., 'Groups') or contains(., 'Grupos')]"

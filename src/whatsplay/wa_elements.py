@@ -29,6 +29,18 @@ ACTIVE_CHAT_SETTLE_SECS = 3.0
 SEARCH_RESULTS_WAIT_SECS = 8.0
 
 
+async def filter_is_selected(button) -> bool:
+    """Whether a chat filter button is the active one.
+
+    Toggle-button markup says so with aria-pressed, the older tab markup with
+    aria-selected.
+    """
+    for attr in ("aria-pressed", "aria-selected"):
+        if await button.get_attribute(attr) == "true":
+            return True
+    return False
+
+
 def normalize_chat_title(title: str) -> str:
     """Canonical form used to decide whether two chat titles are the same chat.
 
@@ -801,6 +813,19 @@ class WhatsAppElements:
                 return True
             return False
 
+        async def _click_toggle() -> bool:
+            # Toggle-button markup: <button id="all-filter" aria-pressed="...">.
+            selectors = [f"button[aria-pressed]:has-text('{label}')" for label in label_options]
+            if filter_type == "all":
+                selectors.insert(0, "button#all-filter")
+            button = self.page.locator(", ".join(selectors))
+            if await button.count() == 0 or not await button.first.is_visible():
+                return False
+            if not await filter_is_selected(button.first):
+                await button.first.click()
+                await asyncio.sleep(0.3)
+            return True
+
         async def _click_dropdown() -> bool:
             more = self.page.locator("button#additional-filters")
             if await more.count() == 0:
@@ -829,4 +854,9 @@ class WhatsAppElements:
                 return True
             return False
 
-        return await _click_tab() or await _click_dropdown() or await _click_xpath_fallback()
+        return (
+            await _click_tab()
+            or await _click_toggle()
+            or await _click_dropdown()
+            or await _click_xpath_fallback()
+        )

@@ -35,7 +35,7 @@ from .object.message import (
     _safe_dispose,
 )
 from .codec_detector import detect_codec
-from .wa_elements import parse_composer_label, same_chat
+from .wa_elements import filter_is_selected, parse_composer_label, same_chat
 
 # Constants
 DEFAULT_DOWNLOADS_DIR = Path.home() / "Downloads" / "WhatsAppFiles"
@@ -100,7 +100,7 @@ class ChatManager:
         """
         try:
             tab = self._page.locator(loc.ALL_CHATS_BUTTON).first
-            if await tab.count() and await tab.get_attribute("aria-selected") != "true":
+            if await tab.count() and not await filter_is_selected(tab):
                 await tab.click()
         except Exception as e:
             logger.debug(f"Could not select the 'All' filter: {e}")

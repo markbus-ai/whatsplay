@@ -264,7 +264,9 @@ async def test_all_filter_accepts_english_dropdown_label(monkeypatch):
     item = MagicMock()
     item.count = AsyncMock(return_value=1)
     item.first.click = AsyncMock()
-    page.locator.side_effect = [tab, more, item]
+    toggle = MagicMock()
+    toggle.count = AsyncMock(return_value=0)
+    page.locator.side_effect = [tab, toggle, more, item]
     monkeypatch.setattr("whatsplay.wa_elements.asyncio.sleep", AsyncMock())
     elements = WhatsAppElements(page)
 
@@ -272,6 +274,8 @@ async def test_all_filter_accepts_english_dropdown_label(monkeypatch):
 
     assert page.locator.call_args_list == [
         call("button[role='tab']:has-text('All'), button[role='tab']:has-text('Todos')"),
+        call("button#all-filter, button[aria-pressed]:has-text('All'), "
+             "button[aria-pressed]:has-text('Todos')"),
         call("button#additional-filters"),
         call("button[role='menuitem']:has-text('All'), button[role='menuitem']:has-text('Todos')"),
     ]
