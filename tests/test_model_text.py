@@ -172,3 +172,45 @@ async def test_only_real_text_changes_are_logged(dom, model, logged, caplog):
         msg = await Message.from_element(elem, page, model_texts={"TXT1": model})
     assert msg.text == model
     assert ("replaces DOM text" in caplog.text) is logged
+
+
+@pytest.mark.asyncio
+async def test_one_lookup_also_returns_the_kind_of_every_rendered_bubble():
+    """A photo without caption reads as an empty message: its kind is what
+    tells a photo from a sticker or a document (prod 2026-11-09)."""
+    async_api = pytest.importorskip("playwright.async_api")
+    from whatsplay.object.message import _model_bubbles
+    async with async_api.async_playwright() as p:
+        try:
+            browser = await p.chromium.launch(executable_path=os.environ.get("CHROMIUM_PATH") or None)
+        except Exception as e:  # no browser installed in this environment
+            pytest.skip(f"chromium unavailable: {e}")
+        page = await browser.new_page()
+        await page.set_content(STUB + BUBBLES)
+        texts, kinds = await _model_bubbles(page)
+        bare = await browser.new_page()
+        await bare.set_content(BUBBLES)
+        without_modules = await _model_bubbles(bare)
+        await browser.close()
+    assert texts == {"IMG1": "quería saber si la bici ya está para retirar ?",
+                     "TXT1": "Bicicleta rodado 29 aluminio"}
+    assert kinds == {"IMG1": "image", "TXT1": "chat"}
+    assert without_modules is None
+
+
+def test_a_message_has_no_kind_until_the_model_is_read():
+    msg = Message(page=None, sender="x", timestamp=None, text="", container=None)
+    assert msg.kind is None
+
+
+@pytest.mark.parametrize("msg_id, kinds, expected", [
+    ("false_1@lid_IMG1", {"IMG1": "image"}, "image"),
+    ("STK1", {"STK1": "sticker"}, "sticker"),
+    ("GONE", {"IMG1": "image"}, None),        # model not loaded
+    ("", {"IMG1": "image"}, None),            # bubble without id
+])
+def test_collected_messages_get_their_kind_from_the_model(msg_id, kinds, expected):
+    from whatsplay.chat_manager import ChatManager
+    msg = Message(page=None, sender="x", timestamp=None, text="", container=None, msg_id=msg_id)
+    ChatManager._attach_kinds([msg], kinds)
+    assert msg.kind == expected

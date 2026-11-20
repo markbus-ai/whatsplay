@@ -96,6 +96,10 @@ if __name__ == "__main__":
 *   `message.filename`: Only on `FileMessage`.
 *   `message.duration`: Only on `VoiceMessage`.
 
+### Message kind
+
+`collect_messages()` sets `message.kind` from WhatsApp's own message model: `"chat"` for text, `"image"`, `"video"`, `"sticker"`, `"ptt"` (voice note), `"audio"`, `"document"` and so on. A photo without a caption has empty `text`; its `kind` is what tells it apart from a sticker. `kind` is `None` when the model could not be read.
+
 ### Message direction
 
 `is_outgoing` is decided by a chain of signals: the bubble tail, a delivery status (only your own messages have one), CSS classes and ids, group sender inheritance, bubble position, and finally the sender name. The signal that decided is stored in `message.direction_signal`.

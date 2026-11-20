@@ -63,7 +63,7 @@ El contenido de `on_unread_chat` se describe en [Manejo de mensajes](guides/hand
 `client.collect_messages()` devuelve estos objetos.
 
 ### Message
-Un mensaje de texto. Atributos principales: `text`, `sender` (str), `timestamp` (datetime), `is_outgoing` (bool), `msg_id`, `direction_signal`, `sender_inherited`. Usa `is_from_self(own_push_names)` para comprobar si lo enviaste tú, `react(emoji)` para reaccionar y `dispose()` para liberar sus handles del navegador.
+Un mensaje de texto. Atributos principales: `text`, `sender` (str), `timestamp` (datetime), `is_outgoing` (bool), `msg_id`, `direction_signal`, `sender_inherited`, `kind` (el tipo de mensaje de WhatsApp, como `"chat"`, `"image"`, `"sticker"`, `"ptt"`, o `None` si no se conoce). Usa `is_from_self(own_push_names)` para comprobar si lo enviaste tú, `react(emoji)` para reaccionar y `dispose()` para liberar sus handles del navegador.
 
 ::: whatsplay.object.message.Message
 

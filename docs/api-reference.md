@@ -63,7 +63,7 @@ The `on_unread_chat` payload is described in [Handling Messages](guides/handling
 `client.collect_messages()` returns these objects.
 
 ### Message
-A text message. Main attributes: `text`, `sender` (str), `timestamp` (datetime), `is_outgoing` (bool), `msg_id`, `direction_signal`, `sender_inherited`. Use `is_from_self(own_push_names)` to check whether you sent it, `react(emoji)` to react, and `dispose()` to release its browser handles.
+A text message. Main attributes: `text`, `sender` (str), `timestamp` (datetime), `is_outgoing` (bool), `msg_id`, `direction_signal`, `sender_inherited`, `kind` (WhatsApp's message type such as `"chat"`, `"image"`, `"sticker"`, `"ptt"`, or `None` when unknown). Use `is_from_self(own_push_names)` to check whether you sent it, `react(emoji)` to react, and `dispose()` to release its browser handles.
 
 ::: whatsplay.object.message.Message
 

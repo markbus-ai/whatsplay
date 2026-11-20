@@ -4,7 +4,7 @@ import re
 import unicodedata
 from datetime import datetime
 from pathlib import Path
-from typing import Iterable, Optional, Dict, Any
+from typing import Iterable, Optional, Dict, Any, Tuple
 from playwright.async_api import Page, ElementHandle, Download
 import asyncio
 
@@ -182,7 +182,8 @@ _MODEL_TEXT_JS = """(msgId) => {
 }"""
 
 
-_MODEL_TEXTS_JS = """() => {
+#: Text and kind ("chat", "image", "sticker", "ptt"...) of every rendered bubble.
+_MODEL_BUBBLES_JS = """() => {
     try {
         const textOf = """ + _TEXT_OF_JS + """;
         const C = window.require('WAWebCollections');
@@ -192,12 +193,13 @@ _MODEL_TEXTS_JS = """() => {
             const id = el.getAttribute('data-id') || (inner && inner.getAttribute('data-id'));
             if (id) ids.add(id.split('_').pop());
         }
-        const out = {};
+        const out = {texts: {}, kinds: {}};
         if (!ids.size) return out;
         for (const m of C.Msg.getModelsArray()) {
             const key = m.id && m.id.id;
             if (key && ids.has(key)) {
-                out[key] = textOf(m);
+                out.texts[key] = textOf(m);
+                out.kinds[key] = String(m.type || '');
             }
         }
         return out;
@@ -207,17 +209,34 @@ _MODEL_TEXTS_JS = """() => {
 }"""
 
 
-async def _model_texts(page: Page) -> Optional[Dict[str, str]]:
-    """Texts of every rendered bubble, keyed by the bare message id, in one
-    page round trip. None when WhatsApp's modules are not reachable."""
+async def _model_bubbles(page: Page) -> Optional[Tuple[Dict[str, str], Dict[str, str]]]:
+    """Texts and kinds of every rendered bubble, keyed by the bare message id,
+    in one page round trip. None when WhatsApp's modules are not reachable.
+
+    The kind is WhatsApp's message type: "chat", "image", "video", "sticker",
+    "ptt" (voice note), "audio", "document", "album"... A photo without caption
+    has empty text; only its kind tells it apart from a sticker.
+    """
     try:
-        texts = await page.evaluate(_MODEL_TEXTS_JS)
+        data = await page.evaluate(_MODEL_BUBBLES_JS)
     except Exception as e:
         logger.debug("message model batch lookup failed: %s", e)
         return None
-    if not isinstance(texts, dict):
+    if not isinstance(data, dict):
         return None
-    return {k: v.strip() for k, v in texts.items() if isinstance(v, str)}
+    texts = data.get("texts") or {}
+    kinds = data.get("kinds") or {}
+    return (
+        {k: v.strip() for k, v in texts.items() if isinstance(v, str)},
+        {k: v for k, v in kinds.items() if isinstance(v, str) and v},
+    )
+
+
+async def _model_texts(page: Page) -> Optional[Dict[str, str]]:
+    """Texts of every rendered bubble, keyed by the bare message id, in one
+    page round trip. None when WhatsApp's modules are not reachable."""
+    bubbles = await _model_bubbles(page)
+    return bubbles[0] if bubbles is not None else None
 
 
 async def _model_text(page: Page, msg_id: str) -> Optional[str]:
@@ -478,6 +497,9 @@ class Message:
         # Which signal decided is_outgoing (a DirectionSignal value; see
         # DIRECTION_ORDER for precedence).
         self.direction_signal = direction_signal
+        # WhatsApp's message type ("chat", "image", "sticker", "ptt"...), set
+        # by collect_messages from the message model. None when unknown.
+        self.kind: Optional[str] = None
 
     def is_from_self(self, own_push_names: Optional[Iterable[str]] = None) -> bool:
         """Safe skip decision for bot consumers.

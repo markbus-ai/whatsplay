@@ -96,6 +96,10 @@ if __name__ == "__main__":
 *   `message.filename`: solo en `FileMessage`.
 *   `message.duration`: solo en `VoiceMessage`.
 
+### Tipo de mensaje
+
+`collect_messages()` completa `message.kind` con el modelo de mensajes de WhatsApp: `"chat"` para texto, `"image"`, `"video"`, `"sticker"`, `"ptt"` (nota de voz), `"audio"`, `"document"`, etc. Una foto sin epígrafe tiene `text` vacío; su `kind` es lo que la distingue de un sticker. `kind` es `None` si no se pudo leer el modelo.
+
 ### Dirección del mensaje
 
 `is_outgoing` se decide mediante una cadena de señales: la cola de la burbuja, un estado de entrega (solo tus propios mensajes lo tienen), clases e ids de CSS, la herencia del remitente en grupos, la posición de la burbuja y, por último, el nombre del remitente. La señal que decidió se guarda en `message.direction_signal`.

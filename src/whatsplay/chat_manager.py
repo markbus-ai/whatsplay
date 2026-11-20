@@ -31,7 +31,7 @@ from .object.message import (
     Message,
     VoiceMessage,
     _flag_direction_fallback,
-    _model_texts,
+    _model_bubbles,
     _safe_dispose,
 )
 from .codec_detector import detect_codec
@@ -622,9 +622,9 @@ class ChatManager:
         msg_elements = await self._page.query_selector_all('div[data-testid^="conv-msg-"]')
         logger.debug("collect_messages: %d containers found", len(msg_elements))
         # One page round trip for every bubble instead of one per bubble.
-        model_texts = await _model_texts(self._page)
-        if model_texts is None:
-            model_texts = {}  # modules unreachable: DOM text, no per-bubble retries
+        bubbles = await _model_bubbles(self._page)
+        # Modules unreachable: DOM text, no per-bubble retries, kinds unknown.
+        model_texts, model_kinds = bubbles if bubbles is not None else ({}, {})
 
         last_sender = ""
         last_is_outgoing = False
@@ -656,6 +656,7 @@ class ChatManager:
                 results.append(simple_msg)
 
         self._apply_group_tail_inheritance(results)
+        self._attach_kinds(results, model_kinds)
 
         if dispose:
             # Data-only consumers (bots that read text/sender/timestamp and
@@ -693,6 +694,13 @@ class ChatManager:
         msg.sender_inherited = True
         if msg.direction_signal == DirectionSignal.NONE:
             msg.is_outgoing = last_is_outgoing
+
+    @staticmethod
+    def _attach_kinds(messages, model_kinds: Dict[str, str]) -> None:
+        """Set each message's kind from WhatsApp's message model (by bare id)."""
+        for msg in messages:
+            msg_id = getattr(msg, "msg_id", "") or ""
+            msg.kind = model_kinds.get(msg_id.split("_")[-1]) if msg_id else None
 
     @staticmethod
     def _apply_group_tail_inheritance(
