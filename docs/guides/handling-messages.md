@@ -98,7 +98,7 @@ if __name__ == "__main__":
 
 ### Message kind
 
-`collect_messages()` sets `message.kind` from WhatsApp's own message model: `"chat"` for text, `"image"`, `"video"`, `"sticker"`, `"ptt"` (voice note), `"audio"`, `"document"` and so on. In a direct chat a photo without a caption has empty `text`, and its `kind` is what tells it apart from a sticker. In a group, `text` still comes from the page, so a captioned photo may also read as empty: there an empty `text` with `kind == "image"` does not mean the photo has no caption. `kind` is `None` when the model could not be read.
+`collect_messages()` sets `message.kind` from WhatsApp's own message model: `"chat"` for text, `"image"`, `"video"`, `"sticker"`, `"ptt"` (voice note), `"audio"`, `"document"` and so on. In a direct chat a photo without a caption has empty `text`, and its `kind` is what tells it apart from a sticker. For other members' messages in a group, `text` comes from the page as in 2.6.x, so a captioned photo may also read as empty: there an empty `text` with `kind == "image"` does not mean the photo has no caption. `kind` is `None` when the model could not be read.
 
 ### Message direction
 

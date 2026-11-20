@@ -6,7 +6,7 @@ import os
 import pytest
 
 from whatsplay.chat_manager import ChatManager
-from whatsplay.object.message import Message, _bare_msg_id, _model_bubbles, _model_text, _model_text_key
+from whatsplay.object.message import Message, _bare_msg_id, _model_bubbles, _model_text, _text_key
 from whatsplay.wa_elements import WhatsAppElements
 
 GROUP_ID = "false_120363000000000000@g.us_IMG2_5491122334455@c.us"
@@ -58,7 +58,7 @@ async def test_group_bubbles_are_found_in_the_model():
         await browser.close()
     assert kinds == {"IMG2": "image"}  # the kind of a group message is read
     assert texts == {"IMG2": "la de la foto"}
-    assert single is None  # but a group bubble keeps its DOM text (mentions)
+    assert single is None  # this stub's Msg.get never resolves a full id
 
 
 def _chip(key, title, pressed="false", extra="", attrs=""):
@@ -123,12 +123,12 @@ async def test_english_dropdown_item_is_selected():
 
 @pytest.mark.parametrize("data_id, key", [
     ("false_1@lid_TXT1", "TXT1"),
-    ("true_5491122334455@c.us_3EB0ABCD", "3EB0ABCD"),
-    (GROUP_ID, None),
+    ("true_120363@g.us_3EB0ABC", "3EB0ABC"),     # own group message: model text, as in 2.6.x
+    (GROUP_ID, "5491122334455@c.us"),            # another member: no model match, page text
 ])
-def test_group_bubbles_keep_their_dom_text(data_id, key):
-    """In a group the model body may show a mention as a raw number."""
-    assert _model_text_key(data_id) == key
+def test_text_keys_are_the_same_as_2_6(data_id, key):
+    """Texts are read exactly as in 2.6.x; only kinds use the real message id."""
+    assert _text_key(data_id) == key
 
 
 @pytest.mark.asyncio
@@ -161,6 +161,3 @@ async def test_single_lookup_still_finds_a_group_message_by_its_full_id():
     assert by_full_id == "mi pregunta"
     assert other is None
 
-
-def test_own_group_message_without_participant_is_a_group_bubble():
-    assert _model_text_key("true_120363@g.us_3EB0ABC") is None

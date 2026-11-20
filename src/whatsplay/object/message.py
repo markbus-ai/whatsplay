@@ -178,21 +178,15 @@ def _bare_msg_id(data_id: str) -> str:
     return parts[2] if len(parts) >= 3 else parts[-1]
 
 
-def _model_text_key(data_id: str) -> Optional[str]:
-    """Model key to read a bubble's text from, or None to keep the DOM text.
+def _text_key(data_id: str) -> str:
+    """Key used to read a bubble's text from the batch, exactly as in 2.6.x.
 
-    Group bubbles ("<fromMe>_<group>@g.us_<id>[_<participant>]") keep the DOM
-    text in the batch read, as in 2.6.x: in a group the model body may hold
-    mentions as raw numbers, and that has not been checked on a live chat.
-    Their kind is still read from the model.
+    It is the last data-id segment. For another member's message in a group
+    that is the participant, which matches no model, so the page text is kept:
+    the model body there may show mentions as raw numbers, not checked live.
+    Only the kind uses the real message id (_bare_msg_id).
     """
-    return None if _is_group_data_id(data_id) else _bare_msg_id(data_id)
-
-
-def _is_group_data_id(data_id: str) -> bool:
-    """Whether a bubble's data-id belongs to a group chat (its chat is @g.us)."""
-    parts = data_id.split("_")
-    return len(parts) >= 2 and parts[1].endswith("@g.us")
+    return data_id.split("_")[-1]
 
 
 #: JS twin of _bare_msg_id.
@@ -205,12 +199,9 @@ _BARE_ID_JS = """(id) => {
 _MODEL_TEXT_JS = """(msgId) => {
     try {
         const C = window.require('WAWebCollections');
-        const bare = (""" + _BARE_ID_JS + """)(msgId);
-        // A group message is looked up by its full id only, as in 2.6.x; the
-        // bare-id fallback is for direct chats (see _model_text_key).
-        const isGroup = (msgId.split('_')[1] || '').endsWith('@g.us');
+        const bare = msgId.split('_').pop();  // as in 2.6.x (see _text_key)
         const m = C.Msg.get(msgId)
-            || (isGroup ? null : C.Msg.getModelsArray().find(x => x.id && x.id.id === bare));
+            || C.Msg.getModelsArray().find(x => x.id && x.id.id === bare);
         if (!m) return null;
         return (""" + _TEXT_OF_JS + """)(m);
     } catch (e) {
@@ -253,8 +244,8 @@ async def _model_bubbles(page: Page) -> Optional[Tuple[Dict[str, str], Dict[str,
 
     The kind is WhatsApp's message type: "chat", "image", "video", "sticker",
     "ptt" (voice note), "audio", "document", "album"... A photo without caption
-    has empty text; only its kind tells it apart from a sticker. In groups the
-    text is not used (see _model_text_key), only the kind.
+    has empty text; only its kind tells it apart from a sticker. Texts are
+    looked up with _text_key, kinds with _bare_msg_id.
     """
     try:
         data = await page.evaluate(_MODEL_BUBBLES_JS)
@@ -719,7 +710,7 @@ class Message:
                         texto = raw_inner.strip()
             if model_texts is not None:
                 # Batch read by collect_messages: no page round trip per bubble.
-                model_text = model_texts.get(_model_text_key(msg_id) or "") if msg_id else None
+                model_text = model_texts.get(_text_key(msg_id)) if msg_id else None
             else:
                 model_text = await _model_text(page, msg_id)
             if model_text is not None:

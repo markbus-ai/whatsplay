@@ -293,7 +293,7 @@ class ChatManager:
                             log("DEBUG: Few chats visible, clicked 'All'")
 
                 except Exception as e:
-                    log(f"DEBUG: Few-rows check failed: {e}")
+                    log(f"DEBUG: Few-rows check failed: {type(e).__name__}: {str(e).splitlines()[0] if str(e) else ''}")
 
                 # Step 2: Get correct scroller for virtualized list
                 await _get_scroller_handle()
