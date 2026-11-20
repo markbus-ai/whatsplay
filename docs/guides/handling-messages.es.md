@@ -98,7 +98,7 @@ if __name__ == "__main__":
 
 ### Tipo de mensaje
 
-`collect_messages()` completa `message.kind` con el modelo de mensajes de WhatsApp: `"chat"` para texto, `"image"`, `"video"`, `"sticker"`, `"ptt"` (nota de voz), `"audio"`, `"document"`, etc. Una foto sin epígrafe tiene `text` vacío; su `kind` es lo que la distingue de un sticker. `kind` es `None` si no se pudo leer el modelo.
+`collect_messages()` completa `message.kind` con el modelo de mensajes de WhatsApp: `"chat"` para texto, `"image"`, `"video"`, `"sticker"`, `"ptt"` (nota de voz), `"audio"`, `"document"`, etc. En un chat directo, una foto sin epígrafe tiene `text` vacío y su `kind` es lo que la distingue de un sticker. En un grupo, `text` sigue saliendo de la página, así que una foto con epígrafe también puede leerse vacía: ahí un `text` vacío con `kind == "image"` no significa que la foto no tenga epígrafe. `kind` es `None` si no se pudo leer el modelo.
 
 ### Dirección del mensaje
 

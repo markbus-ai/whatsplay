@@ -292,8 +292,8 @@ class ChatManager:
                             await tab.click()  # a pressed toggle would un-press
                             log("DEBUG: Few chats visible, clicked 'All'")
 
-                except Exception:
-                    log("DEBUG: Could not count initial rows")
+                except Exception as e:
+                    log(f"DEBUG: Few-rows check failed: {e}")
 
                 # Step 2: Get correct scroller for virtualized list
                 await _get_scroller_handle()

@@ -137,3 +137,30 @@ async def test_chip_without_title_span_but_with_a_count_is_found():
             + '<button aria-pressed="false" data-k="unread" onclick="press(this)">'
               '<span>No leídos</span><span>2</span></button>')
     assert await _filter(html, "unread") == (True, ["unread"])
+
+
+FULL_ID_STUB = """<script>
+const byId = {'false_1@g.us_TXT1_549@c.us': {id: {id: 'TXT1'}, type: 'chat', body: 'mi pregunta'}};
+window.require = (name) => ({Msg: {get: (id) => byId[id],
+  getModelsArray: () => [{id: {id: 'TXT1'}, type: 'chat', body: 'mi pregunta'}]}});
+</script>"""
+
+
+@pytest.mark.asyncio
+async def test_single_lookup_still_finds_a_group_message_by_its_full_id():
+    """As in 2.6.x: Msg.get(full id) resolves a group message; only the bare-id
+    fallback is skipped for groups."""
+    async_api = pytest.importorskip("playwright.async_api")
+    async with async_api.async_playwright() as p:
+        browser = await _browser(p)
+        page = await browser.new_page()
+        await page.set_content(FULL_ID_STUB)
+        by_full_id = await _model_text(page, "false_1@g.us_TXT1_549@c.us")
+        other = await _model_text(page, "false_1@g.us_TXT1_999@c.us")
+        await browser.close()
+    assert by_full_id == "mi pregunta"
+    assert other is None
+
+
+def test_own_group_message_without_participant_is_a_group_bubble():
+    assert _model_text_key("true_120363@g.us_3EB0ABC") is None
