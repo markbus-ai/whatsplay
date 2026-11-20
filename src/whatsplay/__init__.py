@@ -26,7 +26,7 @@ from whatsplay.object.message import (
 )
 from whatsplay.codec_detector import detect_codec, get_codec_name
 
-__version__ = "2.6.12"
+__version__ = "2.6.13"
 
 __all__ = [
     "Client",
