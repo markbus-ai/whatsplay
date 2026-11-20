@@ -168,10 +168,27 @@ _TEXT_OF_JS = """(m) => {
 }"""
 
 
+def _bare_msg_id(data_id: str) -> str:
+    """Message part of a bubble's data-id, the key of WhatsApp's message model.
+
+    "<fromMe>_<chat>_<id>" in a direct chat, "<fromMe>_<group>_<id>_<participant>"
+    in a group: the id is the third segment, never the participant at the end.
+    """
+    parts = data_id.split("_")
+    return parts[2] if len(parts) >= 3 else parts[-1]
+
+
+#: JS twin of _bare_msg_id.
+_BARE_ID_JS = """(id) => {
+    const parts = id.split('_');
+    return parts.length >= 3 ? parts[2] : parts[parts.length - 1];
+}"""
+
+
 _MODEL_TEXT_JS = """(msgId) => {
     try {
         const C = window.require('WAWebCollections');
-        const bare = msgId.split('_').pop();
+        const bare = (""" + _BARE_ID_JS + """)(msgId);
         const m = C.Msg.get(msgId)
             || C.Msg.getModelsArray().find(x => x.id && x.id.id === bare);
         if (!m) return null;
@@ -186,12 +203,13 @@ _MODEL_TEXT_JS = """(msgId) => {
 _MODEL_BUBBLES_JS = """() => {
     try {
         const textOf = """ + _TEXT_OF_JS + """;
+        const bareOf = """ + _BARE_ID_JS + """;
         const C = window.require('WAWebCollections');
         const ids = new Set();
         for (const el of document.querySelectorAll('div[data-testid^="conv-msg-"]')) {
             const inner = el.querySelector('[data-id]');
             const id = el.getAttribute('data-id') || (inner && inner.getAttribute('data-id'));
-            if (id) ids.add(id.split('_').pop());
+            if (id) ids.add(bareOf(id));
         }
         const out = {texts: {}, kinds: {}};
         if (!ids.size) return out;
@@ -230,13 +248,6 @@ async def _model_bubbles(page: Page) -> Optional[Tuple[Dict[str, str], Dict[str,
         {k: v.strip() for k, v in texts.items() if isinstance(v, str)},
         {k: v for k, v in kinds.items() if isinstance(v, str) and v},
     )
-
-
-async def _model_texts(page: Page) -> Optional[Dict[str, str]]:
-    """Texts of every rendered bubble, keyed by the bare message id, in one
-    page round trip. None when WhatsApp's modules are not reachable."""
-    bubbles = await _model_bubbles(page)
-    return bubbles[0] if bubbles is not None else None
 
 
 async def _model_text(page: Page, msg_id: str) -> Optional[str]:
@@ -685,7 +696,7 @@ class Message:
                         texto = raw_inner.strip()
             if model_texts is not None:
                 # Batch read by collect_messages: no page round trip per bubble.
-                model_text = model_texts.get(msg_id.split("_")[-1]) if msg_id else None
+                model_text = model_texts.get(_bare_msg_id(msg_id)) if msg_id else None
             else:
                 model_text = await _model_text(page, msg_id)
             if model_text is not None:

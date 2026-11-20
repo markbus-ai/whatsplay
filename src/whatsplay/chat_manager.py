@@ -30,6 +30,7 @@ from .object.message import (
     FileMessage,
     Message,
     VoiceMessage,
+    _bare_msg_id,
     _flag_direction_fallback,
     _model_bubbles,
     _safe_dispose,
@@ -282,8 +283,10 @@ class ChatManager:
                     log(f"DEBUG: Initially visible rows: {total_rows_now}")
 
                     if total_rows_now <= MIN_VISIBLE_CHATS_THRESHOLD:
-                        await self._page.locator(loc.ALL_CHATS_BUTTON).click()
-                        log("DEBUG: Few chats visible, clicking 'All' button")
+                        tab = self._page.locator(loc.ALL_CHATS_BUTTON).first
+                        if await tab.count() and not await filter_is_selected(tab):
+                            await tab.click()  # a pressed toggle would un-press
+                        log("DEBUG: Few chats visible, made sure 'All' is selected")
 
                 except Exception:
                     log("DEBUG: Could not count initial rows")
@@ -700,7 +703,7 @@ class ChatManager:
         """Set each message's kind from WhatsApp's message model (by bare id)."""
         for msg in messages:
             msg_id = getattr(msg, "msg_id", "") or ""
-            msg.kind = model_kinds.get(msg_id.split("_")[-1]) if msg_id else None
+            msg.kind = model_kinds.get(_bare_msg_id(msg_id)) if msg_id else None
 
     @staticmethod
     def _apply_group_tail_inheritance(

@@ -108,7 +108,7 @@ BUBBLES = """
 @pytest.mark.asyncio
 async def test_one_lookup_returns_the_texts_of_every_rendered_bubble():
     async_api = pytest.importorskip("playwright.async_api")
-    from whatsplay.object.message import _model_texts
+    from whatsplay.object.message import _model_bubbles
     async with async_api.async_playwright() as p:
         try:
             browser = await p.chromium.launch(executable_path=os.environ.get("CHROMIUM_PATH") or None)
@@ -116,10 +116,10 @@ async def test_one_lookup_returns_the_texts_of_every_rendered_bubble():
             pytest.skip(f"chromium unavailable: {e}")
         page = await browser.new_page()
         await page.set_content(STUB + BUBBLES)
-        texts = await _model_texts(page)
+        texts, _ = await _model_bubbles(page)
         bare = await browser.new_page()  # a fresh window has no window.require
         await bare.set_content(BUBBLES)
-        without_modules = await _model_texts(bare)
+        without_modules = await _model_bubbles(bare)
         await browser.close()
     # IMG2 is a loaded model but not rendered: not returned
     assert texts == {"IMG1": "quería saber si la bici ya está para retirar ?",

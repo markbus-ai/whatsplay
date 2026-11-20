@@ -792,8 +792,8 @@ class WhatsAppElements:
         """Hace click en los filtros de chat (Todos, Grupos, No leídos)"""
         labels = {
             "all": ("All", "Todos"),
-            "groups": ("Grupos",),
-            "unread": ("No leídos",),
+            "groups": ("Groups", "Grupos"),
+            "unread": ("Unread", "No leídos"),
         }
         label_options = labels.get(filter_type)
         if not label_options:
@@ -860,11 +860,15 @@ class WhatsAppElements:
             if not xpath:
                 return False
             el = await self.wait_for_selector(xpath, timeout=3000)
-            if el:
-                await el.click()
-                await asyncio.sleep(0.3)
+            if not el:
+                return False
+            try:
+                if not await filter_is_selected(el):  # a pressed toggle would un-press
+                    await el.click()
+                    await asyncio.sleep(0.3)
                 return True
-            return False
+            finally:
+                await _safe_dispose(el)
 
         return (
             await _click_tab()
