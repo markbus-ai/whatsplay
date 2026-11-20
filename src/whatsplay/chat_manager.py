@@ -284,9 +284,13 @@ class ChatManager:
 
                     if total_rows_now <= MIN_VISIBLE_CHATS_THRESHOLD:
                         tab = self._page.locator(loc.ALL_CHATS_BUTTON).first
-                        if await tab.count() and not await filter_is_selected(tab):
+                        if not await tab.count():
+                            log("DEBUG: Few chats visible, 'All' filter not found")
+                        elif await filter_is_selected(tab):
+                            log("DEBUG: Few chats visible, 'All' already selected")
+                        else:
                             await tab.click()  # a pressed toggle would un-press
-                        log("DEBUG: Few chats visible, made sure 'All' is selected")
+                            log("DEBUG: Few chats visible, clicked 'All'")
 
                 except Exception:
                     log("DEBUG: Could not count initial rows")

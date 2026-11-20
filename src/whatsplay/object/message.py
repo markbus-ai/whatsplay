@@ -178,6 +178,17 @@ def _bare_msg_id(data_id: str) -> str:
     return parts[2] if len(parts) >= 3 else parts[-1]
 
 
+def _model_text_key(data_id: str) -> Optional[str]:
+    """Model key to read a bubble's text from, or None to keep the DOM text.
+
+    Group bubbles ("<fromMe>_<group>_<id>_<participant>") keep the DOM text,
+    as before 2.7.0: in a group the model body may hold mentions as raw
+    numbers, and that has not been checked on a live chat. Their kind is still
+    read from the model.
+    """
+    return None if len(data_id.split("_")) >= 4 else _bare_msg_id(data_id)
+
+
 #: JS twin of _bare_msg_id.
 _BARE_ID_JS = """(id) => {
     const parts = id.split('_');
@@ -188,6 +199,7 @@ _BARE_ID_JS = """(id) => {
 _MODEL_TEXT_JS = """(msgId) => {
     try {
         const C = window.require('WAWebCollections');
+        if (msgId.split('_').length >= 4) return null;  // group: keep the DOM text
         const bare = (""" + _BARE_ID_JS + """)(msgId);
         const m = C.Msg.get(msgId)
             || C.Msg.getModelsArray().find(x => x.id && x.id.id === bare);
@@ -696,7 +708,7 @@ class Message:
                         texto = raw_inner.strip()
             if model_texts is not None:
                 # Batch read by collect_messages: no page round trip per bubble.
-                model_text = model_texts.get(_bare_msg_id(msg_id)) if msg_id else None
+                model_text = model_texts.get(_model_text_key(msg_id) or "") if msg_id else None
             else:
                 model_text = await _model_text(page, msg_id)
             if model_text is not None:

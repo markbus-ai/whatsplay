@@ -6,7 +6,7 @@ import os
 import pytest
 
 from whatsplay.chat_manager import ChatManager
-from whatsplay.object.message import Message, _bare_msg_id, _model_bubbles, _model_text
+from whatsplay.object.message import Message, _bare_msg_id, _model_bubbles, _model_text, _model_text_key
 from whatsplay.wa_elements import WhatsAppElements
 
 GROUP_ID = "false_120363000000000000@g.us_IMG2_5491122334455@c.us"
@@ -56,8 +56,9 @@ async def test_group_bubbles_are_found_in_the_model():
         texts, kinds = await _model_bubbles(page)
         single = await _model_text(page, "false_120363@g.us_TXT1_5491122334455@c.us")
         await browser.close()
-    assert (texts, kinds) == ({"IMG2": "la de la foto"}, {"IMG2": "image"})
-    assert single == "Bicicleta rodado 29 aluminio"
+    assert kinds == {"IMG2": "image"}  # the kind of a group message is read
+    assert texts == {"IMG2": "la de la foto"}
+    assert single is None  # but a group bubble keeps its DOM text (mentions)
 
 
 def _chip(key, title, pressed="false", extra="", attrs=""):
@@ -118,3 +119,21 @@ async def test_english_dropdown_item_is_selected():
             '<div id="m" role="menu" hidden><button role="menuitem" data-k="all" '
             'onclick="press(this); this.parentNode.hidden=true">All</button></div>')
     assert await _filter(html, "all") == (True, ["all"])
+
+
+@pytest.mark.parametrize("data_id, key", [
+    ("false_1@lid_TXT1", "TXT1"),
+    ("true_5491122334455@c.us_3EB0ABCD", "3EB0ABCD"),
+    (GROUP_ID, None),
+])
+def test_group_bubbles_keep_their_dom_text(data_id, key):
+    """In a group the model body may show a mention as a raw number."""
+    assert _model_text_key(data_id) == key
+
+
+@pytest.mark.asyncio
+async def test_chip_without_title_span_but_with_a_count_is_found():
+    html = (_chip("all", "Todos", "true", attrs='id="all-filter"')
+            + '<button aria-pressed="false" data-k="unread" onclick="press(this)">'
+              '<span>No leídos</span><span>2</span></button>')
+    assert await _filter(html, "unread") == (True, ["unread"])
