@@ -814,17 +814,29 @@ class WhatsAppElements:
             return False
 
         async def _click_toggle() -> bool:
-            # Toggle-button markup: <button id="all-filter" aria-pressed="...">.
-            selectors = [f"button[aria-pressed]:has-text('{label}')" for label in label_options]
+            # Toggle markup (prod 2026-11-20): <button id="all-filter"
+            # aria-pressed>, <button aria-pressed><span title="No leídos">…</span>2
+            # </button>. Never a :has-text substring: the "Llamadas" rail button
+            # is also aria-pressed and its icon title "ic-call" contains "all".
+            # Each candidate is its own locator, because a comma-joined list
+            # returns matches in DOM order and the rail comes first.
+            toggles = self.page.locator("button[aria-pressed]")
+            titles = ", ".join(f"span[title='{label}']" for label in label_options)
+            exact = re.compile(
+                r"^\s*(?:" + "|".join(re.escape(label) for label in label_options) + r")\s*\d*\s*$",
+                re.IGNORECASE,
+            )
+            candidates = [toggles.filter(has=self.page.locator(titles)), toggles.filter(has_text=exact)]
             if filter_type == "all":
-                selectors.insert(0, "button#all-filter")
-            button = self.page.locator(", ".join(selectors))
-            if await button.count() == 0 or not await button.first.is_visible():
-                return False
-            if not await filter_is_selected(button.first):
-                await button.first.click()
-                await asyncio.sleep(0.3)
-            return True
+                candidates.insert(0, self.page.locator("button#all-filter"))
+            for button in candidates:
+                if await button.count() == 0 or not await button.first.is_visible():
+                    continue
+                if not await filter_is_selected(button.first):
+                    await button.first.click()
+                    await asyncio.sleep(0.3)
+                return True
+            return False
 
         async def _click_dropdown() -> bool:
             more = self.page.locator("button#additional-filters")

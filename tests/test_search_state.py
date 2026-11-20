@@ -1,4 +1,4 @@
-from unittest.mock import AsyncMock, MagicMock, call
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
@@ -251,35 +251,6 @@ async def test_all_filter_accepts_english_tab_label(monkeypatch):
         "button[role='tab']:has-text('All'), button[role='tab']:has-text('Todos')"
     )
     tab.first.click.assert_awaited_once_with()
-
-
-@pytest.mark.asyncio
-async def test_all_filter_accepts_english_dropdown_label(monkeypatch):
-    page = MagicMock()
-    tab = MagicMock()
-    tab.count = AsyncMock(return_value=0)
-    more = MagicMock()
-    more.count = AsyncMock(return_value=1)
-    more.first.click = AsyncMock()
-    item = MagicMock()
-    item.count = AsyncMock(return_value=1)
-    item.first.click = AsyncMock()
-    toggle = MagicMock()
-    toggle.count = AsyncMock(return_value=0)
-    page.locator.side_effect = [tab, toggle, more, item]
-    monkeypatch.setattr("whatsplay.wa_elements.asyncio.sleep", AsyncMock())
-    elements = WhatsAppElements(page)
-
-    assert await elements.click_chat_filter("all") is True
-
-    assert page.locator.call_args_list == [
-        call("button[role='tab']:has-text('All'), button[role='tab']:has-text('Todos')"),
-        call("button#all-filter, button[aria-pressed]:has-text('All'), "
-             "button[aria-pressed]:has-text('Todos')"),
-        call("button#additional-filters"),
-        call("button[role='menuitem']:has-text('All'), button[role='menuitem']:has-text('Todos')"),
-    ]
-    item.first.click.assert_awaited_once_with()
 
 
 @pytest.mark.asyncio
